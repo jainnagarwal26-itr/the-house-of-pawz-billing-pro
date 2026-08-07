@@ -80,7 +80,7 @@
   border-color: rgba(63, 63, 70, 1);
 }
 
-/* Print Styles for Invoices & PDF Export */
+/* Print & PDF Export Styles for Invoices */
 @media print {
   @page {
     size: A4 portrait;
@@ -99,43 +99,20 @@
     print-color-adjust: exact !important;
   }
 
-  /* Hide app navigation, background cards, headers, overlays */
-  .no-print, nav, header, footer, aside {
-    display: none !important;
+  /* Hide everything on the page during print */
+  body * {
+    visibility: hidden !important;
   }
 
-  /* Reset outer fixed modal backdrop for print */
-  .invoice-print-modal-backdrop {
-    position: static !important;
-    background: #ffffff !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    width: 100% !important;
-    height: auto !important;
-    overflow: visible !important;
-    display: block !important;
-    box-shadow: none !important;
-    border: none !important;
-    inset: auto !important;
-  }
-
-  /* Reset modal content box for print */
-  .invoice-print-modal-content {
-    position: static !important;
-    max-width: 100% !important;
-    width: 100% !important;
-    height: auto !important;
-    max-height: none !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-    border: none !important;
-    background: #ffffff !important;
-    overflow: visible !important;
+  /* Expose ONLY the printable invoice container */
+  .print-container, .print-container * {
+    visibility: visible !important;
   }
 
   .print-container {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
     width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
@@ -145,7 +122,12 @@
     overflow: visible !important;
   }
 
-  /* Prevent page break inside invoice sections */
+  .no-print {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* Prevent page breaks inside invoice elements */
   .print-container table,
   .print-container .invoice-header,
   .print-container .invoice-footer {

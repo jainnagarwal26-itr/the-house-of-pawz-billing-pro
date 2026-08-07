@@ -41,6 +41,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
 
   // Preview Modal
   const [selectedInvoiceForPreview, setSelectedInvoiceForPreview] = useState<Invoice | null>(null);
+  const [isAutoDownloadPDF, setIsAutoDownloadPDF] = useState(false);
 
   // Admin Approval Request State
   const [approvalRequest, setApprovalRequest] = useState<{
@@ -268,7 +269,10 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
 
                       {/* Download PDF */}
                       <button
-                        onClick={() => setSelectedInvoiceForPreview(inv)}
+                        onClick={() => {
+                          setSelectedInvoiceForPreview(inv);
+                          setIsAutoDownloadPDF(true);
+                        }}
                         className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/60 rounded-lg transition-colors"
                         title="Download Tax Invoice as PDF"
                       >
@@ -343,7 +347,11 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
           invoice={selectedInvoiceForPreview}
           settings={settings}
           userRole={userRole}
-          onClose={() => setSelectedInvoiceForPreview(null)}
+          autoDownloadPDF={isAutoDownloadPDF}
+          onClose={() => {
+            setSelectedInvoiceForPreview(null);
+            setIsAutoDownloadPDF(false);
+          }}
           onShareWhatsApp={() => handleTriggerAction('SHARE', selectedInvoiceForPreview)}
         />
       )}

@@ -8,6 +8,7 @@ interface InvoicePrintPreviewProps {
   userRole: UserRole;
   onClose: () => void;
   onShareWhatsApp?: () => void;
+  autoDownloadPDF?: boolean;
 }
 
 export const InvoicePrintPreview: React.FC<InvoicePrintPreviewProps> = ({
@@ -15,7 +16,8 @@ export const InvoicePrintPreview: React.FC<InvoicePrintPreviewProps> = ({
   settings,
   userRole,
   onClose,
-  onShareWhatsApp
+  onShareWhatsApp,
+  autoDownloadPDF
 }) => {
   const isAdmin = userRole === 'ADMIN';
 
@@ -33,6 +35,15 @@ export const InvoicePrintPreview: React.FC<InvoicePrintPreviewProps> = ({
       document.title = origTitle;
     }, 1000);
   };
+
+  React.useEffect(() => {
+    if (autoDownloadPDF) {
+      const timer = setTimeout(() => {
+        handleDownloadPDF();
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [autoDownloadPDF]);
 
   return (
     <div className="invoice-print-modal-backdrop fixed inset-0 bg-black/80 backdrop-blur-xs flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
