@@ -1,0 +1,6 @@
+{
+  "name": "The House of Pawz – Billing Pro",
+  "description": "Desktop-grade GST billing, pet boarding management, invoice generation, and Excel database software for pet care centers.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

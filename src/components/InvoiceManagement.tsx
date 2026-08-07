@@ -1,0 +1,343 @@
+import React, { useState } from 'react';
+import { 
+  Receipt, Search, PlusCircle, Printer, Share2, 
+  Trash2, XCircle, Eye, Lock, Filter, ShieldAlert, FileSpreadsheet, KeyRound
+} from 'lucide-react';
+import { Invoice, Customer, Pet, CompanySettings, UserRole, formatINR, PaymentStatus } from '../types';
+import { InvoicePrintPreview } from './InvoicePrintPreview';
+import { AdminApprovalModal } from './AdminApprovalModal';
+
+interface InvoiceManagementProps {
+  invoices: Invoice[];
+  customers: Customer[];
+  pets: Pet[];
+  settings: CompanySettings;
+  userRole: UserRole;
+  userName: string;
+  onOpenCreateModal: () => void;
+  onOpenEditModal: (invoice: Invoice) => void;
+  onCancelInvoice: (invoiceId: string) => void;
+  onDeleteInvoice?: (invoiceId: string) => void;
+  onExportExcel: () => void;
+}
+
+export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
+  invoices,
+  customers,
+  pets,
+  settings,
+  userRole,
+  userName,
+  onOpenCreateModal,
+  onOpenEditModal,
+  onCancelInvoice,
+  onDeleteInvoice,
+  onExportExcel
+}) => {
+  const isAdmin = userRole === 'ADMIN' || userRole === 'SUPER_ADMIN';
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | PaymentStatus>('ALL');
+
+  // Preview Modal
+  const [selectedInvoiceForPreview, setSelectedInvoiceForPreview] = useState<Invoice | null>(null);
+
+  // Admin Approval Request State
+  const [approvalRequest, setApprovalRequest] = useState<{
+    type: 'EDIT' | 'CANCEL' | 'SHARE';
+    invoice: Invoice;
+  } | null>(null);
+
+  const handleTriggerAction = (type: 'EDIT' | 'CANCEL' | 'SHARE', inv: Invoice) => {
+    if (isAdmin) {
+      if (type === 'EDIT') onOpenEditModal(inv);
+      if (type === 'CANCEL') {
+        if (window.confirm(`Are you sure you want to cancel Invoice ${inv.invoiceNumber}?`)) {
+          onCancelInvoice(inv.id);
+        }
+      }
+      if (type === 'SHARE') {
+        const message = encodeURIComponent(
+          `Hello ${inv.customerName},\nHere is your Tax Invoice ${inv.invoiceNumber} from The House of Pawz.\nGrand Total: ₹${inv.grandTotal.toFixed(2)}\nPaid: ₹${inv.paidAmount.toFixed(2)}\nBalance: ₹${inv.balanceDue.toFixed(2)}\nThank you for trusting us with ${inv.petName || 'your pet'}!`
+        );
+        window.open(`https://wa.me/91${inv.customerPhone.replace(/[^0-9]/g, '')}?text=${message}`, '_blank');
+      }
+    } else {
+      // Non-admin billing staff -> trigger Admin PIN Approval Modal
+      setApprovalRequest({ type, invoice: inv });
+    }
+  };
+
+  const handleAdminApproved = (adminNotes: string) => {
+    if (!approvalRequest) return;
+    const { type, invoice } = approvalRequest;
+    setApprovalRequest(null);
+
+    if (type === 'EDIT') {
+      onOpenEditModal(invoice);
+    } else if (type === 'CANCEL') {
+      onCancelInvoice(invoice.id);
+    } else if (type === 'SHARE') {
+      const message = encodeURIComponent(
+        `Hello ${invoice.customerName},\nHere is your Tax Invoice ${invoice.invoiceNumber} from The House of Pawz.\nGrand Total: ₹${invoice.grandTotal.toFixed(2)}\nPaid: ₹${invoice.paidAmount.toFixed(2)}\nBalance: ₹${invoice.balanceDue.toFixed(2)}\nThank you for trusting us with ${invoice.petName || 'your pet'}!`
+      );
+      window.open(`https://wa.me/91${invoice.customerPhone.replace(/[^0-9]/g, '')}?text=${message}`, '_blank');
+    }
+  };
+
+  // Filtered list
+  const filteredInvoices = invoices.filter(inv => {
+    const matchesSearch = 
+      inv.invoiceNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      inv.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      inv.customerPhone.includes(searchQuery) ||
+      (inv.petName && inv.petName.toLowerCase().includes(searchQuery.toLowerCase()));
+
+    const matchesStatus = statusFilter === 'ALL' || inv.paymentStatus === statusFilter;
+
+    return matchesSearch && matchesStatus;
+  });
+
+  return (
+    <div className="p-3 sm:p-6 space-y-4 sm:space-y-6 max-w-7xl mx-auto">
+      {/* Top Banner & Title */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+            <Receipt className="w-5 h-5 text-[#D62828]" />
+            GST Tax Invoice Management
+          </h2>
+          <p className="text-xs text-slate-500 dark:text-zinc-400">
+            Series: <strong>HOP/26-27/</strong> • Indian GST 18% Compliant • Real-time Payment Status
+          </p>
+        </div>
+
+        <div className="flex items-center space-x-2">
+          {isAdmin && (
+            <button
+              onClick={onExportExcel}
+              className="px-3.5 py-2 bg-emerald-900/80 hover:bg-emerald-800 text-emerald-200 font-semibold rounded-xl text-xs flex items-center space-x-1.5 border border-emerald-700 shadow-sm transition-colors"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+              <span>Export Invoices Excel</span>
+            </button>
+          )}
+
+          <button
+            onClick={onOpenCreateModal}
+            className="px-4 py-2 bg-[#D62828] hover:bg-red-700 text-white font-extrabold rounded-xl text-xs flex items-center space-x-1.5 shadow-md shadow-red-900/40 transition-transform active:scale-95"
+          >
+            <PlusCircle className="w-4 h-4" />
+            <span>+ Create GST Invoice</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Search & Filter Controls */}
+      <div className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="relative flex-1 max-w-md">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+          <input
+            type="text"
+            placeholder="Search Invoice No, Client Name, Phone or Pet..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 text-xs font-medium focus:ring-2 focus:ring-[#D62828]"
+          />
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <Filter className="w-4 h-4 text-slate-400 shrink-0" />
+          <span className="text-xs text-slate-500 font-semibold">Status:</span>
+          <div className="flex items-center space-x-1 bg-slate-100 dark:bg-zinc-800 p-1 rounded-xl">
+            {(['ALL', 'PAID', 'PARTIAL', 'UNPAID', 'CANCELLED'] as const).map(st => (
+              <button
+                key={st}
+                onClick={() => setStatusFilter(st)}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors ${
+                  statusFilter === st
+                    ? 'bg-[#D62828] text-white shadow-xs'
+                    : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                {st}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Invoices Table */}
+      <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-xs overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-100 dark:bg-zinc-800/80 text-slate-700 dark:text-zinc-300 text-[10px] uppercase tracking-wider font-extrabold border-b border-slate-200 dark:border-zinc-800">
+                <th className="p-3">Invoice Details</th>
+                <th className="p-3">Customer & Pet</th>
+                <th className="p-3 text-right">Taxable (₹)</th>
+                <th className="p-3 text-right">GST (18%)</th>
+                <th className="p-3 text-right">Grand Total</th>
+                <th className="p-3 text-right">Balance Due</th>
+                <th className="p-3 text-center">Payment Status</th>
+                <th className="p-3 text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-zinc-800/80 text-xs">
+              {filteredInvoices.map(inv => (
+                <tr 
+                  key={inv.id}
+                  className={`hover:bg-slate-50/80 dark:hover:bg-zinc-800/40 transition-colors ${
+                    inv.isCancelled ? 'opacity-50 bg-red-50/20 dark:bg-red-950/10' : ''
+                  }`}
+                >
+                  {/* Invoice Number & Date */}
+                  <td className="p-3">
+                    <span className="font-mono font-bold text-slate-900 dark:text-white block">
+                      {inv.invoiceNumber}
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      Date: {inv.invoiceDate}
+                    </span>
+                    <span className="block text-[9px] text-slate-500 italic mt-0.5">
+                      By: {inv.createdByName}
+                    </span>
+                  </td>
+
+                  {/* Customer & Pet */}
+                  <td className="p-3">
+                    <span className="font-bold text-slate-800 dark:text-zinc-200 block">
+                      {inv.customerName}
+                    </span>
+                    <span className="text-[10px] text-slate-500 block">
+                      📞 {inv.customerPhone}
+                    </span>
+                    {inv.petName && (
+                      <span className="inline-block mt-1 text-[10px] font-semibold text-[#D62828] bg-red-50 dark:bg-red-950/60 px-1.5 py-0.2 rounded">
+                        🐾 {inv.petName}
+                      </span>
+                    )}
+                  </td>
+
+                  {/* Taxable Value */}
+                  <td className="p-3 text-right font-mono text-slate-700 dark:text-zinc-300">
+                    ₹{inv.taxableAmount.toFixed(2)}
+                  </td>
+
+                  {/* GST */}
+                  <td className="p-3 text-right font-mono text-slate-500">
+                    ₹{inv.totalGst.toFixed(2)}
+                  </td>
+
+                  {/* Grand Total */}
+                  <td className="p-3 text-right font-mono font-extrabold text-slate-900 dark:text-white text-sm">
+                    {formatINR(inv.grandTotal)}
+                  </td>
+
+                  {/* Balance Due */}
+                  <td className="p-3 text-right font-mono font-bold text-red-600 dark:text-red-400">
+                    {inv.balanceDue > 0 ? formatINR(inv.balanceDue) : '₹ 0.00'}
+                  </td>
+
+                  {/* Status Badge */}
+                  <td className="p-3 text-center">
+                    <span className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-extrabold font-mono ${
+                      inv.paymentStatus === 'PAID'
+                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                        : inv.paymentStatus === 'PARTIAL'
+                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                        : inv.paymentStatus === 'CANCELLED'
+                        ? 'bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 line-through'
+                        : 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300'
+                    }`}>
+                      {inv.paymentStatus}
+                    </span>
+                  </td>
+
+                  {/* Actions */}
+                  <td className="p-3 text-center">
+                    <div className="flex items-center justify-center space-x-1">
+                      {/* Print / View */}
+                      <button
+                        onClick={() => setSelectedInvoiceForPreview(inv)}
+                        className="p-1.5 text-slate-600 dark:text-zinc-300 hover:text-[#D62828] hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
+                        title="Print / View Tax Invoice"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+
+                      {/* WhatsApp Share */}
+                      <button
+                        onClick={() => handleTriggerAction('SHARE', inv)}
+                        className="p-1.5 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/60 rounded-lg transition-colors"
+                        title={isAdmin ? 'Share via WhatsApp' : 'Requires Admin PIN Approval for Staff'}
+                      >
+                        <Share2 className="w-4 h-4" />
+                      </button>
+
+                      {/* Edit Invoice */}
+                      <button
+                        onClick={() => handleTriggerAction('EDIT', inv)}
+                        className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/60 rounded-lg transition-colors"
+                        title={isAdmin ? 'Edit Invoice' : 'Requires Admin PIN Approval for Staff'}
+                      >
+                        <Receipt className="w-4 h-4" />
+                      </button>
+
+                      {/* Cancel Invoice */}
+                      {!inv.isCancelled && (
+                        <button
+                          onClick={() => handleTriggerAction('CANCEL', inv)}
+                          className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/60 rounded-lg transition-colors"
+                          title={isAdmin ? 'Cancel Invoice' : 'Requires Admin PIN Approval for Staff'}
+                        >
+                          <XCircle className="w-4 h-4" />
+                        </button>
+                      )}
+
+                      {/* Delete Invoice */}
+                      {onDeleteInvoice && (
+                        <button
+                          onClick={() => {
+                            if (confirm(`Are you sure you want to permanently delete invoice ${inv.invoiceNumber}? This action cannot be undone.`)) {
+                              onDeleteInvoice(inv.id);
+                            }
+                          }}
+                          className="p-1.5 text-zinc-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/60 rounded-lg transition-colors"
+                          title="Permanently Delete Invoice"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Admin Approval Modal for Non-Admin Staff */}
+      {approvalRequest && (
+        <AdminApprovalModal
+          title={`Invoice ${approvalRequest.type === 'EDIT' ? 'Modification' : approvalRequest.type === 'CANCEL' ? 'Cancellation' : 'WhatsApp Sharing'}`}
+          actionDescription={`Action requested by Billing Staff for Invoice ${approvalRequest.invoice.invoiceNumber} (${approvalRequest.invoice.customerName}). Please enter Admin Security PIN to authorize.`}
+          onApprove={handleAdminApproved}
+          onCancel={() => setApprovalRequest(null)}
+        />
+      )}
+
+      {/* Invoice Print Preview Modal */}
+      {selectedInvoiceForPreview && (
+        <InvoicePrintPreview
+          invoice={selectedInvoiceForPreview}
+          settings={settings}
+          userRole={userRole}
+          onClose={() => setSelectedInvoiceForPreview(null)}
+          onShareWhatsApp={() => handleTriggerAction('SHARE', selectedInvoiceForPreview)}
+        />
+      )}
+    </div>
+  );
+};
