@@ -1,5 +1,5 @@
 import React from 'react';
-import { Printer, Share2, X, QrCode, ArrowLeft } from 'lucide-react';
+import { Printer, Share2, X, QrCode, ArrowLeft, Download } from 'lucide-react';
 import { Invoice, CompanySettings, formatINR, UserRole } from '../types';
 
 interface InvoicePrintPreviewProps {
@@ -21,6 +21,17 @@ export const InvoicePrintPreview: React.FC<InvoicePrintPreviewProps> = ({
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleDownloadPDF = () => {
+    const origTitle = document.title;
+    const cleanInv = invoice.invoiceNumber.replace(/[\/\\]/g, '_');
+    const cleanCust = (invoice.customerName || 'Client').replace(/[^a-zA-Z0-9_]/g, '_');
+    document.title = `Tax_Invoice_${cleanInv}_${cleanCust}`;
+    window.print();
+    setTimeout(() => {
+      document.title = origTitle;
+    }, 1000);
   };
 
   return (
@@ -55,6 +66,15 @@ export const InvoicePrintPreview: React.FC<InvoicePrintPreviewProps> = ({
           </div>
 
           <div className="flex items-center justify-end space-x-2">
+            <button
+              onClick={handleDownloadPDF}
+              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg text-xs flex items-center space-x-1.5 transition-colors shrink-0 shadow-xs"
+              title="Download Tax Invoice as PDF file"
+            >
+              <Download className="w-4 h-4" />
+              <span>Download PDF</span>
+            </button>
+
             <button
               onClick={handlePrint}
               className="px-3 py-1.5 bg-[#D62828] hover:bg-red-700 text-white font-semibold rounded-lg text-xs flex items-center space-x-1.5 transition-colors shrink-0"

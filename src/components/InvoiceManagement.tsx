@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   Receipt, Search, PlusCircle, Printer, Share2, 
-  Trash2, XCircle, Eye, Lock, Filter, ShieldAlert, FileSpreadsheet, KeyRound
+  Trash2, XCircle, Eye, Lock, Filter, ShieldAlert, FileSpreadsheet, KeyRound, Download
 } from 'lucide-react';
 import { Invoice, Customer, Pet, CompanySettings, UserRole, formatINR, PaymentStatus } from '../types';
 import { InvoicePrintPreview } from './InvoicePrintPreview';
@@ -264,6 +264,15 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                         title="Print / View Tax Invoice"
                       >
                         <Eye className="w-4 h-4" />
+                      </button>
+
+                      {/* Download PDF */}
+                      <button
+                        onClick={() => setSelectedInvoiceForPreview(inv)}
+                        className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/60 rounded-lg transition-colors"
+                        title="Download Tax Invoice as PDF"
+                      >
+                        <Download className="w-4 h-4" />
                       </button>
 
                       {/* WhatsApp Share */}
