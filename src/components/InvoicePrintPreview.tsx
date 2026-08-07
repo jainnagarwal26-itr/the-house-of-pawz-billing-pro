@@ -35,8 +35,8 @@ export const InvoicePrintPreview: React.FC<InvoicePrintPreviewProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-xs flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
-      <div className="bg-white text-slate-900 rounded-xl sm:rounded-2xl w-full max-w-4xl shadow-2xl overflow-hidden my-auto flex flex-col max-h-[96vh] sm:max-h-[92vh]">
+    <div className="invoice-print-modal-backdrop fixed inset-0 bg-black/80 backdrop-blur-xs flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+      <div className="invoice-print-modal-content bg-white text-slate-900 rounded-xl sm:rounded-2xl w-full max-w-4xl shadow-2xl overflow-hidden my-auto flex flex-col max-h-[96vh] sm:max-h-[92vh]">
         {/* Modal Top Control Header (Hidden when printing) */}
         <div className="no-print bg-slate-900 text-white p-3 sm:p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between border-b border-slate-800 shrink-0 gap-2 sm:gap-4">
           <div className="flex items-center justify-between sm:justify-start space-x-2">

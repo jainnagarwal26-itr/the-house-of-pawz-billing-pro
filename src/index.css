@@ -80,25 +80,77 @@
   border-color: rgba(63, 63, 70, 1);
 }
 
-/* Print Styles for Invoices */
+/* Print Styles for Invoices & PDF Export */
 @media print {
-  body {
+  @page {
+    size: A4 portrait;
+    margin: 10mm 12mm 10mm 12mm;
+  }
+
+  html, body {
     background: #ffffff !important;
     color: #000000 !important;
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
     overflow: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
-  .no-print {
+
+  /* Hide app navigation, background cards, headers, overlays */
+  .no-print, nav, header, footer, aside {
     display: none !important;
   }
-  .print-only {
+
+  /* Reset outer fixed modal backdrop for print */
+  .invoice-print-modal-backdrop {
+    position: static !important;
+    background: #ffffff !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
     display: block !important;
+    box-shadow: none !important;
+    border: none !important;
+    inset: auto !important;
   }
+
+  /* Reset modal content box for print */
+  .invoice-print-modal-content {
+    position: static !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: #ffffff !important;
+    overflow: visible !important;
+  }
+
   .print-container {
     width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
     box-shadow: none !important;
     border: none !important;
+    background: #ffffff !important;
+    overflow: visible !important;
+  }
+
+  /* Prevent page break inside invoice sections */
+  .print-container table,
+  .print-container .invoice-header,
+  .print-container .invoice-footer {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
 }
 
