@@ -3,7 +3,8 @@ import {
   CreditCard, Plus, Search, CheckCircle2, 
   IndianRupee, Printer, FileText, Trash2 
 } from 'lucide-react';
-import { Payment, Invoice, Customer, PaymentMode, formatINR, UserRole } from '../types';
+import { Payment, Invoice, Customer, PaymentMode, formatINR, UserRole, User } from '../types';
+import { hasPermission } from '../lib/permissions';
 
 interface PaymentManagementProps {
   payments: Payment[];
@@ -11,6 +12,7 @@ interface PaymentManagementProps {
   customers: Customer[];
   userRole: UserRole;
   userName: string;
+  currentUser?: User | null;
   onRecordPayment: (payment: Payment) => void;
   onDeletePayment?: (paymentId: string) => void;
 }
@@ -21,6 +23,7 @@ export const PaymentManagement: React.FC<PaymentManagementProps> = ({
   customers,
   userRole,
   userName,
+  currentUser,
   onRecordPayment,
   onDeletePayment
 }) => {
@@ -97,13 +100,15 @@ export const PaymentManagement: React.FC<PaymentManagementProps> = ({
           </p>
         </div>
 
-        <button
-          onClick={openModal}
-          className="px-4 py-2 bg-[#D62828] hover:bg-red-700 text-white font-extrabold rounded-xl text-xs flex items-center space-x-1.5 shadow-md shadow-red-900/40"
-        >
-          <Plus className="w-4 h-4" />
-          <span>+ Record Payment</span>
-        </button>
+        {hasPermission(currentUser, 'payments_record') && (
+          <button
+            onClick={openModal}
+            className="px-4 py-2 bg-[#D62828] hover:bg-red-700 text-white font-extrabold rounded-xl text-xs flex items-center space-x-1.5 shadow-md shadow-red-900/40"
+          >
+            <Plus className="w-4 h-4" />
+            <span>+ Record Payment</span>
+          </button>
+        )}
       </div>
 
       {/* Search */}
@@ -160,7 +165,7 @@ export const PaymentManagement: React.FC<PaymentManagementProps> = ({
                 <td className="p-3 font-mono text-slate-500">{p.paymentDate}</td>
                 <td className="p-3 text-slate-600 dark:text-zinc-400 font-medium">{p.receivedBy}</td>
                 <td className="p-3 text-center">
-                  {onDeletePayment && (
+                  {onDeletePayment && hasPermission(currentUser, 'payments_delete') && (
                     <button
                       onClick={() => {
                         if (confirm(`Are you sure you want to delete payment record ${p.id} for ₹${p.amount}?`)) {

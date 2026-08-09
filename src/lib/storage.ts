@@ -224,6 +224,19 @@ export function saveStoredData<T>(key: string, data: T): void {
   }
 }
 
+export function cleanupObsoleteCache(): void {
+  try {
+    const legacyKeys = [
+      'hop_users', 'hop_customers', 'hop_pets', 'hop_invoices', 
+      'hop_payments', 'hop_recurring', 'hop_settings', 'hop_audit_logs',
+      'hop_active_user', 'hop_session', 'hop_dark_mode'
+    ];
+    legacyKeys.forEach(k => localStorage.removeItem(k));
+  } catch (e) {
+    // Ignore storage quota or security errors
+  }
+}
+
 export function createAuditLog(
   action: AuditLog['action'], 
   details: string, 

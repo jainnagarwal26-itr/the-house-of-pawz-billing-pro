@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { 
   UserCog, ShieldCheck, UserCheck, Lock, KeyRound,
-  CheckCircle2, XCircle, Plus, Shield, RefreshCw, Smartphone, Laptop
+  CheckCircle2, XCircle, Plus, Shield, RefreshCw, Smartphone, Laptop, Settings
 } from 'lucide-react';
 import { User, UserRole } from '../types';
+import { PermissionEditorModal } from './PermissionEditorModal';
+import { hasPermission } from '../lib/permissions';
 
 interface UserManagementProps {
   users: User[];
@@ -20,8 +22,24 @@ export const UserManagement: React.FC<UserManagementProps> = ({
   onAddUser,
   onUpdateUser
 }) => {
+  const canView = hasPermission(activeUser, 'user_management_view');
+
+  if (!canView) {
+    return (
+      <div className="p-8 max-w-4xl mx-auto text-center space-y-4">
+        <div className="w-16 h-16 bg-red-100 dark:bg-red-900/40 text-[#D62828] rounded-2xl flex items-center justify-center mx-auto shadow-sm">
+          <Lock className="w-8 h-8" />
+        </div>
+        <h2 className="text-xl font-bold text-slate-900 dark:text-white">Admin Permission Required</h2>
+        <p className="text-sm text-slate-500 max-w-md mx-auto">
+          User & Access Control Center is restricted to authorized System Administrators.
+        </p>
+      </div>
+    );
+  }
   const [showAddModal, setShowAddModal] = useState(false);
   const [resetModalUser, setResetModalUser] = useState<User | null>(null);
+  const [editingPermissionsUser, setEditingPermissionsUser] = useState<User | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [newPin, setNewPin] = useState('1234');
   const [resetSuccess, setResetSuccess] = useState('');
@@ -72,17 +90,19 @@ export const UserManagement: React.FC<UserManagementProps> = ({
   };
 
   const permissionsMatrix = [
-    { feature: 'Create & Save Invoices', super: true, admin: true, manager: true, reception: true, staff: true },
-    { feature: 'Print Draft & Preview PDF', super: true, admin: true, manager: true, reception: true, staff: true },
-    { feature: 'Edit Saved Invoice (Unrestricted)', super: true, admin: true, manager: false, reception: false, staff: false },
-    { feature: 'Cancel / Delete Invoices', super: true, admin: true, manager: false, reception: false, staff: false },
-    { feature: 'Override Discounts (> 15%)', super: true, admin: true, manager: true, reception: false, staff: false },
-    { feature: 'Pet Check-In & Check-Out', super: true, admin: true, manager: true, reception: true, staff: true },
-    { feature: 'Customer & Pet Master Editing', super: true, admin: true, manager: true, reception: true, staff: false },
-    { feature: 'Export CA GST Reports (GSTR-1)', super: true, admin: true, manager: false, reception: false, staff: false },
-    { feature: 'Full Excel Database Backup & Restore', super: true, admin: true, manager: false, reception: false, staff: false },
-    { feature: 'Company Bank & GST Settings', super: true, admin: true, manager: false, reception: false, staff: false },
-    { feature: 'User Roles & Security PINs', super: true, admin: true, manager: false, reception: false, staff: false },
+    { feature: 'Create & Save GST Invoices', admin: true, user: true, staff: true },
+    { feature: 'Print & Download Invoice PDFs', admin: true, user: true, staff: true },
+    { feature: 'Edit Saved Invoice Data', admin: true, user: true, staff: true },
+    { feature: 'Cancel / Delete Invoices', admin: true, user: false, staff: true },
+    { feature: 'Change Invoice Sequence Numbers', admin: true, user: false, staff: true },
+    { feature: 'Pet Boarding Check-In & Check-Out', admin: true, user: true, staff: true },
+    { feature: 'Customer & Pet Master Management', admin: true, user: true, staff: true },
+    { feature: 'Record & Manage Customer Payments', admin: true, user: true, staff: true },
+    { feature: 'Export CA GST Reports (GSTR-1)', admin: true, user: false, staff: true },
+    { feature: 'Excel Database Backup & Export', admin: true, user: false, staff: true },
+    { feature: 'Audit Logs & System History', admin: true, user: false, staff: true },
+    { feature: 'Company Bank & GST Settings', admin: true, user: false, staff: false },
+    { feature: 'User Accounts & Permission Management', admin: true, user: false, staff: false },
   ];
 
   const getRoleLabel = (r: UserRole) => {
@@ -179,11 +199,20 @@ export const UserManagement: React.FC<UserManagementProps> = ({
 
               <div className="flex items-center space-x-2">
                 <button
+                  onClick={() => setEditingPermissionsUser(u)}
+                  className="px-2.5 py-1 bg-red-50 hover:bg-red-100 dark:bg-red-950/60 text-[#D62828] dark:text-red-300 font-bold rounded-lg text-[11px] flex items-center space-x-1 border border-red-200 dark:border-red-900"
+                  title="Configure action-level permissions for this user"
+                >
+                  <UserCog className="w-3 h-3 text-[#D62828]" />
+                  <span>Edit Permissions</span>
+                </button>
+
+                <button
                   onClick={() => setResetModalUser(u)}
                   className="px-2.5 py-1 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 text-slate-700 dark:text-zinc-200 font-bold rounded-lg text-[11px] flex items-center space-x-1"
                 >
                   <KeyRound className="w-3 h-3 text-slate-500" />
-                  <span>Reset PIN</span>
+                  <span>Reset Password</span>
                 </button>
 
                 <button
@@ -198,21 +227,20 @@ export const UserManagement: React.FC<UserManagementProps> = ({
         ))}
       </div>
 
-      {/* Enterprise Role Authorization Matrix */}
+      {/* Production Role Access Control Matrix */}
       <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-slate-200 dark:border-zinc-800 p-5 shadow-xs overflow-x-auto">
-        <h3 className="font-extrabold text-slate-900 dark:text-white text-sm mb-3">
-          5-Tier Enterprise Authorization Matrix
+        <h3 className="font-extrabold text-slate-900 dark:text-white text-sm mb-3 flex items-center justify-between">
+          <span>Production Role Access Control Matrix</span>
+          <span className="text-xs text-slate-400 font-normal">Standard Role Defaults • Custom overrides editable above</span>
         </h3>
 
         <table className="w-full text-left border-collapse text-xs">
           <thead>
             <tr className="bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 font-bold uppercase text-[10px] border-b border-slate-200 dark:border-zinc-800">
               <th className="p-2.5">Feature / Operation</th>
-              <th className="p-2.5 text-center text-purple-600">Super Admin</th>
-              <th className="p-2.5 text-center text-red-600">Admin (CA)</th>
-              <th className="p-2.5 text-center text-amber-600">Manager</th>
-              <th className="p-2.5 text-center text-emerald-600">Reception</th>
-              <th className="p-2.5 text-center text-blue-600">Billing Staff</th>
+              <th className="p-2.5 text-center text-[#D62828]">ADMIN (Chirag Jain)</th>
+              <th className="p-2.5 text-center text-blue-600">USER (Poonam Bharti)</th>
+              <th className="p-2.5 text-center text-emerald-600">BILLING STAFF (Staff)</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-zinc-800 font-medium">
@@ -220,9 +248,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({
               <tr key={pm.feature} className="hover:bg-slate-50 dark:hover:bg-zinc-800/40">
                 <td className="p-2.5 text-slate-800 dark:text-zinc-200">{pm.feature}</td>
                 <td className="p-2.5 text-center"><CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" /></td>
-                <td className="p-2.5 text-center"><CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" /></td>
-                <td className="p-2.5 text-center">{pm.manager ? <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" /> : <XCircle className="w-4 h-4 text-red-400 mx-auto" />}</td>
-                <td className="p-2.5 text-center">{pm.reception ? <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" /> : <XCircle className="w-4 h-4 text-red-400 mx-auto" />}</td>
+                <td className="p-2.5 text-center">{pm.user ? <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" /> : <XCircle className="w-4 h-4 text-red-400 mx-auto" />}</td>
                 <td className="p-2.5 text-center">{pm.staff ? <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" /> : <XCircle className="w-4 h-4 text-red-400 mx-auto" />}</td>
               </tr>
             ))}
@@ -363,6 +389,22 @@ export const UserManagement: React.FC<UserManagementProps> = ({
             </form>
           </div>
         </div>
+      )}
+
+      {/* Permission Editor Modal */}
+      {editingPermissionsUser && (
+        <PermissionEditorModal
+          targetUser={editingPermissionsUser}
+          adminUser={activeUser}
+          allUsers={users}
+          onSave={updatedUser => {
+            if (onUpdateUser) {
+              onUpdateUser(updatedUser);
+            }
+            setEditingPermissionsUser(null);
+          }}
+          onClose={() => setEditingPermissionsUser(null)}
+        />
       )}
     </div>
   );

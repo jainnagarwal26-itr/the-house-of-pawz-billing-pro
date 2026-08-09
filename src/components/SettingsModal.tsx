@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
 import { Settings, Save, Building, QrCode, CheckCircle2, AlertTriangle, Trash2 } from 'lucide-react';
-import { CompanySettings } from '../types';
+import { CompanySettings, User } from '../types';
+import { hasPermission } from '../lib/permissions';
 
 interface SettingsProps {
   settings: CompanySettings;
+  currentUser?: User | null;
   onUpdateSettings: (settings: CompanySettings) => void;
   onFactoryReset?: () => void;
 }
 
-export const SettingsModal: React.FC<SettingsProps> = ({ settings, onUpdateSettings, onFactoryReset }) => {
+export const SettingsModal: React.FC<SettingsProps> = ({ settings, currentUser, onUpdateSettings, onFactoryReset }) => {
   const [companyName, setCompanyName] = useState(settings.companyName);
   const [tagline, setTagline] = useState(settings.tagline);
   const [address, setAddress] = useState(settings.address);

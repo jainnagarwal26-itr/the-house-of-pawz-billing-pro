@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { Customer, Pet, Invoice, Payment, User, CompanySettings, AuditLog, RecurringSubscription } from '../types';
 import { exportFullDatabaseToExcel } from '../lib/excelHelper';
+import { hasPermission } from '../lib/permissions';
 
 interface ExcelManagerProps {
   customers: Customer[];
@@ -15,6 +16,7 @@ interface ExcelManagerProps {
   settings: CompanySettings;
   auditLogs: AuditLog[];
   recurring: RecurringSubscription[];
+  currentUser?: User | null;
   onRestoreBackup?: (backupData: any) => void;
   onAddAuditLog?: (action: any, details: string) => void;
 }

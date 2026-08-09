@@ -6,7 +6,8 @@ import {
   ChevronLeft, PanelLeftClose, PanelLeftOpen, HelpCircle, Download,
   Menu, X, Sparkles, Shield, Camera, Image as ImageIcon, Zap
 } from 'lucide-react';
-import { UserRole } from '../types';
+import { UserRole, User } from '../types';
+import { hasPermission } from '../lib/permissions';
 
 export type ActiveTab = 
   | 'dashboard' 
@@ -27,6 +28,7 @@ interface SidebarProps {
   activeTab: ActiveTab;
   onSelectTab: (tab: ActiveTab) => void;
   userRole: UserRole;
+  user?: User | null;
   onNewInvoice: () => void;
   pendingPaymentCount: number;
   activeBoardingCount: number;
@@ -35,28 +37,48 @@ interface SidebarProps {
   onOpenMobileDrawer?: () => void;
 }
 
-export function isTabAllowedForRole(tab: ActiveTab, role: UserRole): boolean {
-  if (role === 'ADMIN' || role === 'SUPER_ADMIN') return true;
+export function isTabAllowedForUser(tab: ActiveTab, user?: User | null, userRole?: UserRole): boolean {
+  const role = userRole || user?.role || 'USER';
   
-  if (role === 'USER') {
-    return ['dashboard', 'invoices', 'customers', 'pets', 'payments'].includes(tab);
+  if (user) {
+    const tabPermissionMap: Record<ActiveTab, string> = {
+      dashboard: 'dashboard_view',
+      invoices: 'invoices_view',
+      recurring: 'boarding_view',
+      customers: 'customers_view',
+      pets: 'pets_view',
+      media: 'media_center_view',
+      smart_import: 'import_engine_view',
+      payments: 'payments_view',
+      gst_reports: 'gst_reports_view',
+      excel: 'excel_db_view',
+      users: 'user_management_view',
+      audit: 'audit_logs_view',
+      settings: 'settings_view'
+    };
+    const key = tabPermissionMap[tab];
+    if (key) return hasPermission(user, key);
   }
 
+  if (role === 'ADMIN' || role === 'SUPER_ADMIN') return true;
+  if (role === 'USER' || role === 'BILLING_USER') {
+    return ['dashboard', 'invoices', 'customers', 'pets', 'payments'].includes(tab);
+  }
   if (role === 'BILLING_STAFF') {
     return ['dashboard', 'invoices', 'recurring', 'customers', 'pets', 'media', 'smart_import', 'payments', 'gst_reports', 'excel', 'audit'].includes(tab);
-  }
-
-  if (role === 'BILLING_USER') {
-    return ['dashboard', 'invoices', 'customers', 'pets', 'payments'].includes(tab);
   }
 
   return ['dashboard', 'invoices', 'customers', 'pets'].includes(tab);
 }
 
+// Backwards compatibility alias
+export const isTabAllowedForRole = (tab: ActiveTab, role: UserRole) => isTabAllowedForUser(tab, undefined, role);
+
 export const Sidebar: React.FC<SidebarProps> = ({
   activeTab,
   onSelectTab,
   userRole,
+  user,
   onNewInvoice,
   pendingPaymentCount,
   activeBoardingCount,
@@ -156,7 +178,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   ];
 
-  const navItems = rawNavItems.filter(item => isTabAllowedForRole(item.id, userRole));
+  const navItems = rawNavItems.filter(item => isTabAllowedForUser(item.id, user, userRole));
 
   const handleTabClick = (tab: ActiveTab) => {
     onSelectTab(tab);
@@ -169,6 +191,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <aside className={`no-print hidden md:flex ${collapsed ? 'w-16' : 'w-60'} bg-slate-900 text-slate-300 flex-col justify-between shrink-0 h-full select-none border-r border-slate-800 transition-all duration-300 relative`}>
         {/* Top Action & Navigation */}
         <div className="p-3 space-y-3 overflow-y-auto">
+          {/* Company Brand Logo Header */}
+          <div className="pb-2 border-b border-slate-800/80">
+            {collapsed ? (
+              <div className="flex justify-center" title="The House of Pawz">
+                <div className="w-9 h-9 rounded-xl bg-white p-0.5 border border-slate-700 overflow-hidden shadow-sm flex items-center justify-center">
+                  <img src="/Logo.jpg" alt="Logo" className="w-full h-full object-contain rounded-lg" onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }} />
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center space-x-2.5 px-0.5">
+                <div className="w-9 h-9 rounded-xl bg-white p-0.5 border border-slate-700 overflow-hidden shrink-0 shadow-sm flex items-center justify-center">
+                  <img src="/Logo.jpg" alt="Logo" className="w-full h-full object-contain rounded-lg" onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-xs font-black text-white tracking-tight uppercase truncate">
+                    House of Pawz
+                  </h2>
+                  <p className="text-[9px] text-red-400 font-bold font-mono truncate">
+                    Billing Pro Enterprise
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Toggle Collapse Button Header */}
           <div className={`flex items-center ${collapsed ? 'justify-center' : 'justify-between'} pb-1 border-b border-slate-800/80`}>
             {!collapsed && (
@@ -200,7 +247,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {navItems.map(item => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
-              const isDisabled = item.adminOnly && !isAdmin;
+              const isAllowed = isTabAllowedForUser(item.id, user, userRole);
+              const isDisabled = !isAllowed;
 
               return (
                 <button
@@ -374,7 +422,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {navItems.map(item => {
                   const Icon = item.icon;
                   const isActive = activeTab === item.id;
-                  const isDisabled = item.adminOnly && !isAdmin;
+                  const isAllowed = isTabAllowedForUser(item.id, user, userRole);
+                  const isDisabled = !isAllowed;
 
                   return (
                     <button

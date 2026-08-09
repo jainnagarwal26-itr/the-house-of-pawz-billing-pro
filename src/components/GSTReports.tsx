@@ -6,7 +6,8 @@ import {
   BookOpen, PieChart, RefreshCw, FileText, Printer, CheckSquare,
   Users, AlertTriangle, ShieldAlert
 } from 'lucide-react';
-import { Invoice, CompanySettings, Payment, formatINR, Customer, Pet } from '../types';
+import { Invoice, CompanySettings, Payment, formatINR, Customer, Pet, User } from '../types';
+import { hasPermission } from '../lib/permissions';
 import { exportGSTReportToExcel, exportFullDatabaseToExcel } from '../lib/excelHelper';
 
 interface GSTReportsProps {
@@ -15,6 +16,7 @@ interface GSTReportsProps {
   customers?: Customer[];
   pets?: Pet[];
   settings: CompanySettings;
+  currentUser?: User | null;
   isAdmin?: boolean;
 }
 
@@ -26,6 +28,7 @@ export const GSTReports: React.FC<GSTReportsProps> = ({
   customers = [],
   pets = [],
   settings,
+  currentUser,
   isAdmin = true
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
@@ -34,14 +37,16 @@ export const GSTReports: React.FC<GSTReportsProps> = ({
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [verificationResult, setVerificationResult] = useState<string | null>(null);
 
-  // Non-admin Security Gate
-  if (!isAdmin) {
+  const canView = hasPermission(currentUser, 'gst_reports_view') || isAdmin;
+
+  // Security Gate
+  if (!canView) {
     return (
       <div className="p-8 max-w-4xl mx-auto text-center space-y-4">
         <div className="w-16 h-16 bg-red-100 dark:bg-red-900/40 text-[#D62828] rounded-2xl flex items-center justify-center mx-auto shadow-sm">
           <ShieldAlert className="w-8 h-8" />
         </div>
-        <h2 className="text-xl font-bold text-slate-900 dark:text-white">Admin Access Required</h2>
+        <h2 className="text-xl font-bold text-slate-900 dark:text-white">Permission Required</h2>
         <p className="text-sm text-slate-500 max-w-md mx-auto">
           The CA Accounting & GST Control Center contains sensitive business tax, revenue ledgers, and audit tools. Please sign in as an Administrator to view these reports.
         </p>

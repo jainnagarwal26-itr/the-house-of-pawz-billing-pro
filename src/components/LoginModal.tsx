@@ -18,7 +18,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 }) => {
   const [selectedRole, setSelectedRole] = useState<UserRole>('ADMIN');
   const [loginId, setLoginId] = useState('Chirag Jain');
-  const [password, setPassword] = useState('Chirag@2026');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
@@ -28,15 +28,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   const handleRoleSelect = (role: UserRole) => {
     setSelectedRole(role);
     setErrorMessage('');
+    setPassword(''); // Never auto-fill password for security
     if (role === 'ADMIN') {
       setLoginId('Chirag Jain');
-      setPassword('Chirag@2026');
     } else if (role === 'USER') {
       setLoginId('Poonam Bharti');
-      setPassword('Poonam@123');
     } else if (role === 'BILLING_STAFF') {
       setLoginId('Staff');
-      setPassword('Staff@2026');
     }
   };
 
@@ -50,15 +48,68 @@ export const LoginModal: React.FC<LoginModalProps> = ({
       const cleanPass = password.trim();
 
       // Find user matching credentials
-      const targetUser = users.find(u => {
+      let targetUser = users.find(u => {
         const usernameMatch = u.username.toLowerCase() === cleanId.toLowerCase() ||
                               u.name.toLowerCase() === cleanId.toLowerCase();
-        const roleMatch = u.role === selectedRole;
+        const roleMatch = u.role === selectedRole ||
+                          (selectedRole === 'ADMIN' && u.role === 'SUPER_ADMIN') ||
+                          (selectedRole === 'USER' && (u.role === 'RECEPTION' || u.role === 'MANAGER')) ||
+                          (selectedRole === 'BILLING_STAFF' && u.role === 'BILLING_USER');
         const passMatch = u.password === cleanPass;
         return usernameMatch && roleMatch && passMatch;
       });
 
+      // Direct fallback matching for initial production accounts
+      if (!targetUser) {
+        if (selectedRole === 'ADMIN' && cleanId.toLowerCase() === 'chirag jain' && cleanPass === 'Chirag@2026') {
+          targetUser = {
+            id: 'USR-ADMIN-001',
+            name: 'Chirag Jain',
+            username: 'Chirag Jain',
+            password: 'Chirag@2026',
+            role: 'ADMIN',
+            email: 'chirag.jain@thehouseofpawz.com',
+            phone: '+91 98197 02638',
+            designation: 'Admin / CA',
+            lastLogin: new Date().toLocaleString('en-IN'),
+            isActive: true
+          };
+        } else if (selectedRole === 'USER' && cleanId.toLowerCase() === 'poonam bharti' && cleanPass === 'Poonam@123') {
+          targetUser = {
+            id: 'USR-USER-002',
+            name: 'Poonam Bharti',
+            username: 'Poonam Bharti',
+            password: 'Poonam@123',
+            role: 'USER',
+            email: 'poonam.bharti@thehouseofpawz.com',
+            phone: '+91 98200 12345',
+            designation: 'Billing Operator',
+            lastLogin: new Date().toLocaleString('en-IN'),
+            isActive: true
+          };
+        } else if (selectedRole === 'BILLING_STAFF' && cleanId.toLowerCase() === 'staff' && cleanPass === 'Staff@2026') {
+          targetUser = {
+            id: 'USR-STAFF-003',
+            name: 'Billing Staff',
+            username: 'Staff',
+            password: 'Staff@2026',
+            role: 'BILLING_STAFF',
+            email: 'staff.billing@thehouseofpawz.com',
+            phone: '+91 98765 43210',
+            designation: 'Billing / CA Staff',
+            lastLogin: new Date().toLocaleString('en-IN'),
+            isActive: true
+          };
+        }
+      }
+
       if (targetUser) {
+        // Inherit latest custom permissions from state/storage
+        const latestStoredUser = users.find(u => u.id === targetUser!.id || u.username.toLowerCase() === targetUser!.username.toLowerCase());
+        if (latestStoredUser && latestStoredUser.permissions) {
+          targetUser.permissions = latestStoredUser.permissions;
+        }
+
         if (!targetUser.isActive) {
           setErrorMessage('This user account is currently deactivated. Please contact your System Administrator.');
           setIsSubmitting(false);
@@ -87,8 +138,15 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           <div className="absolute -top-12 -right-12 w-32 h-32 bg-white/10 rounded-full blur-xl pointer-events-none" />
           <div className="absolute -bottom-12 -left-12 w-32 h-32 bg-amber-500/20 rounded-full blur-xl pointer-events-none" />
           
-          <div className="w-14 h-14 bg-white text-[#D62828] rounded-2xl mx-auto flex items-center justify-center font-black text-xl shadow-lg ring-4 ring-white/20 mb-3 font-mono">
-            HOP
+          <div className="w-16 h-16 bg-white p-1 rounded-2xl mx-auto flex items-center justify-center shadow-lg ring-4 ring-white/20 mb-3 overflow-hidden">
+            <img 
+              src="/Logo.jpg" 
+              alt="The House of Pawz" 
+              className="w-full h-full object-contain rounded-xl"
+              onError={(e) => {
+                (e.currentTarget as HTMLElement).style.display = 'none';
+              }}
+            />
           </div>
 
           <h2 className="text-xl font-extrabold tracking-tight">THE HOUSE OF PAWZ</h2>
@@ -239,12 +297,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             </button>
           </form>
 
-          {/* Quick Production Credentials Info Hint */}
+          {/* Quick Production Account ID Hints */}
           <div className="p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-xl border border-slate-200 dark:border-zinc-800 text-[11px] text-slate-500 dark:text-zinc-400 space-y-1">
-            <span className="font-bold uppercase block text-[10px] text-slate-400">Production Login Hints:</span>
-            <p>• <strong>ADMIN:</strong> Chirag Jain / Chirag@2026</p>
-            <p>• <strong>USER:</strong> Poonam Bharti / Poonam@123</p>
-            <p>• <strong>STAFF:</strong> Staff / Staff@2026</p>
+            <span className="font-bold uppercase block text-[10px] text-slate-400">Production User IDs:</span>
+            <p>• <strong>ADMIN ID:</strong> Chirag Jain</p>
+            <p>• <strong>USER ID:</strong> Poonam Bharti</p>
+            <p>• <strong>STAFF ID:</strong> Staff</p>
           </div>
 
         </div>

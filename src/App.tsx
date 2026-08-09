@@ -5,7 +5,7 @@ import {
 } from './types';
 import { 
   DEFAULT_COMPANY_SETTINGS, SYSTEM_USERS, 
-  STORAGE_KEYS, loadStoredData, saveStoredData, createAuditLog, factoryResetDatabase 
+  STORAGE_KEYS, loadStoredData, saveStoredData, createAuditLog, factoryResetDatabase, cleanupObsoleteCache 
 } from './lib/storage';
 import { 
   INITIAL_CUSTOMERS, INITIAL_PETS, INITIAL_INVOICES, INITIAL_PAYMENTS 
@@ -13,7 +13,8 @@ import {
 import { exportFullDatabaseToExcel } from './lib/excelHelper';
 
 import { TopBar } from './components/TopBar';
-import { Sidebar, ActiveTab, isTabAllowedForRole } from './components/Sidebar';
+import { Sidebar, ActiveTab, isTabAllowedForUser } from './components/Sidebar';
+import { hasPermission } from './lib/permissions';
 import { Dashboard } from './components/Dashboard';
 import { InvoiceManagement } from './components/InvoiceManagement';
 import { InvoiceModal } from './components/InvoiceModal';
@@ -47,10 +48,25 @@ export default function App() {
   });
   const [showForgotPassword, setShowForgotPassword] = useState(false);
 
-  // Active Users List State
+  // Active Users List State (Strictly Production Accounts: ADMIN, USER, STAFF)
   const [users, setUsers] = useState<User[]>(() => {
-    const data = loadStoredData(STORAGE_KEYS.USERS, SYSTEM_USERS);
-    return data && data.length > 0 ? data : SYSTEM_USERS;
+    const stored = loadStoredData<User[]>(STORAGE_KEYS.USERS, []);
+    const merged = SYSTEM_USERS.map(sysUser => {
+      const existing = stored.find(s => s.id === sysUser.id || s.username.toLowerCase() === sysUser.username.toLowerCase());
+      return existing ? { ...sysUser, ...existing, password: sysUser.password, role: sysUser.role } : sysUser;
+    });
+    if (stored && stored.length > 0) {
+      stored.forEach(s => {
+        const isLegacy = s.id === 'USR-001' || s.id === 'USR-002' || 
+                         s.username === 'admin' || s.username === 'billing_staff' ||
+                         s.name.includes('Pooja Verma') || s.name.includes('Chirag Jain, CA');
+        if (!isLegacy && !merged.some(m => m.id === s.id || m.username.toLowerCase() === s.username.toLowerCase())) {
+          merged.push(s);
+        }
+      });
+    }
+    saveStoredData(STORAGE_KEYS.USERS, merged);
+    return merged;
   });
 
   const [currentUser, setCurrentUser] = useState<User>(() => {
@@ -108,38 +124,46 @@ export default function App() {
     return data && data.length > 0 ? data : INITIAL_PETS;
   });
   const [invoices, setInvoices] = useState<Invoice[]>(() => {
-    const data = loadStoredData<Invoice[]>(STORAGE_KEYS.INVOICES, []);
-    const source = (data && data.length >= 30) ? data : INITIAL_INVOICES;
-    return source.map(inv => {
-      let changed = false;
+    cleanupObsoleteCache();
+    const stored = loadStoredData<Invoice[]>(STORAGE_KEYS.INVOICES, []);
+    const invMap = new Map<string, Invoice>();
+    
+    // First load mandatory master invoices (guarantees Invoice #15 is present)
+    INITIAL_INVOICES.forEach(inv => invMap.set(inv.id, inv));
+
+    // Merge user's stored invoices (preserves any edits or new invoices)
+    if (stored && stored.length > 0) {
+      stored.forEach(inv => invMap.set(inv.id, inv));
+    }
+
+    const mergedList = Array.from(invMap.values()).map(inv => {
       let name = inv.createdByName;
-      if (name && name.includes('Amit Bansal')) {
-        name = name.replace('Amit Bansal', 'Chirag Jain');
-        changed = true;
-      }
-      if (name && name.includes('Chirag Jian')) {
-        name = name.replace('Chirag Jian', 'Chirag Jain');
-        changed = true;
-      }
-      return changed ? { ...inv, createdByName: name } : inv;
+      if (name && name.includes('Amit Bansal')) name = name.replace('Amit Bansal', 'Chirag Jain');
+      if (name && name.includes('Chirag Jian')) name = name.replace('Chirag Jian', 'Chirag Jain');
+      return { ...inv, createdByName: name };
     });
+
+    saveStoredData(STORAGE_KEYS.INVOICES, mergedList);
+    return mergedList;
   });
   const [payments, setPayments] = useState<Payment[]>(() => {
-    const data = loadStoredData<Payment[]>(STORAGE_KEYS.PAYMENTS, []);
-    const source = (data && data.length >= 30) ? data : INITIAL_PAYMENTS;
-    return source.map(pay => {
-      let changed = false;
+    const stored = loadStoredData<Payment[]>(STORAGE_KEYS.PAYMENTS, []);
+    const payMap = new Map<string, Payment>();
+    
+    INITIAL_PAYMENTS.forEach(p => payMap.set(p.id, p));
+    if (stored && stored.length > 0) {
+      stored.forEach(p => payMap.set(p.id, p));
+    }
+
+    const mergedList = Array.from(payMap.values()).map(pay => {
       let rec = pay.receivedBy;
-      if (rec && rec.includes('Amit Bansal')) {
-        rec = rec.replace('Amit Bansal', 'Chirag Jain');
-        changed = true;
-      }
-      if (rec && rec.includes('Chirag Jian')) {
-        rec = rec.replace('Chirag Jian', 'Chirag Jain');
-        changed = true;
-      }
-      return changed ? { ...pay, receivedBy: rec } : pay;
+      if (rec && rec.includes('Amit Bansal')) rec = rec.replace('Amit Bansal', 'Chirag Jain');
+      if (rec && rec.includes('Chirag Jian')) rec = rec.replace('Chirag Jian', 'Chirag Jain');
+      return { ...pay, receivedBy: rec };
     });
+
+    saveStoredData(STORAGE_KEYS.PAYMENTS, mergedList);
+    return mergedList;
   });
   const [recurringList, setRecurringList] = useState<RecurringSubscription[]>(() =>
     loadStoredData(STORAGE_KEYS.RECURRING, [])
@@ -172,7 +196,7 @@ export default function App() {
 
   // Strict Route / Module Level Security Enforcement
   useEffect(() => {
-    if (session && !isTabAllowedForRole(activeTab, session.role)) {
+    if (session && !isTabAllowedForUser(activeTab, session)) {
       setActiveTab('dashboard');
     }
   }, [activeTab, session]);
@@ -258,12 +282,22 @@ export default function App() {
 
   // Action Handler: Save GST Invoice
   const handleSaveInvoice = (savedInv: Invoice) => {
-    const exists = invoices.some(i => i.id === savedInv.id);
+    const existingInv = invoices.find(i => i.id === savedInv.id);
     let updatedInvoices: Invoice[];
 
-    if (exists) {
+    if (existingInv) {
       updatedInvoices = invoices.map(i => i.id === savedInv.id ? savedInv : i);
-      createAuditLog('INVOICE_EDITED', `Updated Tax Invoice ${savedInv.invoiceNumber}`, currentUser);
+      if (existingInv.invoiceNumber !== savedInv.invoiceNumber) {
+        createAuditLog(
+          'INVOICE_EDITED',
+          `Invoice Number Changed | Old: ${existingInv.invoiceNumber} | New: ${savedInv.invoiceNumber} | Changed By: ${currentUser.name} (${currentUser.role})`,
+          currentUser
+        );
+        // Keep payment records synced with updated Invoice Number
+        setPayments(prev => prev.map(p => p.invoiceId === savedInv.id ? { ...p, invoiceNumber: savedInv.invoiceNumber } : p));
+      } else {
+        createAuditLog('INVOICE_EDITED', `Updated Tax Invoice ${savedInv.invoiceNumber}`, currentUser);
+      }
     } else {
       updatedInvoices = [savedInv, ...invoices];
       createAuditLog('INVOICE_CREATED', `Created Tax Invoice ${savedInv.invoiceNumber} for ${savedInv.customerName} (₹ ${savedInv.grandTotal.toFixed(2)})`, currentUser);
@@ -307,8 +341,8 @@ export default function App() {
 
   // Action Handler: Cancel Invoice
   const handleCancelInvoice = (invoiceId: string) => {
-    if (currentUser.role === 'USER') {
-      alert('Access Denied: USER role is not permitted to cancel invoices.');
+    if (!hasPermission(currentUser, 'invoices_cancel')) {
+      alert('Access Denied: You do not have permission to cancel invoices.');
       return;
     }
     const target = invoices.find(i => i.id === invoiceId);
@@ -333,8 +367,8 @@ export default function App() {
 
   // Action Handler: Delete Invoice
   const handleDeleteInvoice = (invoiceId: string) => {
-    if (currentUser.role === 'USER') {
-      alert('Access Denied: USER role is not permitted to delete invoices.');
+    if (!hasPermission(currentUser, 'invoices_delete')) {
+      alert('Access Denied: You do not have permission to delete invoices.');
       return;
     }
     const target = invoices.find(i => i.id === invoiceId);
@@ -346,6 +380,10 @@ export default function App() {
 
   // Action Handler: Record Payment against invoice
   const handleRecordPayment = (newPay: Payment) => {
+    if (!hasPermission(currentUser, 'payments_record')) {
+      alert('Access Denied: You do not have permission to record payments.');
+      return;
+    }
     setPayments([newPay, ...payments]);
 
     // Update invoice balance
@@ -370,6 +408,10 @@ export default function App() {
 
   // Action Handler: Delete Payment
   const handleDeletePayment = (paymentId: string) => {
+    if (!hasPermission(currentUser, 'payments_delete')) {
+      alert('Access Denied: You do not have permission to delete payment records.');
+      return;
+    }
     const target = payments.find(p => p.id === paymentId);
     if (!target) return;
     setPayments(prev => prev.filter(p => p.id !== paymentId));
@@ -379,20 +421,28 @@ export default function App() {
 
   // Action Handler: Add / Edit / Delete Customer
   const handleAddCustomer = (c: Customer) => {
+    if (!hasPermission(currentUser, 'customers_create')) {
+      alert('Access Denied: You do not have permission to add new customers.');
+      return;
+    }
     setCustomers([c, ...customers]);
     createAuditLog('CUSTOMER_ADDED', `Added Customer ${c.name} (${c.phone})`, currentUser);
     setAuditLogs(loadStoredData(STORAGE_KEYS.AUDIT, []));
   };
 
   const handleEditCustomer = (c: Customer) => {
+    if (!hasPermission(currentUser, 'customers_edit')) {
+      alert('Access Denied: You do not have permission to edit customer records.');
+      return;
+    }
     setCustomers(customers.map(existing => existing.id === c.id ? c : existing));
     createAuditLog('CUSTOMER_EDITED', `Updated Customer ${c.name}`, currentUser);
     setAuditLogs(loadStoredData(STORAGE_KEYS.AUDIT, []));
   };
 
   const handleDeleteCustomer = (customerId: string) => {
-    if (currentUser.role === 'USER') {
-      alert('Access Denied: USER role is not permitted to delete customer records.');
+    if (!hasPermission(currentUser, 'customers_delete')) {
+      alert('Access Denied: You do not have permission to delete customer records.');
       return;
     }
     const target = customers.find(c => c.id === customerId);
@@ -404,20 +454,28 @@ export default function App() {
 
   // Action Handler: Add / Edit / Delete Pet Profile & Boarding Status
   const handleAddPet = (p: Pet) => {
+    if (!hasPermission(currentUser, 'pets_create')) {
+      alert('Access Denied: You do not have permission to add pet profiles.');
+      return;
+    }
     setPets([p, ...pets]);
     createAuditLog('PET_ADDED', `Added Pet Profile ${p.name} (${p.breed})`, currentUser);
     setAuditLogs(loadStoredData(STORAGE_KEYS.AUDIT, []));
   };
 
   const handleEditPet = (p: Pet) => {
+    if (!hasPermission(currentUser, 'pets_edit')) {
+      alert('Access Denied: You do not have permission to edit pet profiles.');
+      return;
+    }
     setPets(pets.map(existing => existing.id === p.id ? p : existing));
     createAuditLog('PET_EDITED' as any, `Updated Pet Profile ${p.name}`, currentUser);
     setAuditLogs(loadStoredData(STORAGE_KEYS.AUDIT, []));
   };
 
   const handleDeletePet = (petId: string) => {
-    if (currentUser.role === 'USER') {
-      alert('Access Denied: USER role is not permitted to delete pet profiles.');
+    if (!hasPermission(currentUser, 'pets_delete')) {
+      alert('Access Denied: You do not have permission to delete pet profiles.');
       return;
     }
     const target = pets.find(p => p.id === petId);
@@ -579,6 +637,7 @@ export default function App() {
           activeTab={activeTab}
           onSelectTab={setActiveTab}
           userRole={currentUser.role}
+          user={currentUser}
           onNewInvoice={() => {
             setEditingInvoice(null);
             setShowInvoiceModal(true);
@@ -600,6 +659,7 @@ export default function App() {
               payments={payments}
               auditLogs={auditLogs}
               userRole={currentUser.role}
+              currentUser={currentUser}
               onNewInvoice={() => {
                 setEditingInvoice(null);
                 setShowInvoiceModal(true);
@@ -618,6 +678,7 @@ export default function App() {
               settings={settings}
               userRole={currentUser.role}
               userName={currentUser.name}
+              currentUser={currentUser}
               onOpenCreateModal={() => {
                 setEditingInvoice(null);
                 setShowInvoiceModal(true);
@@ -647,6 +708,7 @@ export default function App() {
             <CustomerMaster
               customers={customers}
               pets={pets}
+              currentUser={currentUser}
               onAddCustomer={handleAddCustomer}
               onEditCustomer={handleEditCustomer}
               onDeleteCustomer={handleDeleteCustomer}
@@ -657,6 +719,7 @@ export default function App() {
             <PetMaster
               pets={pets}
               customers={customers}
+              currentUser={currentUser}
               onAddPet={handleAddPet}
               onEditPet={handleEditPet}
               onDeletePet={handleDeletePet}
@@ -717,6 +780,7 @@ export default function App() {
               customers={customers}
               userRole={currentUser.role}
               userName={currentUser.name}
+              currentUser={currentUser}
               onRecordPayment={handleRecordPayment}
               onDeletePayment={handleDeletePayment}
             />
@@ -729,6 +793,7 @@ export default function App() {
               customers={customers}
               pets={pets}
               settings={settings}
+              currentUser={currentUser}
               isAdmin={currentUser.role === 'ADMIN'}
             />
           )}
@@ -743,6 +808,7 @@ export default function App() {
               settings={settings}
               auditLogs={auditLogs}
               recurring={recurringList}
+              currentUser={currentUser}
               onAddAuditLog={(action, details) => {
                 createAuditLog(action, details, currentUser);
                 setAuditLogs(loadStoredData(STORAGE_KEYS.AUDIT, []));
@@ -764,17 +830,32 @@ export default function App() {
                 const updatedUsers = users.map(existing => existing.id === u.id ? u : existing);
                 setUsers(updatedUsers);
                 saveStoredData(STORAGE_KEYS.USERS, updatedUsers);
+
+                // If editing the active logged-in user, immediately update active session state!
+                if (session && (session.id === u.id || session.username.toLowerCase() === u.username.toLowerCase())) {
+                  setSession(u);
+                  setCurrentUser(u);
+                  saveStoredData(STORAGE_KEYS.SESSION, u);
+                }
+
+                createAuditLog(
+                  'ROLE_SWITCHED' as any,
+                  `ADMIN ${currentUser.name} updated permissions for ${u.name} (${u.role})`,
+                  currentUser
+                );
+                setAuditLogs(loadStoredData(STORAGE_KEYS.AUDIT, []));
               }}
             />
           )}
 
           {activeTab === 'audit' && (
-            <AuditLogs auditLogs={auditLogs} />
+            <AuditLogs auditLogs={auditLogs} currentUser={currentUser} />
           )}
 
           {activeTab === 'settings' && (
             <SettingsModal
               settings={settings}
+              currentUser={currentUser}
               onUpdateSettings={setSettings}
               onFactoryReset={factoryResetDatabase}
             />
@@ -792,6 +873,7 @@ export default function App() {
       {showInvoiceModal && (
         <InvoiceModal
           invoice={editingInvoice}
+          allInvoices={invoices}
           customers={customers}
           pets={pets}
           settings={settings}

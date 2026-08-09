@@ -3,15 +3,33 @@ import {
   History, Search, ShieldCheck, UserCheck, Clock, Download, 
   Printer, Filter, ShieldAlert, Monitor, CheckCircle2
 } from 'lucide-react';
-import { AuditLog } from '../types';
+import { AuditLog, User } from '../types';
+import { hasPermission } from '../lib/permissions';
 
 interface AuditLogsProps {
   auditLogs: AuditLog[];
+  currentUser?: User | null;
 }
 
-export const AuditLogs: React.FC<AuditLogsProps> = ({ auditLogs }) => {
+export const AuditLogs: React.FC<AuditLogsProps> = ({ auditLogs, currentUser }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [actionFilter, setActionFilter] = useState<string>('ALL');
+
+  const canView = hasPermission(currentUser, 'audit_logs_view');
+
+  if (!canView) {
+    return (
+      <div className="p-8 max-w-4xl mx-auto text-center space-y-4">
+        <div className="w-16 h-16 bg-red-100 dark:bg-red-900/40 text-[#D62828] rounded-2xl flex items-center justify-center mx-auto shadow-sm">
+          <ShieldAlert className="w-8 h-8" />
+        </div>
+        <h2 className="text-xl font-bold text-slate-900 dark:text-white">Permission Required</h2>
+        <p className="text-sm text-slate-500 max-w-md mx-auto">
+          Audit Logs contain security-sensitive activity records. Please contact your Administrator to grant access.
+        </p>
+      </div>
+    );
+  }
 
   const filtered = auditLogs.filter(log => {
     const matchesSearch = 

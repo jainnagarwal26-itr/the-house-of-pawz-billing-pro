@@ -3,11 +3,13 @@ import {
   Users, Search, Plus, Phone, Mail, MapPin, 
   IndianRupee, Edit, Trash2, CheckCircle2 
 } from 'lucide-react';
-import { Customer, Pet, formatINR } from '../types';
+import { Customer, Pet, formatINR, User } from '../types';
+import { hasPermission } from '../lib/permissions';
 
 interface CustomerMasterProps {
   customers: Customer[];
   pets: Pet[];
+  currentUser?: User | null;
   onAddCustomer: (customer: Customer) => void;
   onEditCustomer: (customer: Customer) => void;
   onDeleteCustomer?: (customerId: string) => void;
@@ -16,6 +18,7 @@ interface CustomerMasterProps {
 export const CustomerMaster: React.FC<CustomerMasterProps> = ({
   customers,
   pets,
+  currentUser,
   onAddCustomer,
   onEditCustomer,
   onDeleteCustomer
@@ -104,13 +107,15 @@ export const CustomerMaster: React.FC<CustomerMasterProps> = ({
           </p>
         </div>
 
-        <button
-          onClick={openAddModal}
-          className="px-4 py-2 bg-[#D62828] hover:bg-red-700 text-white font-extrabold rounded-xl text-xs flex items-center space-x-1.5 shadow-md shadow-red-900/40"
-        >
-          <Plus className="w-4 h-4" />
-          <span>+ Add New Customer</span>
-        </button>
+        {hasPermission(currentUser, 'customers_create') && (
+          <button
+            onClick={openAddModal}
+            className="px-4 py-2 bg-[#D62828] hover:bg-red-700 text-white font-extrabold rounded-xl text-xs flex items-center space-x-1.5 shadow-md shadow-red-900/40"
+          >
+            <Plus className="w-4 h-4" />
+            <span>+ Add New Customer</span>
+          </button>
+        )}
       </div>
 
       {/* Search */}
@@ -136,7 +141,7 @@ export const CustomerMaster: React.FC<CustomerMasterProps> = ({
               key={c.id} 
               className="bg-white dark:bg-zinc-900 p-5 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-xs flex flex-col justify-between space-y-4 hover:border-[#D62828]/40 transition-colors"
             >
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <div className="flex items-start justify-between">
                   <div>
                     <h3 className="font-extrabold text-slate-900 dark:text-white text-sm">
@@ -145,14 +150,16 @@ export const CustomerMaster: React.FC<CustomerMasterProps> = ({
                     <p className="text-[11px] text-slate-500 font-mono">ID: {c.id}</p>
                   </div>
                   <div className="flex items-center space-x-1">
-                    <button
-                      onClick={() => openEditModal(c)}
-                      className="p-1.5 text-slate-400 hover:text-[#D62828] hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-lg"
-                      title="Edit Customer"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </button>
-                    {onDeleteCustomer && (
+                    {hasPermission(currentUser, 'customers_edit') && (
+                      <button
+                        onClick={() => openEditModal(c)}
+                        className="p-1.5 text-slate-400 hover:text-[#D62828] hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-lg"
+                        title="Edit Customer"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                    )}
+                    {onDeleteCustomer && hasPermission(currentUser, 'customers_delete') && (
                       <button
                         onClick={() => {
                           if (confirm(`Are you sure you want to delete customer "${c.name}"? This action cannot be undone.`)) {

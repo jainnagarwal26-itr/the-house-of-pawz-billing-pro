@@ -254,7 +254,8 @@ export async function exportFullDatabaseToExcel(data: {
     'Email': u.email,
     'Phone': u.phone,
     'Last Login': u.lastLogin,
-    'Status': u.isActive ? 'Active' : 'Inactive'
+    'Status': u.isActive ? 'Active' : 'Inactive',
+    'Custom Permissions': Object.keys(u.permissions || {}).filter(k => u.permissions![k]).join(', ') || 'Role Defaults'
   }));
   addStyledSheet(wb, 'Users', usersData);
 

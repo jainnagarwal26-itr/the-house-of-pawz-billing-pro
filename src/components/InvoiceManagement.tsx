@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Receipt, Search, PlusCircle, Printer, Share2, 
-  Trash2, XCircle, Eye, Lock, Filter, ShieldAlert, FileSpreadsheet, KeyRound, Download
+  Trash2, XCircle, Eye, Lock, Filter, ShieldAlert, FileSpreadsheet, KeyRound, Download,
+  ChevronLeft, ChevronRight
 } from 'lucide-react';
-import { Invoice, Customer, Pet, CompanySettings, UserRole, formatINR, PaymentStatus } from '../types';
+import { Invoice, Customer, Pet, CompanySettings, UserRole, formatINR, PaymentStatus, User } from '../types';
+import { hasPermission } from '../lib/permissions';
 import { InvoicePrintPreview } from './InvoicePrintPreview';
 import { AdminApprovalModal } from './AdminApprovalModal';
 
@@ -14,6 +16,7 @@ interface InvoiceManagementProps {
   settings: CompanySettings;
   userRole: UserRole;
   userName: string;
+  currentUser?: User | null;
   onOpenCreateModal: () => void;
   onOpenEditModal: (invoice: Invoice) => void;
   onCancelInvoice: (invoiceId: string) => void;
@@ -28,6 +31,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   settings,
   userRole,
   userName,
+  currentUser,
   onOpenCreateModal,
   onOpenEditModal,
   onCancelInvoice,
@@ -38,6 +42,15 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | PaymentStatus>('ALL');
+
+  // Pagination State (Default: 10 per page)
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 10;
+
+  // Auto-reset to Page 1 on search/filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, statusFilter]);
 
   // Preview Modal
   const [selectedInvoiceForPreview, setSelectedInvoiceForPreview] = useState<Invoice | null>(null);
@@ -98,6 +111,14 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
 
     return matchesSearch && matchesStatus;
   });
+
+  // Calculate dynamic pagination
+  const totalInvoices = filteredInvoices.length;
+  const totalPages = Math.max(1, Math.ceil(totalInvoices / pageSize));
+  const validPage = Math.min(currentPage, totalPages);
+  const startIndex = (validPage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, totalInvoices);
+  const paginatedInvoices = filteredInvoices.slice(startIndex, endIndex);
 
   return (
     <div className="p-3 sm:p-6 space-y-4 sm:space-y-6 max-w-7xl mx-auto">
@@ -171,21 +192,21 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
       {/* Invoices Table */}
       <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full text-left border-collapse table-fixed min-w-[900px]">
             <thead>
               <tr className="bg-slate-100 dark:bg-zinc-800/80 text-slate-700 dark:text-zinc-300 text-[10px] uppercase tracking-wider font-extrabold border-b border-slate-200 dark:border-zinc-800">
-                <th className="p-3">Invoice Details</th>
-                <th className="p-3">Customer & Pet</th>
-                <th className="p-3 text-right">Taxable (₹)</th>
-                <th className="p-3 text-right">GST (18%)</th>
-                <th className="p-3 text-right">Grand Total</th>
-                <th className="p-3 text-right">Balance Due</th>
-                <th className="p-3 text-center">Payment Status</th>
-                <th className="p-3 text-center">Actions</th>
+                <th className="py-3 px-3.5 w-[16%]">Invoice Details</th>
+                <th className="py-3 px-3.5 w-[22%]">Customer & Pet</th>
+                <th className="py-3 px-3 text-right w-[11%]">Taxable (₹)</th>
+                <th className="py-3 px-3 text-right w-[10%]">GST (18%)</th>
+                <th className="py-3 px-3 text-right w-[13%]">Grand Total</th>
+                <th className="py-3 px-3 text-right w-[11%]">Balance Due</th>
+                <th className="py-3 px-3 text-center w-[10%]">Status</th>
+                <th className="py-3 px-3 text-center w-[17%] min-w-[150px]">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-zinc-800/80 text-xs">
-              {filteredInvoices.map(inv => (
+              {paginatedInvoices.map(inv => (
                 <tr 
                   key={inv.id}
                   className={`hover:bg-slate-50/80 dark:hover:bg-zinc-800/40 transition-colors ${
@@ -245,11 +266,11 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                     <span className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-extrabold font-mono ${
                       inv.paymentStatus === 'PAID'
                         ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                        : inv.paymentStatus === 'CANCELLED'
+                        ? 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300'
                         : inv.paymentStatus === 'PARTIAL'
                         ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-                        : inv.paymentStatus === 'CANCELLED'
-                        ? 'bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 line-through'
-                        : 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300'
+                        : 'bg-red-50 text-red-700 border border-red-200 dark:bg-red-950/40 dark:text-red-400'
                     }`}>
                       {inv.paymentStatus}
                     </span>
@@ -258,47 +279,58 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                   {/* Actions */}
                   <td className="p-3 text-center">
                     <div className="flex items-center justify-center space-x-1">
-                      {/* Print / View */}
-                      <button
-                        onClick={() => setSelectedInvoiceForPreview(inv)}
-                        className="p-1.5 text-slate-600 dark:text-zinc-300 hover:text-[#D62828] hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
-                        title="Print / View Tax Invoice"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
+                      {/* View Preview */}
+                      {hasPermission(currentUser, 'invoices_view') && (
+                        <button
+                          onClick={() => {
+                            setIsAutoDownloadPDF(false);
+                            setSelectedInvoiceForPreview(inv);
+                          }}
+                          className="p-1.5 text-slate-600 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
+                          title="View Invoice Preview"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                      )}
 
                       {/* Download PDF */}
-                      <button
-                        onClick={() => {
-                          setSelectedInvoiceForPreview(inv);
-                          setIsAutoDownloadPDF(true);
-                        }}
-                        className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/60 rounded-lg transition-colors"
-                        title="Download Tax Invoice as PDF"
-                      >
-                        <Download className="w-4 h-4" />
-                      </button>
+                      {hasPermission(currentUser, 'invoices_download_pdf') && (
+                        <button
+                          onClick={() => {
+                            setSelectedInvoiceForPreview(inv);
+                            setIsAutoDownloadPDF(true);
+                          }}
+                          className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/60 rounded-lg transition-colors"
+                          title="Download Tax Invoice as PDF"
+                        >
+                          <Download className="w-4 h-4" />
+                        </button>
+                      )}
 
                       {/* WhatsApp Share */}
-                      <button
-                        onClick={() => handleTriggerAction('SHARE', inv)}
-                        className="p-1.5 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/60 rounded-lg transition-colors"
-                        title={isAdmin ? 'Share via WhatsApp' : 'Requires Admin PIN Approval for Staff'}
-                      >
-                        <Share2 className="w-4 h-4" />
-                      </button>
+                      {hasPermission(currentUser, 'invoices_whatsapp') && (
+                        <button
+                          onClick={() => handleTriggerAction('SHARE', inv)}
+                          className="p-1.5 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/60 rounded-lg transition-colors"
+                          title={isAdmin ? 'Share via WhatsApp' : 'Requires Admin PIN Approval for Staff'}
+                        >
+                          <Share2 className="w-4 h-4" />
+                        </button>
+                      )}
 
                       {/* Edit Invoice */}
-                      <button
-                        onClick={() => handleTriggerAction('EDIT', inv)}
-                        className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/60 rounded-lg transition-colors"
-                        title={isAdmin ? 'Edit Invoice' : 'Requires Admin PIN Approval for Staff'}
-                      >
-                        <Receipt className="w-4 h-4" />
-                      </button>
+                      {hasPermission(currentUser, 'invoices_edit') && (
+                        <button
+                          onClick={() => handleTriggerAction('EDIT', inv)}
+                          className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/60 rounded-lg transition-colors"
+                          title={isAdmin ? 'Edit Invoice' : 'Requires Admin PIN Approval for Staff'}
+                        >
+                          <Receipt className="w-4 h-4" />
+                        </button>
+                      )}
 
                       {/* Cancel Invoice */}
-                      {!inv.isCancelled && userRole !== 'USER' && (
+                      {!inv.isCancelled && hasPermission(currentUser, 'invoices_cancel') && (
                         <button
                           onClick={() => handleTriggerAction('CANCEL', inv)}
                           className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/60 rounded-lg transition-colors"
@@ -309,7 +341,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                       )}
 
                       {/* Delete Invoice */}
-                      {onDeleteInvoice && userRole !== 'USER' && (
+                      {onDeleteInvoice && hasPermission(currentUser, 'invoices_delete') && (
                         <button
                           onClick={() => {
                             if (confirm(`Are you sure you want to permanently delete invoice ${inv.invoiceNumber}? This action cannot be undone.`)) {
@@ -326,8 +358,68 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                   </td>
                 </tr>
               ))}
+              {paginatedInvoices.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="p-8 text-center text-slate-400 italic text-xs">
+                    No matching tax invoices found.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
+        </div>
+
+        {/* Dynamic Responsive Pagination Controls Bar */}
+        <div className="p-3 sm:p-4 bg-slate-50 dark:bg-zinc-800/60 border-t border-slate-200 dark:border-zinc-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+          {/* Status Display Text */}
+          <div className="text-slate-600 dark:text-zinc-300 font-medium">
+            Showing <strong className="text-slate-900 dark:text-white font-mono">{totalInvoices === 0 ? 0 : startIndex + 1}–{endIndex}</strong> of <strong className="text-slate-900 dark:text-white font-mono">{totalInvoices}</strong> invoices
+          </div>
+
+          {/* Desktop & Mobile Responsive Pagination Controls */}
+          <div className="flex items-center space-x-1.5">
+            {/* Previous Button */}
+            <button
+              disabled={validPage <= 1}
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-zinc-700 font-bold bg-white dark:bg-zinc-900 text-slate-700 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed flex items-center space-x-1 transition-colors shadow-2xs"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              <span>Previous</span>
+            </button>
+
+            {/* Desktop Page Numbers */}
+            <div className="hidden sm:flex items-center space-x-1">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(pNum => (
+                <button
+                  key={pNum}
+                  onClick={() => setCurrentPage(pNum)}
+                  className={`w-8 h-8 rounded-xl font-mono text-xs font-bold transition-all ${
+                    validPage === pNum
+                      ? 'bg-[#D62828] text-white shadow-xs'
+                      : 'bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800'
+                  }`}
+                >
+                  {pNum}
+                </button>
+              ))}
+            </div>
+
+            {/* Mobile Compact Page Counter */}
+            <div className="sm:hidden text-xs font-mono font-bold px-2 text-slate-600 dark:text-zinc-300">
+              Page {validPage} of {totalPages}
+            </div>
+
+            {/* Next Button */}
+            <button
+              disabled={validPage >= totalPages}
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-zinc-700 font-bold bg-white dark:bg-zinc-900 text-slate-700 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed flex items-center space-x-1 transition-colors shadow-2xs"
+            >
+              <span>Next</span>
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
 

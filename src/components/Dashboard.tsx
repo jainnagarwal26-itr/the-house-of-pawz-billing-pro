@@ -13,7 +13,8 @@ import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, 
   BarChart, Bar, PieChart, Pie, Cell, CartesianGrid, Legend 
 } from 'recharts';
-import { Invoice, Pet, Customer, Payment, AuditLog, formatINR, UserRole } from '../types';
+import { Invoice, Pet, Customer, Payment, AuditLog, formatINR, UserRole, User } from '../types';
+import { hasPermission } from '../lib/permissions';
 
 interface DashboardProps {
   invoices: Invoice[];
@@ -22,6 +23,7 @@ interface DashboardProps {
   payments: Payment[];
   auditLogs: AuditLog[];
   userRole: UserRole;
+  currentUser?: User | null;
   onNewInvoice: () => void;
   onNavigateTab: (tab: any) => void;
   onOpenBarcodeScanner: () => void;
@@ -35,6 +37,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   payments,
   auditLogs,
   userRole,
+  currentUser,
   onNewInvoice,
   onNavigateTab,
   onOpenBarcodeScanner,

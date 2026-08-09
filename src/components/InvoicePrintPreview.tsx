@@ -1,11 +1,13 @@
 import React from 'react';
 import { Printer, Share2, X, QrCode, ArrowLeft, Download } from 'lucide-react';
-import { Invoice, CompanySettings, formatINR, UserRole } from '../types';
+import { Invoice, CompanySettings, formatINR, UserRole, User } from '../types';
+import { hasPermission } from '../lib/permissions';
 
 interface InvoicePrintPreviewProps {
   invoice: Invoice;
   settings: CompanySettings;
   userRole: UserRole;
+  currentUser?: User | null;
   onClose: () => void;
   onShareWhatsApp?: () => void;
   autoDownloadPDF?: boolean;
@@ -15,6 +17,7 @@ export const InvoicePrintPreview: React.FC<InvoicePrintPreviewProps> = ({
   invoice,
   settings,
   userRole,
+  currentUser,
   onClose,
   onShareWhatsApp,
   autoDownloadPDF
@@ -27,9 +30,14 @@ export const InvoicePrintPreview: React.FC<InvoicePrintPreviewProps> = ({
 
   const handleDownloadPDF = () => {
     const origTitle = document.title;
-    const cleanInv = invoice.invoiceNumber.replace(/[\/\\]/g, '_');
-    const cleanCust = (invoice.customerName || 'Client').replace(/[^a-zA-Z0-9_]/g, '_');
-    document.title = `Tax_Invoice_${cleanInv}_${cleanCust}`;
+    // Sanitize customer name and invoice number for filename (e.g. THOP_Invoice_Dilnavaz_HOP-26-27-000001.pdf)
+    const custRaw = invoice.customerName 
+      ? invoice.customerName.trim().replace(/\s+/g, '_').replace(/[\/\\:\*\?"<>\|]/g, '') 
+      : '';
+    const invRaw = (invoice.invoiceNumber || '001').trim().replace(/[\/\\:\*\?"<>\|]/g, '-');
+    const filename = custRaw ? `THOP_Invoice_${custRaw}_${invRaw}` : `THOP_Invoice_${invRaw}`;
+    
+    document.title = filename;
     window.print();
     setTimeout(() => {
       document.title = origTitle;
@@ -44,6 +52,8 @@ export const InvoicePrintPreview: React.FC<InvoicePrintPreviewProps> = ({
       return () => clearTimeout(timer);
     }
   }, [autoDownloadPDF]);
+
+  const canShareWhatsApp = hasPermission(currentUser, 'invoices_whatsapp');
 
   return (
     <div className="invoice-print-modal-backdrop fixed inset-0 bg-black/80 backdrop-blur-xs flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
@@ -76,28 +86,31 @@ export const InvoicePrintPreview: React.FC<InvoicePrintPreviewProps> = ({
             </button>
           </div>
 
+          {/* Action Buttons in exact recommended order: [Back to App] -> [Print Invoice] -> [Download PDF] -> [Share via WhatsApp] */}
           <div className="flex items-center justify-end space-x-2">
             <button
-              onClick={handleDownloadPDF}
-              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg text-xs flex items-center space-x-1.5 transition-colors shrink-0 shadow-xs"
-              title="Download Tax Invoice as PDF file"
-            >
-              <Download className="w-4 h-4" />
-              <span>Download PDF</span>
-            </button>
-
-            <button
               onClick={handlePrint}
-              className="px-3 py-1.5 bg-[#D62828] hover:bg-red-700 text-white font-semibold rounded-lg text-xs flex items-center space-x-1.5 transition-colors shrink-0"
+              className="px-3 py-1.5 bg-[#D62828] hover:bg-red-700 text-white font-semibold rounded-lg text-xs flex items-center space-x-1.5 transition-colors shrink-0 shadow-xs"
+              title="Print Tax Invoice on A4 paper"
             >
               <Printer className="w-4 h-4" />
               <span>Print Invoice</span>
             </button>
 
-            {isAdmin && onShareWhatsApp && (
+            <button
+              onClick={handleDownloadPDF}
+              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg text-xs flex items-center space-x-1.5 transition-colors shrink-0 shadow-xs"
+              title="Download Tax Invoice as PDF"
+            >
+              <Download className="w-4 h-4" />
+              <span>Download PDF</span>
+            </button>
+
+            {canShareWhatsApp && onShareWhatsApp && (
               <button
                 onClick={onShareWhatsApp}
-                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg text-xs flex items-center space-x-1.5 transition-colors shrink-0"
+                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg text-xs flex items-center space-x-1.5 transition-colors shrink-0 shadow-xs"
+                title="Send invoice details to client on WhatsApp"
               >
                 <Share2 className="w-4 h-4" />
                 <span className="hidden sm:inline">Share via WhatsApp</span>
@@ -115,21 +128,21 @@ export const InvoicePrintPreview: React.FC<InvoicePrintPreviewProps> = ({
           </div>
         </div>
 
-        {/* Printable Invoice Container */}
-        <div className="p-3 sm:p-8 overflow-y-auto bg-white font-sans text-xs print-container flex-1">
-          {/* Header Branding */}
-          <div className="flex flex-col sm:flex-row justify-between items-start border-b-2 border-red-700 pb-4 mb-4 gap-4">
+        {/* Invoice Document Body (Print Target Area) */}
+        <div className="invoice-print-area p-6 sm:p-10 overflow-y-auto flex-1 bg-white text-slate-900 font-sans text-xs select-text">
+          {/* Header & Company Details */}
+          <div className="flex flex-col sm:flex-row items-start justify-between pb-6 border-b-2 border-slate-900 gap-4">
             <div>
               <div className="flex items-center space-x-3">
                 {settings.logoPath ? (
                   <img
                     src={settings.logoPath}
                     alt={settings.companyName}
-                    className="h-12 w-auto max-w-[120px] object-contain shrink-0"
+                    className="h-15 sm:h-16 w-auto max-w-[150px] object-contain shrink-0"
                     onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
                   />
                 ) : (
-                  <div className="w-10 h-10 rounded-lg bg-[#D62828] text-white flex items-center justify-center font-extrabold text-base font-mono shrink-0 shadow-sm">
+                  <div className="w-12 h-12 rounded-lg bg-[#D62828] text-white flex items-center justify-center font-extrabold text-lg font-mono shrink-0 shadow-sm">
                     HOP
                   </div>
                 )}
@@ -143,6 +156,7 @@ export const InvoicePrintPreview: React.FC<InvoicePrintPreviewProps> = ({
               <p className="text-[11px] text-slate-600 mt-2 leading-snug">
                 {settings.address}, {settings.cityStateZip}<br />
                 Phone: {settings.phone} | Email: {settings.email}<br />
+                Website: <a href="https://www.wisdomcentre.co.in/" target="_blank" rel="noopener noreferrer" className="text-blue-700 hover:underline font-semibold">https://www.wisdomcentre.co.in/</a><br />
                 <strong>GSTIN: {settings.gstin}</strong> | State Code: {settings.stateCode}
               </p>
             </div>

@@ -1,5 +1,15 @@
 export type UserRole = 'ADMIN' | 'USER' | 'BILLING_STAFF' | 'SUPER_ADMIN' | 'MANAGER' | 'RECEPTION' | 'BILLING_USER';
 
+export interface PermissionChangeRecord {
+  id: string;
+  timestamp: string;
+  key: string;
+  label: string;
+  oldState: string;
+  newState: string;
+  changedBy: string;
+}
+
 export interface User {
   id: string;
   name: string;
@@ -14,6 +24,8 @@ export interface User {
   isActive: boolean;
   pinCode?: string; // Default '1234' for Admin approvals
   recoveryKey?: string;
+  permissions?: Record<string, boolean>;
+  permissionHistory?: PermissionChangeRecord[];
 }
 
 export interface Customer {

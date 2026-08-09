@@ -3,11 +3,13 @@ import {
   Dog, Search, Plus, CheckCircle2, AlertTriangle, 
   Calendar, Edit, Trash2, LogIn, LogOut, QrCode 
 } from 'lucide-react';
-import { Pet, Customer } from '../types';
+import { Pet, Customer, User } from '../types';
+import { hasPermission } from '../lib/permissions';
 
 interface PetMasterProps {
   pets: Pet[];
   customers: Customer[];
+  currentUser?: User | null;
   onAddPet: (pet: Pet) => void;
   onEditPet: (pet: Pet) => void;
   onDeletePet?: (petId: string) => void;
@@ -17,6 +19,7 @@ interface PetMasterProps {
 export const PetMaster: React.FC<PetMasterProps> = ({
   pets,
   customers,
+  currentUser,
   onAddPet,
   onEditPet,
   onDeletePet,

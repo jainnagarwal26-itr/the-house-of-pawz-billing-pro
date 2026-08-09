@@ -5,33 +5,39 @@ import {
 } from 'lucide-react';
 import { 
   Invoice, InvoiceItem, Customer, Pet, CatalogItem, 
-  CompanySettings, UserRole, formatINR, PaymentStatus, PaymentMode 
+  CompanySettings, UserRole, formatINR, PaymentStatus, PaymentMode, User 
 } from '../types';
 import { CATALOG_ITEMS } from '../lib/storage';
+import { hasPermission } from '../lib/permissions';
 
 interface InvoiceModalProps {
   invoice?: Invoice | null;
+  allInvoices?: Invoice[];
   customers: Customer[];
   pets: Pet[];
   settings: CompanySettings;
   userRole: UserRole;
   userName: string;
+  currentUser?: User | null;
   onSaveInvoice: (invoice: Invoice) => void;
   onClose: () => void;
 }
 
 export const InvoiceModal: React.FC<InvoiceModalProps> = ({
   invoice,
+  allInvoices,
   customers,
   pets,
   settings,
   userRole,
   userName,
+  currentUser,
   onSaveInvoice,
   onClose
 }) => {
   const isEditing = !!invoice;
   const isAdmin = userRole === 'ADMIN';
+  const canEditInvoiceNumber = hasPermission(currentUser, 'invoices_change_number');
 
   // Selected Customer State
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>(invoice?.customerId || customers[0]?.id || '');
@@ -46,9 +52,10 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
   const [petName, setPetName] = useState<string>(invoice?.petName || '');
 
   // Invoice Meta
-  const [invoiceNumber] = useState<string>(
+  const [invoiceNumber, setInvoiceNumber] = useState<string>(
     invoice?.invoiceNumber || `${settings.invoicePrefix}${Date.now().toString().slice(-6)}`
   );
+  const [validationError, setValidationError] = useState<string>('');
   
   const todayStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
   const [invoiceDate, setInvoiceDate] = useState<string>(invoice?.invoiceDate || todayStr);
@@ -231,10 +238,36 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
   // Form Submission
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setValidationError('');
+
+    const cleanNum = invoiceNumber.trim();
+    if (!cleanNum) {
+      setValidationError('Invoice number cannot be empty. Please enter a valid invoice number.');
+      return;
+    }
+
+    // Safety Rule #3: Duplicate Invoice Number Uniqueness Validation
+    if (allInvoices && allInvoices.length > 0) {
+      const duplicate = allInvoices.find(inv => 
+        inv.invoiceNumber.trim().toLowerCase() === cleanNum.toLowerCase() && inv.id !== invoice?.id
+      );
+      if (duplicate) {
+        setValidationError('Invoice number already exists. Please enter a unique invoice number.');
+        return;
+      }
+    }
+
+    // Confirmation if changing existing invoice number
+    if (invoice && invoice.invoiceNumber !== cleanNum) {
+      const confirmed = window.confirm(
+        `Are you sure you want to change the Invoice Number from "${invoice.invoiceNumber}" to "${cleanNum}"?`
+      );
+      if (!confirmed) return;
+    }
 
     const savedInvoice: Invoice = {
       id: invoice?.id || `INV-${Date.now().toString().slice(-6)}`,
-      invoiceNumber,
+      invoiceNumber: cleanNum,
       invoiceDate,
       dueDate,
       customerId: selectedCustomerId,
@@ -309,6 +342,14 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
 
         {/* Modal Form Content */}
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-6 text-xs">
+          {/* Validation Error Banner */}
+          {validationError && (
+            <div className="p-3 bg-red-50 dark:bg-red-950/80 border border-red-200 dark:border-red-800 rounded-xl text-red-700 dark:text-red-300 flex items-center space-x-2 animate-in fade-in">
+              <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+              <span className="font-bold">{validationError}</span>
+            </div>
+          )}
+
           {/* Staff Mode Lock Warning if editing */}
           {isEditing && !isAdmin && (
             <div className="p-3 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 rounded-xl text-amber-900 dark:text-amber-200 flex items-center space-x-2">
@@ -444,9 +485,31 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
                 </label>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 pt-1">
+              <div className="grid grid-cols-3 gap-2 pt-1">
                 <div>
-                  <label className="text-[10px] text-slate-500">Invoice Date:</label>
+                  <label className="text-[10px] text-slate-500 font-bold block mb-0.5">
+                    Invoice Number *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    disabled={!canEditInvoiceNumber}
+                    value={invoiceNumber}
+                    onChange={e => {
+                      setInvoiceNumber(e.target.value);
+                      setValidationError('');
+                    }}
+                    placeholder="e.g. HOP/26-27/000001 or 01"
+                    className={`w-full p-1.5 rounded-lg text-xs font-mono font-bold border transition-colors ${
+                      canEditInvoiceNumber
+                        ? 'bg-white dark:bg-zinc-900 border-red-300 dark:border-red-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-red-500'
+                        : 'bg-slate-100 dark:bg-zinc-800 border-slate-300 dark:border-zinc-700 text-slate-500 cursor-not-allowed'
+                    }`}
+                    title={canEditInvoiceNumber ? 'Edit Tax Invoice Number' : 'USER role cannot change Invoice Number'}
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-500 font-bold block mb-0.5">Invoice Date:</label>
                   <input
                     type="text"
                     value={invoiceDate}
@@ -455,7 +518,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] text-slate-500">Due Date:</label>
+                  <label className="text-[10px] text-slate-500 font-bold block mb-0.5">Due Date:</label>
                   <input
                     type="text"
                     value={dueDate}
