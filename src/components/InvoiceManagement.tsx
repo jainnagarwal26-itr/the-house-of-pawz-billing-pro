@@ -298,7 +298,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                       </button>
 
                       {/* Cancel Invoice */}
-                      {!inv.isCancelled && (
+                      {!inv.isCancelled && userRole !== 'USER' && (
                         <button
                           onClick={() => handleTriggerAction('CANCEL', inv)}
                           className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/60 rounded-lg transition-colors"
@@ -309,7 +309,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                       )}
 
                       {/* Delete Invoice */}
-                      {onDeleteInvoice && (
+                      {onDeleteInvoice && userRole !== 'USER' && (
                         <button
                           onClick={() => {
                             if (confirm(`Are you sure you want to permanently delete invoice ${inv.invoiceNumber}? This action cannot be undone.`)) {

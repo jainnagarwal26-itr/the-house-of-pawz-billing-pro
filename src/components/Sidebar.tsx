@@ -35,6 +35,24 @@ interface SidebarProps {
   onOpenMobileDrawer?: () => void;
 }
 
+export function isTabAllowedForRole(tab: ActiveTab, role: UserRole): boolean {
+  if (role === 'ADMIN' || role === 'SUPER_ADMIN') return true;
+  
+  if (role === 'USER') {
+    return ['dashboard', 'invoices', 'customers', 'pets', 'payments'].includes(tab);
+  }
+
+  if (role === 'BILLING_STAFF') {
+    return ['dashboard', 'invoices', 'recurring', 'customers', 'pets', 'media', 'smart_import', 'payments', 'gst_reports', 'excel', 'audit'].includes(tab);
+  }
+
+  if (role === 'BILLING_USER') {
+    return ['dashboard', 'invoices', 'customers', 'pets', 'payments'].includes(tab);
+  }
+
+  return ['dashboard', 'invoices', 'customers', 'pets'].includes(tab);
+}
+
 export const Sidebar: React.FC<SidebarProps> = ({
   activeTab,
   onSelectTab,
@@ -49,7 +67,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [collapsed, setCollapsed] = useState(false);
   const isAdmin = userRole === 'ADMIN' || userRole === 'SUPER_ADMIN';
 
-  const navItems = [
+  const rawNavItems = [
     {
       id: 'dashboard' as ActiveTab,
       label: 'Dashboard',
@@ -137,6 +155,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       adminOnly: true
     }
   ];
+
+  const navItems = rawNavItems.filter(item => isTabAllowedForRole(item.id, userRole));
 
   const handleTabClick = (tab: ActiveTab) => {
     onSelectTab(tab);

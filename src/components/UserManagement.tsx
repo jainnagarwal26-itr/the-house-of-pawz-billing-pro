@@ -10,13 +10,15 @@ interface UserManagementProps {
   activeUser: User;
   onSwitchUserRole: (role: UserRole) => void;
   onAddUser: (user: User) => void;
+  onUpdateUser?: (user: User) => void;
 }
 
 export const UserManagement: React.FC<UserManagementProps> = ({
   users,
   activeUser,
   onSwitchUserRole,
-  onAddUser
+  onAddUser,
+  onUpdateUser
 }) => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [resetModalUser, setResetModalUser] = useState<User | null>(null);
@@ -26,7 +28,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({
 
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
-  const [role, setRole] = useState<UserRole>('BILLING_USER');
+  const [role, setRole] = useState<UserRole>('USER');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
 
@@ -53,11 +55,20 @@ export const UserManagement: React.FC<UserManagementProps> = ({
 
   const handleResetPassword = (e: React.FormEvent) => {
     e.preventDefault();
-    setResetSuccess(`Password and Admin PIN for ${resetModalUser?.name} successfully updated to PIN: ${newPin}.`);
+    if (resetModalUser && onUpdateUser) {
+      const updated: User = {
+        ...resetModalUser,
+        password: newPassword || resetModalUser.password || 'Chirag@2026',
+        pinCode: newPin || '1234'
+      };
+      onUpdateUser(updated);
+    }
+    setResetSuccess(`Password for ${resetModalUser?.name} successfully updated.`);
     setTimeout(() => {
       setResetSuccess('');
       setResetModalUser(null);
-    }, 2000);
+      setNewPassword('');
+    }, 1500);
   };
 
   const permissionsMatrix = [
@@ -76,22 +87,20 @@ export const UserManagement: React.FC<UserManagementProps> = ({
 
   const getRoleLabel = (r: UserRole) => {
     switch (r) {
-      case 'SUPER_ADMIN': return 'Super Admin (Owner)';
-      case 'ADMIN': return 'Admin (CA / Managing Partner)';
-      case 'MANAGER': return 'Store Manager';
-      case 'RECEPTION': return 'Front Desk Reception';
-      case 'BILLING_USER': return 'Billing Staff';
+      case 'ADMIN': return 'ADMIN (Admin / CA)';
+      case 'USER': return 'USER (Billing Operator)';
+      case 'BILLING_STAFF': return 'BILLING STAFF (CA Staff)';
+      case 'SUPER_ADMIN': return 'Super Admin';
       default: return r;
     }
   };
 
   const getRoleBadgeColor = (r: UserRole) => {
     switch (r) {
-      case 'SUPER_ADMIN': return 'bg-purple-100 text-purple-900 border-purple-300 dark:bg-purple-950 dark:text-purple-200';
-      case 'ADMIN': return 'bg-red-100 text-red-800 border-red-300 dark:bg-red-950 dark:text-red-300';
-      case 'MANAGER': return 'bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950 dark:text-amber-200';
-      case 'RECEPTION': return 'bg-emerald-100 text-emerald-900 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-200';
-      default: return 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950 dark:text-blue-300';
+      case 'ADMIN': return 'bg-red-100 text-[#D62828] border-red-300 dark:bg-red-950 dark:text-red-300';
+      case 'USER': return 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950 dark:text-blue-300';
+      case 'BILLING_STAFF': return 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300';
+      default: return 'bg-slate-100 text-slate-800 border-slate-300 dark:bg-zinc-800 dark:text-zinc-300';
     }
   };
 

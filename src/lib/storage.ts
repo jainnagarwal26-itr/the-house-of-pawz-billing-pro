@@ -33,26 +33,49 @@ export const DEFAULT_COMPANY_SETTINGS: CompanySettings = {
 
 export const SYSTEM_USERS: User[] = [
   {
-    id: 'USR-001',
-    name: 'Chirag Jain, CA',
-    username: 'admin',
+    id: 'USR-ADMIN-001',
+    name: 'Chirag Jain',
+    username: 'Chirag Jain',
+    password: 'Chirag@2026',
     role: 'ADMIN',
-    email: 'chirag.ca@houseofpawz.com',
-    phone: '+91 98111 22233',
+    email: 'chirag.jain@thehouseofpawz.com',
+    phone: '+91 98197 02638',
+    designation: 'Admin / CA',
     avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=faces',
-    lastLogin: '2026-08-06 10:15 AM',
-    isActive: true
+    lastLogin: '2026-08-09 11:00 AM',
+    isActive: true,
+    pinCode: '1234',
+    recoveryKey: 'RECOVER-CHIRAG-2026'
   },
   {
-    id: 'USR-002',
-    name: 'Pooja Verma (Billing Staff)',
-    username: 'billing_staff',
-    role: 'BILLING_USER',
-    email: 'pooja.billing@houseofpawz.com',
-    phone: '+91 98765 43210',
+    id: 'USR-USER-002',
+    name: 'Poonam Bharti',
+    username: 'Poonam Bharti',
+    password: 'Poonam@123',
+    role: 'USER',
+    email: 'poonam.bharti@thehouseofpawz.com',
+    phone: '+91 98200 12345',
+    designation: 'Billing Operator',
     avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100&h=100&fit=crop&crop=faces',
-    lastLogin: '2026-08-06 09:30 AM',
-    isActive: true
+    lastLogin: '2026-08-09 10:30 AM',
+    isActive: true,
+    pinCode: '1234',
+    recoveryKey: 'RECOVER-POONAM-123'
+  },
+  {
+    id: 'USR-STAFF-003',
+    name: 'Billing Staff',
+    username: 'Staff',
+    password: 'Staff@2026',
+    role: 'BILLING_STAFF',
+    email: 'staff.billing@thehouseofpawz.com',
+    phone: '+91 98765 43210',
+    designation: 'Billing / CA Staff',
+    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=100&h=100&fit=crop&crop=faces',
+    lastLogin: '2026-08-09 09:15 AM',
+    isActive: true,
+    pinCode: '1234',
+    recoveryKey: 'RECOVER-STAFF-2026'
   }
 ];
 
@@ -173,6 +196,7 @@ const STORAGE_KEYS = {
   RECURRING: 'hop_recurring_v2',
   AUDIT: 'hop_audit_v2',
   ACTIVE_USER: 'hop_active_user_v2',
+  SESSION: 'hop_session_v2',
   DARK_MODE: 'hop_dark_mode_v2'
 };
 

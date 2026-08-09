@@ -1,16 +1,19 @@
-export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'MANAGER' | 'RECEPTION' | 'BILLING_USER';
+export type UserRole = 'ADMIN' | 'USER' | 'BILLING_STAFF' | 'SUPER_ADMIN' | 'MANAGER' | 'RECEPTION' | 'BILLING_USER';
 
 export interface User {
   id: string;
   name: string;
   username: string;
+  password?: string;
   role: UserRole;
   email: string;
   phone: string;
+  designation?: string;
   avatar?: string;
   lastLogin: string;
   isActive: boolean;
   pinCode?: string; // Default '1234' for Admin approvals
+  recoveryKey?: string;
 }
 
 export interface Customer {

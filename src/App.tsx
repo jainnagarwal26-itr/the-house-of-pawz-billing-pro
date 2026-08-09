@@ -13,7 +13,7 @@ import {
 import { exportFullDatabaseToExcel } from './lib/excelHelper';
 
 import { TopBar } from './components/TopBar';
-import { Sidebar, ActiveTab } from './components/Sidebar';
+import { Sidebar, ActiveTab, isTabAllowedForRole } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
 import { InvoiceManagement } from './components/InvoiceManagement';
 import { InvoiceModal } from './components/InvoiceModal';
@@ -31,6 +31,8 @@ import { SettingsModal } from './components/SettingsModal';
 import { BarcodeScannerModal } from './components/BarcodeScannerModal';
 import { GlobalSearchModal } from './components/GlobalSearchModal';
 import { NotificationPanel } from './components/NotificationPanel';
+import { LoginModal } from './components/LoginModal';
+import { ForgotPasswordModal } from './components/ForgotPasswordModal';
 import { Footer } from './components/Footer';
 
 export default function App() {
@@ -39,55 +41,34 @@ export default function App() {
     loadStoredData(STORAGE_KEYS.DARK_MODE, false)
   );
 
-  // Active User State
+  // Authenticated Session State
+  const [session, setSession] = useState<User | null>(() => {
+    return loadStoredData<User | null>(STORAGE_KEYS.SESSION, null);
+  });
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+
+  // Active Users List State
   const [users, setUsers] = useState<User[]>(() => {
     const data = loadStoredData(STORAGE_KEYS.USERS, SYSTEM_USERS);
-    return data.map(u => {
-      let name = u.name;
-      let email = u.email;
-      let changed = false;
-      if (name.includes('Amit Bansal')) {
-        name = name.replace('Amit Bansal', 'Chirag Jain');
-        changed = true;
-      }
-      if (name.includes('Chirag Jian')) {
-        name = name.replace('Chirag Jian', 'Chirag Jain');
-        changed = true;
-      }
-      if (email.includes('amit.ca')) {
-        email = email.replace('amit.ca', 'chirag.ca');
-        changed = true;
-      }
-      if (email.includes('jian.ca')) {
-        email = email.replace('jian.ca', 'jain.ca');
-        changed = true;
-      }
-      return changed ? { ...u, name, email } : u;
-    });
+    return data && data.length > 0 ? data : SYSTEM_USERS;
   });
+
   const [currentUser, setCurrentUser] = useState<User>(() => {
-    const u = loadStoredData(STORAGE_KEYS.ACTIVE_USER, SYSTEM_USERS[0]);
-    let name = u.name;
-    let email = u.email;
-    let changed = false;
-    if (name.includes('Amit Bansal')) {
-      name = name.replace('Amit Bansal', 'Chirag Jain');
-      changed = true;
-    }
-    if (name.includes('Chirag Jian')) {
-      name = name.replace('Chirag Jian', 'Chirag Jain');
-      changed = true;
-    }
-    if (email.includes('amit.ca')) {
-      email = email.replace('amit.ca', 'chirag.ca');
-      changed = true;
-    }
-    if (email.includes('jian.ca')) {
-      email = email.replace('jian.ca', 'jain.ca');
-      changed = true;
-    }
-    return changed ? { ...u, name, email } : u;
+    const active = loadStoredData<User | null>(STORAGE_KEYS.SESSION, null);
+    if (active) return active;
+    const fallback = loadStoredData(STORAGE_KEYS.ACTIVE_USER, SYSTEM_USERS[0]);
+    return fallback;
   });
+
+  // Keep currentUser in sync with session
+  useEffect(() => {
+    if (session) {
+      setCurrentUser(session);
+      saveStoredData(STORAGE_KEYS.SESSION, session);
+    }
+  }, [session]);
+
+
 
   // Settings State
   const [settings, setSettings] = useState<CompanySettings>(() => {
@@ -189,6 +170,13 @@ export default function App() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showMobileDrawer, setShowMobileDrawer] = useState(false);
 
+  // Strict Route / Module Level Security Enforcement
+  useEffect(() => {
+    if (session && !isTabAllowedForRole(activeTab, session.role)) {
+      setActiveTab('dashboard');
+    }
+  }, [activeTab, session]);
+
   // Apply dark mode class to html and body elements
   useEffect(() => {
     if (darkMode) {
@@ -226,6 +214,35 @@ export default function App() {
     window.addEventListener('keydown', handleGlobalKeys);
     return () => window.removeEventListener('keydown', handleGlobalKeys);
   }, []);
+
+  // Authentication & Session Handlers
+  const handleLoginSuccess = (user: User, remember: boolean) => {
+    setSession(user);
+    setCurrentUser(user);
+    if (remember) {
+      saveStoredData(STORAGE_KEYS.SESSION, user);
+    }
+    createAuditLog('USER_LOGIN' as any, `Successful login by ${user.name} (${user.role})`, user);
+    setAuditLogs(loadStoredData(STORAGE_KEYS.AUDIT, []));
+  };
+
+  const handleLogout = () => {
+    if (session) {
+      createAuditLog('USER_LOGOUT' as any, `Logged out of session (${session.name})`, session);
+    }
+    localStorage.removeItem(STORAGE_KEYS.SESSION);
+    setSession(null);
+    setAuditLogs(loadStoredData(STORAGE_KEYS.AUDIT, []));
+  };
+
+  const handlePasswordResetSuccess = (updatedUser: User) => {
+    const updatedUsers = users.map(u => u.id === updatedUser.id ? updatedUser : u);
+    setUsers(updatedUsers);
+    saveStoredData(STORAGE_KEYS.USERS, updatedUsers);
+    setShowForgotPassword(false);
+    createAuditLog('PASSWORD_RESET' as any, `Password reset for account ${updatedUser.name} (${updatedUser.username})`, updatedUser);
+    setAuditLogs(loadStoredData(STORAGE_KEYS.AUDIT, []));
+  };
 
   // Action Handler: Role Switcher
   const handleSwitchRole = (newRole: UserRole) => {
@@ -290,6 +307,10 @@ export default function App() {
 
   // Action Handler: Cancel Invoice
   const handleCancelInvoice = (invoiceId: string) => {
+    if (currentUser.role === 'USER') {
+      alert('Access Denied: USER role is not permitted to cancel invoices.');
+      return;
+    }
     const target = invoices.find(i => i.id === invoiceId);
     if (!target) return;
 
@@ -312,6 +333,10 @@ export default function App() {
 
   // Action Handler: Delete Invoice
   const handleDeleteInvoice = (invoiceId: string) => {
+    if (currentUser.role === 'USER') {
+      alert('Access Denied: USER role is not permitted to delete invoices.');
+      return;
+    }
     const target = invoices.find(i => i.id === invoiceId);
     if (!target) return;
     setInvoices(prev => prev.filter(i => i.id !== invoiceId));
@@ -366,6 +391,10 @@ export default function App() {
   };
 
   const handleDeleteCustomer = (customerId: string) => {
+    if (currentUser.role === 'USER') {
+      alert('Access Denied: USER role is not permitted to delete customer records.');
+      return;
+    }
     const target = customers.find(c => c.id === customerId);
     if (!target) return;
     setCustomers(prev => prev.filter(c => c.id !== customerId));
@@ -387,6 +416,10 @@ export default function App() {
   };
 
   const handleDeletePet = (petId: string) => {
+    if (currentUser.role === 'USER') {
+      alert('Access Denied: USER role is not permitted to delete pet profiles.');
+      return;
+    }
     const target = pets.find(p => p.id === petId);
     if (!target) return;
     setPets(prev => prev.filter(p => p.id !== petId));
@@ -503,12 +536,33 @@ export default function App() {
     setAuditLogs(loadStoredData(STORAGE_KEYS.AUDIT, []));
   };
 
+  // If user is not authenticated, show Login Screen / Forgot Password Modal
+  if (!session) {
+    return (
+      <div className="h-screen w-full bg-slate-950">
+        <LoginModal
+          users={users}
+          onLoginSuccess={handleLoginSuccess}
+          onOpenForgotPassword={() => setShowForgotPassword(true)}
+        />
+        {showForgotPassword && (
+          <ForgotPasswordModal
+            users={users}
+            onResetSuccess={handlePasswordResetSuccess}
+            onClose={() => setShowForgotPassword(false)}
+          />
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="h-screen h-[100dvh] w-full bg-[#F8F9FA] dark:bg-[#121212] text-slate-900 dark:text-zinc-100 font-sans flex flex-col overflow-hidden">
       {/* Desktop & Mobile Top Window Navigation */}
       <TopBar
         currentUser={currentUser}
         onSwitchRole={handleSwitchRole}
+        onLogout={handleLogout}
         darkMode={darkMode}
         onToggleDarkMode={() => setDarkMode(!darkMode)}
         onOpenGlobalSearch={() => setShowGlobalSearch(true)}
@@ -701,7 +755,16 @@ export default function App() {
               users={users}
               activeUser={currentUser}
               onSwitchUserRole={handleSwitchRole}
-              onAddUser={u => setUsers([...users, u])}
+              onAddUser={u => {
+                const updatedUsers = [...users, u];
+                setUsers(updatedUsers);
+                saveStoredData(STORAGE_KEYS.USERS, updatedUsers);
+              }}
+              onUpdateUser={u => {
+                const updatedUsers = users.map(existing => existing.id === u.id ? u : existing);
+                setUsers(updatedUsers);
+                saveStoredData(STORAGE_KEYS.USERS, updatedUsers);
+              }}
             />
           )}
 
