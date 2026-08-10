@@ -254,6 +254,35 @@ BEGIN
         );
     END IF;
 
+    -- Ensure matching auth.identities records exist for GoTrue login
+    INSERT INTO auth.identities (id, user_id, identity_data, provider, provider_id, last_sign_in_at, created_at, updated_at)
+    VALUES
+    (
+        gen_random_uuid(),
+        'a0000000-0000-0000-0000-000000000001'::uuid,
+        jsonb_build_object('sub', 'a0000000-0000-0000-0000-000000000001', 'email', 'chirag@thehouseofpawz.com', 'email_verified', true, 'phone_verified', false),
+        'email',
+        'a0000000-0000-0000-0000-000000000001',
+        NOW(), NOW(), NOW()
+    ),
+    (
+        gen_random_uuid(),
+        'a0000000-0000-0000-0000-000000000002'::uuid,
+        jsonb_build_object('sub', 'a0000000-0000-0000-0000-000000000002', 'email', 'poonam@thehouseofpawz.com', 'email_verified', true, 'phone_verified', false),
+        'email',
+        'a0000000-0000-0000-0000-000000000002',
+        NOW(), NOW(), NOW()
+    ),
+    (
+        gen_random_uuid(),
+        'a0000000-0000-0000-0000-000000000003'::uuid,
+        jsonb_build_object('sub', 'a0000000-0000-0000-0000-000000000003', 'email', 'staff@thehouseofpawz.com', 'email_verified', true, 'phone_verified', false),
+        'email',
+        'a0000000-0000-0000-0000-000000000003',
+        NOW(), NOW(), NOW()
+    )
+    ON CONFLICT (provider, provider_id) DO NOTHING;
+
     SELECT id INTO chirag_uuid
       FROM auth.users
      WHERE email = 'chirag@thehouseofpawz.com'
