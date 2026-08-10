@@ -1,10 +1,11 @@
 import React, { useState, useRef } from 'react';
 import { 
   HardDrive, Download, Upload, CheckCircle2, ShieldAlert, Table, 
-  RotateCcw, ShieldCheck, Activity, Save, Folder, Clock, AlertTriangle, Wrench, RefreshCw
+  RotateCcw, ShieldCheck, Activity, Save, Folder, Clock, AlertTriangle, Wrench, RefreshCw,
+  Cloud, CloudOff, FileSpreadsheet, ExternalLink
 } from 'lucide-react';
 import { Customer, Pet, Invoice, Payment, User, CompanySettings, AuditLog, RecurringSubscription } from '../types';
-import { exportFullDatabaseToExcel } from '../lib/excelHelper';
+import { exportFullDatabaseToExcel, generateAndUploadExcelBackup, XlsxBackupMetadata } from '../lib/excelHelper';
 import { hasPermission } from '../lib/permissions';
 
 interface ExcelManagerProps {
@@ -51,6 +52,40 @@ export const ExcelManager: React.FC<ExcelManagerProps> = ({
   // Diagnostics State
   const [isRepairing, setIsRepairing] = useState(false);
   const [repairMessage, setRepairMessage] = useState<string | null>(null);
+
+  // Cloud Backup State
+  const [isGeneratingBackup, setIsGeneratingBackup] = useState(false);
+  const [backupMeta, setBackupMeta] = useState<XlsxBackupMetadata | null>(null);
+  const [backupError, setBackupError] = useState<string | null>(null);
+
+  const handleCloudBackup = async () => {
+    setIsGeneratingBackup(true);
+    setBackupError(null);
+    setBackupMeta(null);
+    try {
+      const meta = await generateAndUploadExcelBackup();
+      setBackupMeta(meta);
+      setBackupError(null);
+      if (onAddAuditLog) {
+        onAddAuditLog(
+          'BACKUP_CREATED' as any,
+          `XLSX_BACKUP_GENERATED: ${meta.filename} (${meta.sizeKb} KB) — ${meta.invoiceCount} invoices, ${meta.customerCount} customers, ${meta.paymentCount} payments uploaded to Supabase Storage backups/`
+        );
+      }
+    } catch (err: any) {
+      const errMsg = err?.message || 'Unknown error during XLSX backup';
+      setBackupError(errMsg);
+      if (onAddAuditLog) {
+        onAddAuditLog(
+          'BACKUP_CREATED' as any,
+          `XLSX_BACKUP_FAILED: ${errMsg}`
+        );
+      }
+    } finally {
+      setIsGeneratingBackup(false);
+    }
+  };
+
 
   const totalRecordsCount = customers.length + pets.length + invoices.length + payments.length + users.length;
 
@@ -211,6 +246,99 @@ export const ExcelManager: React.FC<ExcelManagerProps> = ({
           <span className="font-semibold">{repairMessage}</span>
         </div>
       )}
+
+      {/* ── SUPABASE CLOUD BACKUP SECTION (Admin Only) ─────────────────── */}
+      <div className="bg-white dark:bg-zinc-900 p-5 rounded-2xl border-2 border-emerald-500/30 dark:border-emerald-600/30 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h3 className="font-extrabold text-slate-900 dark:text-white text-sm flex items-center gap-2">
+              <Cloud className="w-4 h-4 text-emerald-600" />
+              <span>Supabase Cloud Backup</span>
+              <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200 uppercase tracking-wider">
+                Admin Only
+              </span>
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+              Fetches LIVE data from Supabase → generates 9-sheet XLSX → uploads to private <span className="font-mono text-emerald-600">backups/</span> bucket → returns signed URL
+            </p>
+          </div>
+
+          <button
+            onClick={handleCloudBackup}
+            disabled={isGeneratingBackup}
+            className={`px-5 py-2.5 font-extrabold rounded-xl text-xs flex items-center space-x-2 shadow-lg transition-all ${
+              isGeneratingBackup
+                ? 'bg-slate-400 cursor-not-allowed text-white'
+                : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-900/30 active:scale-95'
+            }`}
+          >
+            {isGeneratingBackup ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                <span>Generating Backup…</span>
+              </>
+            ) : (
+              <>
+                <FileSpreadsheet className="w-4 h-4" />
+                <span>Generate Latest Excel Backup</span>
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Backup Error */}
+        {backupError && (
+          <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-800 rounded-xl text-xs flex items-start space-x-2 text-red-900 dark:text-red-200">
+            <CloudOff className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold">XLSX_BACKUP_FAILED</p>
+              <p className="font-mono mt-0.5 break-all">{backupError}</p>
+              <p className="mt-1 text-[11px] text-red-700 dark:text-red-300">Production billing operations are NOT affected by this error. Click retry to try again.</p>
+            </div>
+          </div>
+        )}
+
+        {/* Backup Success Metadata */}
+        {backupMeta && !backupError && (
+          <div className="p-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-700 rounded-xl space-y-3">
+            <div className="flex items-center space-x-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span className="font-bold text-emerald-900 dark:text-emerald-100 text-xs">XLSX_BACKUP_GENERATED ✓</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+              {[
+                { label: 'Filename', value: backupMeta.filename },
+                { label: 'Generated At', value: backupMeta.generatedAt },
+                { label: 'File Size', value: `${backupMeta.sizeKb} KB` },
+                { label: 'Invoices', value: backupMeta.invoiceCount.toString() },
+                { label: 'Customers', value: backupMeta.customerCount.toString() },
+                { label: 'Pets', value: backupMeta.petCount.toString() },
+                { label: 'Invoice Items', value: backupMeta.invoiceItemCount.toString() },
+                { label: 'Payments', value: backupMeta.paymentCount.toString() },
+                { label: 'Storage Bucket', value: 'backups/ (Private)' }
+              ].map(item => (
+                <div key={item.label} className="bg-white dark:bg-zinc-900 p-2 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                  <p className="text-[10px] font-bold text-slate-500 dark:text-zinc-400 uppercase">{item.label}</p>
+                  <p className="font-mono font-bold text-slate-900 dark:text-white mt-0.5 truncate">{item.value}</p>
+                </div>
+              ))}
+            </div>
+            <a
+              href={backupMeta.signedUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center space-x-2 px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl text-xs shadow-md transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              <span>Download Latest Backup</span>
+              <ExternalLink className="w-3 h-3 opacity-70" />
+            </a>
+            <p className="text-[10px] text-slate-400 dark:text-zinc-500 font-mono">
+              Signed URL expires in 1 hour. Generate a new backup for a fresh link.
+            </p>
+          </div>
+        )}
+      </div>
 
       {/* System Health Status Banner */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">

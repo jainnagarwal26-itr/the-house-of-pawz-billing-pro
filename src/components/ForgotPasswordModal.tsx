@@ -54,16 +54,15 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
     setErrorMessage('');
 
     const cleanKey = securityKey.trim();
-    // Verify against recoveryKey, pinCode '1234', or 'RECOVER'
+    // Verify against stored recoveryKey or pinCode only
+    // No hardcoded fallback passwords allowed in production
     if (
-      cleanKey === matchedUser?.recoveryKey ||
-      cleanKey === matchedUser?.pinCode ||
-      cleanKey === '1234' ||
-      cleanKey === 'Chirag@2026'
+      (matchedUser?.recoveryKey && cleanKey === matchedUser.recoveryKey) ||
+      (matchedUser?.pinCode && cleanKey === matchedUser.pinCode)
     ) {
       setStep(3);
     } else {
-      setErrorMessage('Invalid Security Recovery Key or Security PIN. Please check or ask Admin for assistance.');
+      setErrorMessage('Invalid Security Recovery Key or Security PIN. Please contact Admin for assistance.');
     }
   };
 

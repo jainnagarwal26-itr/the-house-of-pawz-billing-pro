@@ -15,7 +15,7 @@ export type ActiveTab =
   | 'recurring'
   | 'customers' 
   | 'pets' 
-  | 'media'
+  | 'communication'
   | 'smart_import'
   | 'payments' 
   | 'gst_reports' 
@@ -47,7 +47,7 @@ export function isTabAllowedForUser(tab: ActiveTab, user?: User | null, userRole
       recurring: 'boarding_view',
       customers: 'customers_view',
       pets: 'pets_view',
-      media: 'media_center_view',
+      communication: 'communication_center_view',
       smart_import: 'import_engine_view',
       payments: 'payments_view',
       gst_reports: 'gst_reports_view',
@@ -62,13 +62,13 @@ export function isTabAllowedForUser(tab: ActiveTab, user?: User | null, userRole
 
   if (role === 'ADMIN' || role === 'SUPER_ADMIN') return true;
   if (role === 'USER' || role === 'BILLING_USER') {
-    return ['dashboard', 'invoices', 'customers', 'pets', 'payments'].includes(tab);
+    return ['dashboard', 'invoices', 'customers', 'pets', 'communication', 'payments'].includes(tab);
   }
   if (role === 'BILLING_STAFF') {
-    return ['dashboard', 'invoices', 'recurring', 'customers', 'pets', 'media', 'smart_import', 'payments', 'gst_reports', 'excel', 'audit'].includes(tab);
+    return ['dashboard', 'invoices', 'recurring', 'customers', 'pets', 'communication', 'smart_import', 'payments', 'gst_reports', 'excel', 'audit'].includes(tab);
   }
 
-  return ['dashboard', 'invoices', 'customers', 'pets'].includes(tab);
+  return ['dashboard', 'invoices', 'customers', 'pets', 'communication'].includes(tab);
 }
 
 // Backwards compatibility alias
@@ -125,12 +125,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badgeColor: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200'
     },
     {
-      id: 'media' as ActiveTab,
-      label: 'Media & PDF Center',
-      icon: Camera,
+      id: 'communication' as ActiveTab,
+      label: 'Communication Centre',
+      icon: Sparkles,
       adminOnly: false,
-      badge: 'WEBP',
-      badgeColor: 'bg-[#D62828] text-white font-mono'
+      badge: 'HUB',
+      badgeColor: 'bg-blue-600 text-white font-mono'
     },
     {
       id: 'smart_import' as ActiveTab,

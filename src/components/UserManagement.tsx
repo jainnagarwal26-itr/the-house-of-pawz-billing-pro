@@ -76,8 +76,8 @@ export const UserManagement: React.FC<UserManagementProps> = ({
     if (resetModalUser && onUpdateUser) {
       const updated: User = {
         ...resetModalUser,
-        password: newPassword || resetModalUser.password || 'Chirag@2026',
-        pinCode: newPin || '1234'
+        // Password changes must be handled via Supabase Auth, not stored in UI state
+        pinCode: newPin || resetModalUser.pinCode || ''
       };
       onUpdateUser(updated);
     }

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { 
-  ShieldCheck, UserCheck, KeyRound, Eye, EyeOff, 
-  Lock, AlertCircle, HelpCircle, Building2, CheckCircle2, Sparkles
+  ShieldCheck, UserCheck, Eye, EyeOff, 
+  Lock, AlertCircle, Building2
 } from 'lucide-react';
 import { User, UserRole } from '../types';
+import { loginWithSupabase } from '../lib/authService';
 
 interface LoginModalProps {
   users: User[];
@@ -24,11 +25,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   const [errorMessage, setErrorMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Quick Role Selector Switcher Handler
   const handleRoleSelect = (role: UserRole) => {
     setSelectedRole(role);
     setErrorMessage('');
-    setPassword(''); // Never auto-fill password for security
+    setPassword('');
     if (role === 'ADMIN') {
       setLoginId('Chirag Jain');
     } else if (role === 'USER') {
@@ -38,95 +38,32 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     }
   };
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
     setIsSubmitting(true);
 
-    setTimeout(() => {
-      const cleanId = loginId.trim();
-      const cleanPass = password.trim();
+    const cleanId = loginId.trim().toLowerCase();
+    const cleanPass = password.trim();
 
-      // Find user matching credentials
-      let targetUser = users.find(u => {
-        const usernameMatch = u.username.toLowerCase() === cleanId.toLowerCase() ||
-                              u.name.toLowerCase() === cleanId.toLowerCase();
-        const roleMatch = u.role === selectedRole ||
-                          (selectedRole === 'ADMIN' && u.role === 'SUPER_ADMIN') ||
-                          (selectedRole === 'USER' && (u.role === 'RECEPTION' || u.role === 'MANAGER')) ||
-                          (selectedRole === 'BILLING_STAFF' && u.role === 'BILLING_USER');
-        const passMatch = u.password === cleanPass;
-        return usernameMatch && roleMatch && passMatch;
-      });
+    // Map username/ID to auth email if username entered
+    let authEmail = cleanId;
+    if (cleanId === 'chirag jain' || cleanId === 'chirag') {
+      authEmail = 'chirag@thehouseofpawz.com';
+    } else if (cleanId === 'poonam bharti' || cleanId === 'poonam') {
+      authEmail = 'poonam@thehouseofpawz.com';
+    } else if (cleanId === 'staff') {
+      authEmail = 'staff@thehouseofpawz.com';
+    }
 
-      // Direct fallback matching for initial production accounts
-      if (!targetUser) {
-        if (selectedRole === 'ADMIN' && cleanId.toLowerCase() === 'chirag jain' && cleanPass === 'Chirag@2026') {
-          targetUser = {
-            id: 'USR-ADMIN-001',
-            name: 'Chirag Jain',
-            username: 'Chirag Jain',
-            password: 'Chirag@2026',
-            role: 'ADMIN',
-            email: 'chirag.jain@thehouseofpawz.com',
-            phone: '+91 98197 02638',
-            designation: 'Admin / CA',
-            lastLogin: new Date().toLocaleString('en-IN'),
-            isActive: true
-          };
-        } else if (selectedRole === 'USER' && cleanId.toLowerCase() === 'poonam bharti' && cleanPass === 'Poonam@123') {
-          targetUser = {
-            id: 'USR-USER-002',
-            name: 'Poonam Bharti',
-            username: 'Poonam Bharti',
-            password: 'Poonam@123',
-            role: 'USER',
-            email: 'poonam.bharti@thehouseofpawz.com',
-            phone: '+91 98200 12345',
-            designation: 'Billing Operator',
-            lastLogin: new Date().toLocaleString('en-IN'),
-            isActive: true
-          };
-        } else if (selectedRole === 'BILLING_STAFF' && cleanId.toLowerCase() === 'staff' && cleanPass === 'Staff@2026') {
-          targetUser = {
-            id: 'USR-STAFF-003',
-            name: 'Billing Staff',
-            username: 'Staff',
-            password: 'Staff@2026',
-            role: 'BILLING_STAFF',
-            email: 'staff.billing@thehouseofpawz.com',
-            phone: '+91 98765 43210',
-            designation: 'Billing / CA Staff',
-            lastLogin: new Date().toLocaleString('en-IN'),
-            isActive: true
-          };
-        }
-      }
+    const { user: supabaseUser, error } = await loginWithSupabase(authEmail, cleanPass);
 
-      if (targetUser) {
-        // Inherit latest custom permissions from state/storage
-        const latestStoredUser = users.find(u => u.id === targetUser!.id || u.username.toLowerCase() === targetUser!.username.toLowerCase());
-        if (latestStoredUser && latestStoredUser.permissions) {
-          targetUser.permissions = latestStoredUser.permissions;
-        }
-
-        if (!targetUser.isActive) {
-          setErrorMessage('This user account is currently deactivated. Please contact your System Administrator.');
-          setIsSubmitting(false);
-          return;
-        }
-
-        const updatedUser: User = {
-          ...targetUser,
-          lastLogin: new Date().toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })
-        };
-
-        onLoginSuccess(updatedUser, rememberMe);
-      } else {
-        setErrorMessage('Invalid Login ID or Password for the selected role. Please check your credentials.');
-      }
-      setIsSubmitting(false);
-    }, 400);
+    if (supabaseUser) {
+      onLoginSuccess(supabaseUser, rememberMe);
+    } else {
+      setErrorMessage(error || 'Invalid credentials for selected role. Please check your password.');
+    }
+    setIsSubmitting(false);
   };
 
   return (
@@ -151,25 +88,24 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
           <h2 className="text-xl font-extrabold tracking-tight">THE HOUSE OF PAWZ</h2>
           <p className="text-xs text-amber-200 font-semibold tracking-wider uppercase mt-0.5">
-            BILLING PRO • PRODUCTION ERP ACCESS
+            BILLING PRO • SUPABASE AUTH
           </p>
         </div>
 
         {/* Form Body */}
         <div className="p-6 space-y-5">
-          {/* Step 1: Select Role Tabs */}
+          {/* Role Tabs */}
           <div>
             <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400 mb-2">
               Select Your Access Role:
             </label>
             <div className="grid grid-cols-3 gap-2">
-              {/* ADMIN TAB */}
               <button
                 type="button"
                 onClick={() => handleRoleSelect('ADMIN')}
                 className={`p-2.5 rounded-xl border flex flex-col items-center justify-center space-y-1 transition-all ${
                   selectedRole === 'ADMIN'
-                    ? 'bg-red-50 dark:bg-red-950/80 border-[#D62828] text-[#D62828] font-bold shadow-xs ring-2 ring-red-500/20'
+                    ? 'bg-red-50 dark:bg-red-950/80 border-[#D62828] text-[#D62828] font-bold ring-2 ring-red-500/20'
                     : 'bg-slate-50 dark:bg-zinc-800/60 border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-400 hover:bg-slate-100'
                 }`}
               >
@@ -178,13 +114,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                 <span className="text-[9px] text-slate-400 font-normal">Admin / CA</span>
               </button>
 
-              {/* USER TAB */}
               <button
                 type="button"
                 onClick={() => handleRoleSelect('USER')}
                 className={`p-2.5 rounded-xl border flex flex-col items-center justify-center space-y-1 transition-all ${
                   selectedRole === 'USER'
-                    ? 'bg-blue-50 dark:bg-blue-950/80 border-blue-600 text-blue-600 font-bold shadow-xs ring-2 ring-blue-500/20'
+                    ? 'bg-blue-50 dark:bg-blue-950/80 border-blue-600 text-blue-600 font-bold ring-2 ring-blue-500/20'
                     : 'bg-slate-50 dark:bg-zinc-800/60 border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-400 hover:bg-slate-100'
                 }`}
               >
@@ -193,13 +128,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                 <span className="text-[9px] text-slate-400 font-normal">Operator</span>
               </button>
 
-              {/* BILLING STAFF TAB */}
               <button
                 type="button"
                 onClick={() => handleRoleSelect('BILLING_STAFF')}
                 className={`p-2.5 rounded-xl border flex flex-col items-center justify-center space-y-1 transition-all ${
                   selectedRole === 'BILLING_STAFF'
-                    ? 'bg-emerald-50 dark:bg-emerald-950/80 border-emerald-600 text-emerald-600 font-bold shadow-xs ring-2 ring-emerald-500/20'
+                    ? 'bg-emerald-50 dark:bg-emerald-950/80 border-emerald-600 text-emerald-600 font-bold ring-2 ring-emerald-500/20'
                     : 'bg-slate-50 dark:bg-zinc-800/60 border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-400 hover:bg-slate-100'
                 }`}
               >
@@ -210,26 +144,24 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             </div>
           </div>
 
-          {/* Validation Error Alert */}
           {errorMessage && (
-            <div className="p-3 bg-red-50 dark:bg-red-950/80 border border-red-200 dark:border-red-800 rounded-xl text-red-700 dark:text-red-300 text-xs flex items-center space-x-2 animate-shake">
+            <div className="p-3 bg-red-50 dark:bg-red-950/80 border border-red-200 dark:border-red-800 rounded-xl text-red-700 dark:text-red-300 text-xs flex items-center space-x-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{errorMessage}</span>
             </div>
           )}
 
-          {/* Login Form */}
           <form onSubmit={handleLogin} className="space-y-4 text-xs">
             <div>
               <label className="block text-slate-700 dark:text-zinc-300 font-bold mb-1">
-                Login ID *
+                Login ID or Email *
               </label>
               <input
                 type="text"
                 required
                 value={loginId}
                 onChange={e => setLoginId(e.target.value)}
-                placeholder="Enter your Login ID"
+                placeholder="Enter Login ID or Email"
                 className="w-full h-10 px-3 rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-300 dark:border-zinc-700 text-slate-900 dark:text-white font-medium focus:outline-none focus:ring-2 focus:ring-[#D62828]/40"
               />
             </div>
@@ -267,7 +199,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               </div>
             </div>
 
-            {/* Remember Session Checkbox */}
             <div className="flex items-center justify-between pt-1">
               <label className="flex items-center space-x-2 text-slate-600 dark:text-zinc-400 cursor-pointer select-none">
                 <input
@@ -280,14 +211,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               </label>
             </div>
 
-            {/* Submit Button */}
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full h-11 bg-gradient-to-r from-[#D62828] to-red-700 hover:from-red-700 hover:to-red-800 text-white font-bold rounded-xl shadow-lg shadow-red-900/30 flex items-center justify-center space-x-2 transition-all disabled:opacity-50"
+              className="w-full h-11 bg-gradient-to-r from-[#D62828] to-red-700 hover:from-red-700 hover:to-red-800 text-white font-bold rounded-xl shadow-lg flex items-center justify-center space-x-2 transition-all disabled:opacity-50"
             >
               {isSubmitting ? (
-                <span>Verifying Credentials...</span>
+                <span>Authenticating with Supabase...</span>
               ) : (
                 <>
                   <Lock className="w-4 h-4" />
@@ -297,14 +227,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             </button>
           </form>
 
-          {/* Quick Production Account ID Hints */}
           <div className="p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-xl border border-slate-200 dark:border-zinc-800 text-[11px] text-slate-500 dark:text-zinc-400 space-y-1">
-            <span className="font-bold uppercase block text-[10px] text-slate-400">Production User IDs:</span>
-            <p>• <strong>ADMIN ID:</strong> Chirag Jain</p>
-            <p>• <strong>USER ID:</strong> Poonam Bharti</p>
-            <p>• <strong>STAFF ID:</strong> Staff</p>
+            <span className="font-bold uppercase block text-[10px] text-slate-400">Login Help:</span>
+            <p>• Enter your registered email or username</p>
+            <p>• Contact Admin if you cannot login</p>
           </div>
-
         </div>
       </div>
     </div>

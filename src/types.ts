@@ -177,6 +177,13 @@ export interface AuditLog {
     | 'INVOICE_CREATED' 
     | 'INVOICE_EDITED' 
     | 'INVOICE_CANCELLED' 
+    | 'INVOICE_WHATSAPP_OPENED'
+    | 'INVOICE_EMAIL_OPENED'
+    | 'INVOICE_PDF_DOWNLOADED'
+    | 'RECEIPT_WHATSAPP_OPENED'
+    | 'RECEIPT_EMAIL_OPENED'
+    | 'STATEMENT_WHATSAPP_OPENED'
+    | 'STATEMENT_EMAIL_OPENED'
     | 'PAYMENT_RECORDED' 
     | 'CUSTOMER_ADDED' 
     | 'CUSTOMER_EDITED'
@@ -255,36 +262,16 @@ export function formatDateDDMMYYYY(dateString?: string): string {
   return `${day}/${month}/${year}`;
 }
 
-export type PhotoCategory = 
-  | 'CheckIn' 
-  | 'Morning Update' 
-  | 'Afternoon Update' 
-  | 'Evening Update' 
-  | 'Food' 
-  | 'Medicine' 
-  | 'Play Time' 
-  | 'Grooming' 
-  | 'Birthday' 
-  | 'Special Event' 
-  | 'CheckOut';
-
-export interface PetMediaPhoto {
+export interface CommunicationRecord {
   id: string;
-  petId: string;
-  petName: string;
+  timestamp: string;
+  date: string;
   customerId: string;
   customerName: string;
-  customerPhone?: string;
-  boardingRoomNo?: string;
-  category: PhotoCategory;
-  originalFileName: string;
-  convertedFileName: string; // e.g. 20260806_091500_CheckIn.webp
-  filePath: string; // Photos/Pets/PET000001/CheckIn/20260806_091500_CheckIn.webp
-  fileSizeKB: number;
-  dimensions: string; // "1280x960"
-  format: 'WebP';
-  quality: number; // 80%
-  uploadTimestamp: string;
-  caption?: string;
-  imageUrl: string;
+  documentType: 'Invoice' | 'Receipt' | 'Statement';
+  documentRef: string;
+  channel: 'WhatsApp' | 'Email' | 'PDF';
+  userName: string;
+  status: 'Opened' | 'Downloaded' | 'Composer Opened';
+  notes?: string;
 }

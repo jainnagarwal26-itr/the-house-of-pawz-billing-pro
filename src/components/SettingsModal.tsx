@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Settings, Save, Building, QrCode, CheckCircle2, AlertTriangle, Trash2 } from 'lucide-react';
 import { CompanySettings, User } from '../types';
 import { hasPermission } from '../lib/permissions';
@@ -29,6 +29,27 @@ export const SettingsModal: React.FC<SettingsProps> = ({ settings, currentUser, 
   const [invoicePrefix, setInvoicePrefix] = useState(settings.invoicePrefix);
 
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (settings) {
+      setCompanyName(settings.companyName || 'The House of Pawz');
+      setTagline(settings.tagline || 'Luxury Pet Boarding, Daycare, Training & Spa');
+      setAddress(settings.address || 'Bungalow No. 164, Aram Nagar 1, Versova, Andheri West');
+      setCityStateZip(settings.cityStateZip || 'Mumbai, Maharashtra - 400061');
+      setPhone(settings.phone || '');
+      setEmail(settings.email || '');
+      setGstin(settings.gstin || '');
+      setAccountName(settings.accountName || 'The House of Pawz');
+      setBankName(settings.bankName || '');
+      setAccountNo(settings.accountNo || '');
+      setIfscCode(settings.ifscCode || '');
+      setBranch(settings.branch || 'Four Bungalow, Andheri (W).');
+      setUpiId(settings.upiId || '');
+      setLogoPath(settings.logoPath || '/Logo.jpg');
+      setSignaturePath(settings.signaturePath || '/Signature.jpg');
+      setInvoicePrefix(settings.invoicePrefix || 'HOP/26-27/');
+    }
+  }, [settings]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

@@ -1,18 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { 
   User, UserRole, Customer, Pet, Invoice, Payment, 
-  RecurringSubscription, AuditLog, CompanySettings, CatalogItem 
+  RecurringSubscription, AuditLog, CompanySettings, CatalogItem, CommunicationRecord 
 } from './types';
 import { 
   DEFAULT_COMPANY_SETTINGS, SYSTEM_USERS, 
-  STORAGE_KEYS, loadStoredData, saveStoredData, createAuditLog, factoryResetDatabase, cleanupObsoleteCache 
+  STORAGE_KEYS, loadStoredData, saveStoredData, factoryResetDatabase, cleanupObsoleteCache 
 } from './lib/storage';
-import { 
-  INITIAL_CUSTOMERS, INITIAL_PETS, INITIAL_INVOICES, INITIAL_PAYMENTS 
-} from './lib/initialClientData';
 import { exportFullDatabaseToExcel } from './lib/excelHelper';
 
-import { TopBar } from './components/TopBar';
+import { TopBar, DatabaseSyncStatus } from './components/TopBar';
 import { Sidebar, ActiveTab, isTabAllowedForUser } from './components/Sidebar';
 import { hasPermission } from './lib/permissions';
 import { Dashboard } from './components/Dashboard';
@@ -21,7 +18,7 @@ import { InvoiceModal } from './components/InvoiceModal';
 import { RecurringBilling } from './components/RecurringBilling';
 import { CustomerMaster } from './components/CustomerMaster';
 import { PetMaster } from './components/PetMaster';
-import { MediaGallery } from './components/MediaGallery';
+import { CommunicationCentre } from './components/CommunicationCentre';
 import { SmartImportEngine } from './components/SmartImportEngine';
 import { PaymentManagement } from './components/PaymentManagement';
 import { GSTReports } from './components/GSTReports';
@@ -36,7 +33,21 @@ import { LoginModal } from './components/LoginModal';
 import { ForgotPasswordModal } from './components/ForgotPasswordModal';
 import { Footer } from './components/Footer';
 
+// Supabase Production Services
+import { fetchActiveSessionUser, logoutSupabase } from './lib/authService';
+import { fetchCustomersFromSupabase, createCustomerInSupabase, updateCustomerInSupabase, deleteCustomerFromSupabase } from './lib/customerService';
+import { fetchPetsFromSupabase, createPetInSupabase, updatePetInSupabase, deletePetFromSupabase } from './lib/petService';
+import { fetchInvoicesFromSupabase, createInvoiceInSupabase, cancelInvoiceInSupabase, deleteInvoiceFromSupabase, fetchNextInvoiceNumberFromDB } from './lib/invoiceService';
+import { executeLiveProductionImport } from './lib/migrationService';
+import { fetchPaymentsFromSupabase, recordPaymentInSupabase } from './lib/paymentService';
+import { fetchCompanySettingsFromSupabase, updateCompanySettingsInSupabase } from './lib/settingsService';
+import { fetchUsersFromSupabase, updateUserPermissionInSupabase, updateUserRoleInSupabase } from './lib/userService';
+import { fetchAuditLogsFromSupabase, logAuditEventToSupabase } from './lib/auditService';
+
 export default function App() {
+  // Database Connection State
+  const [syncStatus, setSyncStatus] = useState<DatabaseSyncStatus>('syncing');
+
   // Dark Mode State
   const [darkMode, setDarkMode] = useState<boolean>(() => 
     loadStoredData(STORAGE_KEYS.DARK_MODE, false)
@@ -48,32 +59,13 @@ export default function App() {
   });
   const [showForgotPassword, setShowForgotPassword] = useState(false);
 
-  // Active Users List State (Strictly Production Accounts: ADMIN, USER, STAFF)
-  const [users, setUsers] = useState<User[]>(() => {
-    const stored = loadStoredData<User[]>(STORAGE_KEYS.USERS, []);
-    const merged = SYSTEM_USERS.map(sysUser => {
-      const existing = stored.find(s => s.id === sysUser.id || s.username.toLowerCase() === sysUser.username.toLowerCase());
-      return existing ? { ...sysUser, ...existing, password: sysUser.password, role: sysUser.role } : sysUser;
-    });
-    if (stored && stored.length > 0) {
-      stored.forEach(s => {
-        const isLegacy = s.id === 'USR-001' || s.id === 'USR-002' || 
-                         s.username === 'admin' || s.username === 'billing_staff' ||
-                         s.name.includes('Pooja Verma') || s.name.includes('Chirag Jain, CA');
-        if (!isLegacy && !merged.some(m => m.id === s.id || m.username.toLowerCase() === s.username.toLowerCase())) {
-          merged.push(s);
-        }
-      });
-    }
-    saveStoredData(STORAGE_KEYS.USERS, merged);
-    return merged;
-  });
+  // Active Users List State
+  const [users, setUsers] = useState<User[]>(SYSTEM_USERS);
 
   const [currentUser, setCurrentUser] = useState<User>(() => {
     const active = loadStoredData<User | null>(STORAGE_KEYS.SESSION, null);
     if (active) return active;
-    const fallback = loadStoredData(STORAGE_KEYS.ACTIVE_USER, SYSTEM_USERS[0]);
-    return fallback;
+    return SYSTEM_USERS[0];
   });
 
   // Keep currentUser in sync with session
@@ -84,106 +76,18 @@ export default function App() {
     }
   }, [session]);
 
-
-
   // Settings State
-  const [settings, setSettings] = useState<CompanySettings>(() => {
-    const data = loadStoredData(STORAGE_KEYS.SETTINGS, DEFAULT_COMPANY_SETTINGS);
-    const updated = {
-      ...DEFAULT_COMPANY_SETTINGS,
-      ...data
-    };
-    // Auto-update bank details if still using old HDFC default
-    if (updated.bankName === 'HDFC Bank Ltd.' || updated.accountNo === '50200088991234') {
-      updated.accountName = 'The House of Pawz';
-      updated.bankName = 'INDUSIND BANK';
-      updated.accountNo = '201003400051';
-      updated.ifscCode = 'INDB0001074';
-      updated.branch = 'Four Bungalow, Andheri (W).';
-    }
-    if (!updated.logoPath) updated.logoPath = '/Logo.jpg';
-    if (!updated.signaturePath) updated.signaturePath = '/Signature.jpg';
-    if (!updated.accountName) updated.accountName = 'The House of Pawz';
-    return updated;
-  });
+  const [settings, setSettings] = useState<CompanySettings>(DEFAULT_COMPANY_SETTINGS);
 
-  // Core Data Collections (Initialized with Actual Client Invoices 01-32)
-  const [customers, setCustomers] = useState<Customer[]>(() => {
-    const data = loadStoredData<Customer[]>(STORAGE_KEYS.CUSTOMERS, []);
-    const source = (data && data.length > 0) ? data : INITIAL_CUSTOMERS;
-    return source.map(c => {
-      const initMatch = INITIAL_CUSTOMERS.find(ic => ic.name === c.name || ic.id === c.id);
-      const adv = (c.advanceBalance !== undefined && c.advanceBalance !== null && c.advanceBalance > 0) 
-        ? c.advanceBalance 
-        : (initMatch?.advanceBalance || 0);
-      return { ...c, advanceBalance: adv };
-    });
-  });
-  const [pets, setPets] = useState<Pet[]>(() => {
-    const data = loadStoredData<Pet[]>(STORAGE_KEYS.PETS, []);
-    return data && data.length > 0 ? data : INITIAL_PETS;
-  });
-  const [invoices, setInvoices] = useState<Invoice[]>(() => {
-    cleanupObsoleteCache();
-    const stored = loadStoredData<Invoice[]>(STORAGE_KEYS.INVOICES, []);
-    const invMap = new Map<string, Invoice>();
-    
-    // First load mandatory master invoices (guarantees Invoice #15 is present)
-    INITIAL_INVOICES.forEach(inv => invMap.set(inv.id, inv));
-
-    // Merge user's stored invoices (preserves any edits or new invoices)
-    if (stored && stored.length > 0) {
-      stored.forEach(inv => invMap.set(inv.id, inv));
-    }
-
-    const mergedList = Array.from(invMap.values()).map(inv => {
-      let name = inv.createdByName;
-      if (name && name.includes('Amit Bansal')) name = name.replace('Amit Bansal', 'Chirag Jain');
-      if (name && name.includes('Chirag Jian')) name = name.replace('Chirag Jian', 'Chirag Jain');
-      return { ...inv, createdByName: name };
-    });
-
-    saveStoredData(STORAGE_KEYS.INVOICES, mergedList);
-    return mergedList;
-  });
-  const [payments, setPayments] = useState<Payment[]>(() => {
-    const stored = loadStoredData<Payment[]>(STORAGE_KEYS.PAYMENTS, []);
-    const payMap = new Map<string, Payment>();
-    
-    INITIAL_PAYMENTS.forEach(p => payMap.set(p.id, p));
-    if (stored && stored.length > 0) {
-      stored.forEach(p => payMap.set(p.id, p));
-    }
-
-    const mergedList = Array.from(payMap.values()).map(pay => {
-      let rec = pay.receivedBy;
-      if (rec && rec.includes('Amit Bansal')) rec = rec.replace('Amit Bansal', 'Chirag Jain');
-      if (rec && rec.includes('Chirag Jian')) rec = rec.replace('Chirag Jian', 'Chirag Jain');
-      return { ...pay, receivedBy: rec };
-    });
-
-    saveStoredData(STORAGE_KEYS.PAYMENTS, mergedList);
-    return mergedList;
-  });
+  // Core Data Collections
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [pets, setPets] = useState<Pet[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
   const [recurringList, setRecurringList] = useState<RecurringSubscription[]>(() =>
     loadStoredData(STORAGE_KEYS.RECURRING, [])
   );
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => {
-    const data = loadStoredData<AuditLog[]>(STORAGE_KEYS.AUDIT, []);
-    return data.map(log => {
-      let changed = false;
-      let name = log.userName;
-      if (name && name.includes('Amit Bansal')) {
-        name = name.replace('Amit Bansal', 'Chirag Jain');
-        changed = true;
-      }
-      if (name && name.includes('Chirag Jian')) {
-        name = name.replace('Chirag Jian', 'Chirag Jain');
-        changed = true;
-      }
-      return changed ? { ...log, userName: name } : log;
-    });
-  });
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
 
   // UI State
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
@@ -193,6 +97,61 @@ export default function App() {
   const [showGlobalSearch, setShowGlobalSearch] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showMobileDrawer, setShowMobileDrawer] = useState(false);
+  const [communicationHistory, setCommunicationHistory] = useState<CommunicationRecord[]>(() => 
+    loadStoredData('hop_communications_v2', [])
+  );
+
+  // ─── SUPABASE INITIAL DATA LOAD ────────────────────────
+  const loadProductionDataFromSupabase = async () => {
+    setSyncStatus('syncing');
+    try {
+      // 1. Check Auth Session
+      const activeUser = await fetchActiveSessionUser();
+      if (activeUser) {
+        setSession(activeUser);
+        setCurrentUser(activeUser);
+      }
+
+      // 2. Load all Production Tables in Parallel
+      const [
+        dbCustomers,
+        dbPets,
+        dbInvoices,
+        dbPayments,
+        dbSettings,
+        dbUsers,
+        dbAuditLogs
+      ] = await Promise.all([
+        fetchCustomersFromSupabase(),
+        fetchPetsFromSupabase(),
+        fetchInvoicesFromSupabase(),
+        fetchPaymentsFromSupabase(),
+        fetchCompanySettingsFromSupabase(),
+        fetchUsersFromSupabase(),
+        fetchAuditLogsFromSupabase()
+      ]);
+
+      if (dbCustomers.length > 0) setCustomers(dbCustomers);
+      if (dbPets.length > 0) setPets(dbPets);
+      if (dbInvoices.length > 0) setInvoices(dbInvoices);
+      if (dbPayments.length > 0) setPayments(dbPayments);
+      if (dbSettings) setSettings(dbSettings);
+      if (dbUsers.length > 0) setUsers(dbUsers);
+      if (dbAuditLogs.length > 0) setAuditLogs(dbAuditLogs);
+
+      // NOTE: Historical migration (Invoices 000001–000067) is complete.
+      // The auto-trigger has been intentionally removed. Do NOT re-add it.
+
+      setSyncStatus('connected');
+    } catch (err) {
+      console.error('Error connecting to Supabase database:', err);
+      setSyncStatus('offline');
+    }
+  };
+
+  useEffect(() => {
+    loadProductionDataFromSupabase();
+  }, []);
 
   // Strict Route / Module Level Security Enforcement
   useEffect(() => {
@@ -212,16 +171,6 @@ export default function App() {
     }
     saveStoredData(STORAGE_KEYS.DARK_MODE, darkMode);
   }, [darkMode]);
-
-  // Persist State Changes to LocalStorage
-  useEffect(() => saveStoredData(STORAGE_KEYS.SETTINGS, settings), [settings]);
-  useEffect(() => saveStoredData(STORAGE_KEYS.CUSTOMERS, customers), [customers]);
-  useEffect(() => saveStoredData(STORAGE_KEYS.PETS, pets), [pets]);
-  useEffect(() => saveStoredData(STORAGE_KEYS.INVOICES, invoices), [invoices]);
-  useEffect(() => saveStoredData(STORAGE_KEYS.PAYMENTS, payments), [payments]);
-  useEffect(() => saveStoredData(STORAGE_KEYS.RECURRING, recurringList), [recurringList]);
-  useEffect(() => saveStoredData(STORAGE_KEYS.USERS, users), [users]);
-  useEffect(() => saveStoredData(STORAGE_KEYS.ACTIVE_USER, currentUser), [currentUser]);
 
   // Global Keyboard Shortcuts (F2 for Search, Alt+N for New Invoice)
   useEffect(() => {
@@ -246,101 +195,62 @@ export default function App() {
     if (remember) {
       saveStoredData(STORAGE_KEYS.SESSION, user);
     }
-    createAuditLog('USER_LOGIN' as any, `Successful login by ${user.name} (${user.role})`, user);
-    setAuditLogs(loadStoredData(STORAGE_KEYS.AUDIT, []));
+    logAuditEventToSupabase('USER_LOGIN', `Successful login by ${user.name} (${user.role})`);
+    loadProductionDataFromSupabase();
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (session) {
-      createAuditLog('USER_LOGOUT' as any, `Logged out of session (${session.name})`, session);
+      logAuditEventToSupabase('USER_LOGOUT', `Logged out of session (${session.name})`);
     }
+    await logoutSupabase();
     localStorage.removeItem(STORAGE_KEYS.SESSION);
     setSession(null);
-    setAuditLogs(loadStoredData(STORAGE_KEYS.AUDIT, []));
   };
 
   const handlePasswordResetSuccess = (updatedUser: User) => {
     const updatedUsers = users.map(u => u.id === updatedUser.id ? updatedUser : u);
     setUsers(updatedUsers);
-    saveStoredData(STORAGE_KEYS.USERS, updatedUsers);
     setShowForgotPassword(false);
-    createAuditLog('PASSWORD_RESET' as any, `Password reset for account ${updatedUser.name} (${updatedUser.username})`, updatedUser);
-    setAuditLogs(loadStoredData(STORAGE_KEYS.AUDIT, []));
+    logAuditEventToSupabase('PASSWORD_RESET', `Password reset for account ${updatedUser.name} (${updatedUser.username})`);
   };
 
   // Action Handler: Role Switcher
-  const handleSwitchRole = (newRole: UserRole) => {
+  const handleSwitchRole = async (newRole: UserRole) => {
     const updatedUser = { ...currentUser, role: newRole };
     setCurrentUser(updatedUser);
-    createAuditLog(
+    logAuditEventToSupabase(
       'ROLE_SWITCHED', 
-      `Switched active role to ${newRole === 'ADMIN' ? 'Admin (CA/Owner)' : 'Billing Staff User'}`, 
-      updatedUser
+      `Switched active role to ${newRole === 'ADMIN' ? 'Admin (CA/Owner)' : 'Billing Staff User'}`
     );
-    setAuditLogs(loadStoredData(STORAGE_KEYS.AUDIT, []));
   };
 
   // Action Handler: Save GST Invoice
-  const handleSaveInvoice = (savedInv: Invoice) => {
-    const existingInv = invoices.find(i => i.id === savedInv.id);
-    let updatedInvoices: Invoice[];
-
-    if (existingInv) {
-      updatedInvoices = invoices.map(i => i.id === savedInv.id ? savedInv : i);
-      if (existingInv.invoiceNumber !== savedInv.invoiceNumber) {
-        createAuditLog(
-          'INVOICE_EDITED',
-          `Invoice Number Changed | Old: ${existingInv.invoiceNumber} | New: ${savedInv.invoiceNumber} | Changed By: ${currentUser.name} (${currentUser.role})`,
-          currentUser
-        );
-        // Keep payment records synced with updated Invoice Number
-        setPayments(prev => prev.map(p => p.invoiceId === savedInv.id ? { ...p, invoiceNumber: savedInv.invoiceNumber } : p));
-      } else {
-        createAuditLog('INVOICE_EDITED', `Updated Tax Invoice ${savedInv.invoiceNumber}`, currentUser);
-      }
-    } else {
-      updatedInvoices = [savedInv, ...invoices];
-      createAuditLog('INVOICE_CREATED', `Created Tax Invoice ${savedInv.invoiceNumber} for ${savedInv.customerName} (₹ ${savedInv.grandTotal.toFixed(2)})`, currentUser);
+  const handleSaveInvoice = async (savedInv: Invoice) => {
+    const res = await createInvoiceInSupabase(savedInv);
+    if (res.error) {
+      // Throw so InvoiceModal's try/catch catches it and shows validationError
+      // (isSubmitting will be unlocked in finally, allowing retry)
+      throw new Error(`Error saving invoice to Supabase: ${res.error}`);
     }
 
-    setInvoices(updatedInvoices);
+    logAuditEventToSupabase('INVOICE_CREATED', `Created Tax Invoice ${savedInv.invoiceNumber} for ${savedInv.customerName} (₹ ${savedInv.grandTotal.toFixed(2)})`);
 
-    // Update customer outstanding balance
-    const updatedCustomers = customers.map(c => {
-      if (c.id === savedInv.customerId) {
-        return {
-          ...c,
-          outstandingBalance: c.outstandingBalance + savedInv.balanceDue
-        };
-      }
-      return c;
-    });
-    setCustomers(updatedCustomers);
-
-    // If payment was collected at invoice creation, record payment log
-    if (savedInv.paidAmount > 0) {
-      const todayStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
-      const payLog: Payment = {
-        id: `PAY-${Date.now().toString().slice(-4)}`,
-        invoiceId: savedInv.id,
-        invoiceNumber: savedInv.invoiceNumber,
-        customerId: savedInv.customerId,
-        customerName: savedInv.customerName,
-        amount: savedInv.paidAmount,
-        paymentDate: todayStr,
-        paymentMode: savedInv.paymentMode,
-        transactionRef: 'Collected at Invoice Generation',
-        receivedBy: currentUser.name
-      };
-      setPayments([payLog, ...payments]);
-    }
+    // Refresh Invoices, Customers, Payments from Supabase
+    const [freshInvs, freshCusts, freshPays] = await Promise.all([
+      fetchInvoicesFromSupabase(),
+      fetchCustomersFromSupabase(),
+      fetchPaymentsFromSupabase()
+    ]);
+    if (freshInvs.length > 0) setInvoices(freshInvs);
+    if (freshCusts.length > 0) setCustomers(freshCusts);
+    if (freshPays.length > 0) setPayments(freshPays);
 
     setShowInvoiceModal(false);
-    setAuditLogs(loadStoredData(STORAGE_KEYS.AUDIT, []));
   };
 
   // Action Handler: Cancel Invoice
-  const handleCancelInvoice = (invoiceId: string) => {
+  const handleCancelInvoice = async (invoiceId: string) => {
     if (!hasPermission(currentUser, 'invoices_cancel')) {
       alert('Access Denied: You do not have permission to cancel invoices.');
       return;
@@ -348,180 +258,210 @@ export default function App() {
     const target = invoices.find(i => i.id === invoiceId);
     if (!target) return;
 
-    const updatedInvoices = invoices.map(i => {
-      if (i.id === invoiceId) {
-        return {
-          ...i,
-          isCancelled: true,
-          paymentStatus: 'CANCELLED' as const,
-          balanceDue: 0
-        };
-      }
-      return i;
-    });
+    const res = await cancelInvoiceInSupabase(invoiceId, 'Cancelled from UI');
+    if (res.error) {
+      alert(`Error cancelling invoice: ${res.error}`);
+      return;
+    }
 
-    setInvoices(updatedInvoices);
-    createAuditLog('INVOICE_CANCELLED', `Cancelled Tax Invoice ${target.invoiceNumber}`, currentUser);
-    setAuditLogs(loadStoredData(STORAGE_KEYS.AUDIT, []));
+    logAuditEventToSupabase('INVOICE_CANCELLED', `Cancelled Tax Invoice ${target.invoiceNumber}`);
+    const freshInvs = await fetchInvoicesFromSupabase();
+    setInvoices(freshInvs);
   };
 
   // Action Handler: Delete Invoice
-  const handleDeleteInvoice = (invoiceId: string) => {
+  const handleDeleteInvoice = async (invoiceId: string) => {
     if (!hasPermission(currentUser, 'invoices_delete')) {
       alert('Access Denied: You do not have permission to delete invoices.');
       return;
     }
     const target = invoices.find(i => i.id === invoiceId);
     if (!target) return;
-    setInvoices(prev => prev.filter(i => i.id !== invoiceId));
-    createAuditLog('INVOICE_CANCELLED' as any, `Deleted Tax Invoice ${target.invoiceNumber}`, currentUser);
-    setAuditLogs(loadStoredData(STORAGE_KEYS.AUDIT, []));
+
+    const res = await deleteInvoiceFromSupabase(invoiceId);
+    if (res.error) {
+      alert(`Error deleting invoice: ${res.error}`);
+      return;
+    }
+
+    logAuditEventToSupabase('INVOICE_CANCELLED' as any, `Deleted Tax Invoice ${target.invoiceNumber}`);
+    const freshInvs = await fetchInvoicesFromSupabase();
+    setInvoices(freshInvs);
   };
 
   // Action Handler: Record Payment against invoice
-  const handleRecordPayment = (newPay: Payment) => {
+  const handleRecordPayment = async (newPay: Payment) => {
     if (!hasPermission(currentUser, 'payments_record')) {
       alert('Access Denied: You do not have permission to record payments.');
       return;
     }
-    setPayments([newPay, ...payments]);
 
-    // Update invoice balance
-    const updatedInvoices = invoices.map(inv => {
-      if (inv.id === newPay.invoiceId) {
-        const newPaid = inv.paidAmount + newPay.amount;
-        const newBal = Math.max(0, inv.grandTotal - newPaid);
-        return {
-          ...inv,
-          paidAmount: newPaid,
-          balanceDue: newBal,
-          paymentStatus: (newBal === 0 ? 'PAID' : 'PARTIAL') as any
-        };
-      }
-      return inv;
-    });
-    setInvoices(updatedInvoices);
+    const res = await recordPaymentInSupabase(newPay);
+    if (res.error) {
+      alert(`Error recording payment: ${res.error}`);
+      return;
+    }
 
-    createAuditLog('PAYMENT_RECORDED', `Recorded payment ₹ ${newPay.amount} for Invoice ${newPay.invoiceNumber} via ${newPay.paymentMode}`, currentUser);
-    setAuditLogs(loadStoredData(STORAGE_KEYS.AUDIT, []));
+    logAuditEventToSupabase('PAYMENT_RECORDED', `Recorded payment ₹ ${newPay.amount} for Invoice ${newPay.invoiceNumber} via ${newPay.paymentMode}`);
+
+    const [freshInvs, freshPays] = await Promise.all([
+      fetchInvoicesFromSupabase(),
+      fetchPaymentsFromSupabase()
+    ]);
+    if (freshInvs.length > 0) setInvoices(freshInvs);
+    if (freshPays.length > 0) setPayments(freshPays);
   };
 
   // Action Handler: Delete Payment
-  const handleDeletePayment = (paymentId: string) => {
+  const handleDeletePayment = async (paymentId: string) => {
     if (!hasPermission(currentUser, 'payments_delete')) {
       alert('Access Denied: You do not have permission to delete payment records.');
       return;
     }
     const target = payments.find(p => p.id === paymentId);
     if (!target) return;
-    setPayments(prev => prev.filter(p => p.id !== paymentId));
-    createAuditLog('PAYMENT_RECORDED' as any, `Deleted Payment Record ${target.id} (₹${target.amount})`, currentUser);
-    setAuditLogs(loadStoredData(STORAGE_KEYS.AUDIT, []));
+
+    logAuditEventToSupabase('PAYMENT_RECORDED' as any, `Deleted Payment Record ${target.id} (₹${target.amount})`);
+    const freshPays = await fetchPaymentsFromSupabase();
+    setPayments(freshPays);
   };
 
   // Action Handler: Add / Edit / Delete Customer
-  const handleAddCustomer = (c: Customer) => {
+  const handleAddCustomer = async (c: Customer) => {
     if (!hasPermission(currentUser, 'customers_create')) {
       alert('Access Denied: You do not have permission to add new customers.');
       return;
     }
-    setCustomers([c, ...customers]);
-    createAuditLog('CUSTOMER_ADDED', `Added Customer ${c.name} (${c.phone})`, currentUser);
-    setAuditLogs(loadStoredData(STORAGE_KEYS.AUDIT, []));
+    const res = await createCustomerInSupabase(c);
+    if (res.error) {
+      alert(`Error adding customer: ${res.error}`);
+      return;
+    }
+    logAuditEventToSupabase('CUSTOMER_ADDED', `Added Customer ${c.name} (${c.phone})`);
+    const freshCusts = await fetchCustomersFromSupabase();
+    setCustomers(freshCusts);
   };
 
-  const handleEditCustomer = (c: Customer) => {
+  const handleEditCustomer = async (c: Customer) => {
     if (!hasPermission(currentUser, 'customers_edit')) {
       alert('Access Denied: You do not have permission to edit customer records.');
       return;
     }
-    setCustomers(customers.map(existing => existing.id === c.id ? c : existing));
-    createAuditLog('CUSTOMER_EDITED', `Updated Customer ${c.name}`, currentUser);
-    setAuditLogs(loadStoredData(STORAGE_KEYS.AUDIT, []));
+    const res = await updateCustomerInSupabase(c.id, c);
+    if (res.error) {
+      alert(`Error updating customer: ${res.error}`);
+      return;
+    }
+    logAuditEventToSupabase('CUSTOMER_EDITED', `Updated Customer ${c.name}`);
+    const freshCusts = await fetchCustomersFromSupabase();
+    setCustomers(freshCusts);
   };
 
-  const handleDeleteCustomer = (customerId: string) => {
+  const handleDeleteCustomer = async (customerId: string) => {
     if (!hasPermission(currentUser, 'customers_delete')) {
       alert('Access Denied: You do not have permission to delete customer records.');
       return;
     }
     const target = customers.find(c => c.id === customerId);
     if (!target) return;
-    setCustomers(prev => prev.filter(c => c.id !== customerId));
-    createAuditLog('CUSTOMER_EDITED' as any, `Deleted Customer ${target.name}`, currentUser);
-    setAuditLogs(loadStoredData(STORAGE_KEYS.AUDIT, []));
+
+    const res = await deleteCustomerFromSupabase(customerId);
+    if (res.error) {
+      alert(`Error deleting customer: ${res.error}`);
+      return;
+    }
+    logAuditEventToSupabase('CUSTOMER_EDITED' as any, `Deleted Customer ${target.name}`);
+    const freshCusts = await fetchCustomersFromSupabase();
+    setCustomers(freshCusts);
   };
 
   // Action Handler: Add / Edit / Delete Pet Profile & Boarding Status
-  const handleAddPet = (p: Pet) => {
+  const handleAddPet = async (p: Pet) => {
     if (!hasPermission(currentUser, 'pets_create')) {
       alert('Access Denied: You do not have permission to add pet profiles.');
       return;
     }
-    setPets([p, ...pets]);
-    createAuditLog('PET_ADDED', `Added Pet Profile ${p.name} (${p.breed})`, currentUser);
-    setAuditLogs(loadStoredData(STORAGE_KEYS.AUDIT, []));
+    const res = await createPetInSupabase(p);
+    if (res.error) {
+      alert(`Error adding pet: ${res.error}`);
+      return;
+    }
+    logAuditEventToSupabase('PET_ADDED', `Added Pet Profile ${p.name} (${p.breed})`);
+    const freshPets = await fetchPetsFromSupabase();
+    setPets(freshPets);
   };
 
-  const handleEditPet = (p: Pet) => {
+  const handleEditPet = async (p: Pet) => {
     if (!hasPermission(currentUser, 'pets_edit')) {
       alert('Access Denied: You do not have permission to edit pet profiles.');
       return;
     }
-    setPets(pets.map(existing => existing.id === p.id ? p : existing));
-    createAuditLog('PET_EDITED' as any, `Updated Pet Profile ${p.name}`, currentUser);
-    setAuditLogs(loadStoredData(STORAGE_KEYS.AUDIT, []));
+    const res = await updatePetInSupabase(p.id, p);
+    if (res.error) {
+      alert(`Error updating pet: ${res.error}`);
+      return;
+    }
+    logAuditEventToSupabase('PET_EDITED' as any, `Updated Pet Profile ${p.name}`);
+    const freshPets = await fetchPetsFromSupabase();
+    setPets(freshPets);
   };
 
-  const handleDeletePet = (petId: string) => {
+  const handleDeletePet = async (petId: string) => {
     if (!hasPermission(currentUser, 'pets_delete')) {
       alert('Access Denied: You do not have permission to delete pet profiles.');
       return;
     }
     const target = pets.find(p => p.id === petId);
     if (!target) return;
-    setPets(prev => prev.filter(p => p.id !== petId));
-    createAuditLog('PET_EDITED' as any, `Deleted Pet Profile ${target.name}`, currentUser);
-    setAuditLogs(loadStoredData(STORAGE_KEYS.AUDIT, []));
+
+    const res = await deletePetFromSupabase(petId);
+    if (res.error) {
+      alert(`Error deleting pet: ${res.error}`);
+      return;
+    }
+    logAuditEventToSupabase('PET_EDITED' as any, `Deleted Pet Profile ${target.name}`);
+    const freshPets = await fetchPetsFromSupabase();
+    setPets(freshPets);
   };
 
-  const handleToggleBoarding = (petId: string, isCheckIn: boolean, roomNo?: string) => {
+  const handleToggleBoarding = async (petId: string, isCheckIn: boolean, roomNo?: string) => {
     const todayStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    const updatedPets = pets.map(p => {
-      if (p.id === petId) {
-        return {
-          ...p,
-          isBoardingNow: isCheckIn,
-          checkInDate: isCheckIn ? todayStr : p.checkInDate,
-          checkOutDate: !isCheckIn ? todayStr : p.checkOutDate,
-          roomNo: isCheckIn ? roomNo || p.roomNo : p.roomNo
-        };
-      }
-      return p;
-    });
-
-    setPets(updatedPets);
     const targetPet = pets.find(p => p.id === petId);
-    createAuditLog(
+
+    const updates = {
+      isBoardingNow: isCheckIn,
+      checkInDate: isCheckIn ? todayStr : targetPet?.checkInDate,
+      checkOutDate: !isCheckIn ? todayStr : targetPet?.checkOutDate,
+      roomNo: isCheckIn ? roomNo || targetPet?.roomNo : targetPet?.roomNo
+    };
+
+    await updatePetInSupabase(petId, updates);
+    logAuditEventToSupabase(
       isCheckIn ? 'PET_CHECKIN' : 'PET_CHECKOUT',
-      `${isCheckIn ? 'Checked-In' : 'Checked-Out'} pet "${targetPet?.name}" for boarding (${roomNo || 'Suite'})`,
-      currentUser
+      `${isCheckIn ? 'Checked-In' : 'Checked-Out'} pet "${targetPet?.name}" for boarding (${roomNo || 'Suite'})`
     );
-    setAuditLogs(loadStoredData(STORAGE_KEYS.AUDIT, []));
+    const freshPets = await fetchPetsFromSupabase();
+    setPets(freshPets);
   };
 
   // Action Handler: Recurring billing auto-generation
   const handleAddRecurring = (sub: RecurringSubscription) => {
-    setRecurringList([sub, ...recurringList]);
+    const updated = [sub, ...recurringList];
+    setRecurringList(updated);
+    saveStoredData(STORAGE_KEYS.RECURRING, updated);
   };
 
-  const handleGenerateInvoiceForRecurring = (sub: RecurringSubscription) => {
+  // IMPORTANT: async — invoice number comes exclusively from the DB RPC, never from Date.now()
+  const handleGenerateInvoiceForRecurring = async (sub: RecurringSubscription) => {
     const todayStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
     const cust = customers.find(c => c.id === sub.customerId);
 
+    // Always obtain invoice number from the Supabase sequence RPC
+    const nextInvNumber = await fetchNextInvoiceNumberFromDB('26-27');
+
     const autoInv: Invoice = {
-      id: `INV-${Date.now().toString().slice(-6)}`,
-      invoiceNumber: `${settings.invoicePrefix}${Date.now().toString().slice(-6)}`,
+      id: `INV-REC-${Date.now().toString().slice(-8)}`,
+      invoiceNumber: nextInvNumber,
       invoiceDate: todayStr,
       dueDate: todayStr,
       customerId: sub.customerId,
@@ -536,7 +476,7 @@ export default function App() {
       isInterState: false,
       items: [
         {
-          id: 'ITEM-AUTO',
+          id: `ITEM-REC-${Date.now().toString().slice(-8)}`,
           type: 'SERVICE',
           name: sub.serviceName,
           hsnSac: '999799',
@@ -574,7 +514,7 @@ export default function App() {
       createdAt: new Date().toISOString()
     };
 
-    handleSaveInvoice(autoInv);
+    await handleSaveInvoice(autoInv);
     setActiveTab('invoices');
   };
 
@@ -590,8 +530,14 @@ export default function App() {
       auditLogs,
       recurring: recurringList
     });
-    createAuditLog('EXCEL_EXPORT', 'Exported complete 9-sheet Excel database workbook (.XLSX)', currentUser);
-    setAuditLogs(loadStoredData(STORAGE_KEYS.AUDIT, []));
+    logAuditEventToSupabase('EXCEL_EXPORT', 'Exported complete 9-sheet Excel database workbook (.XLSX)');
+  };
+
+  // Save Settings Handler
+  const handleSaveSettings = async (updatedSettings: CompanySettings) => {
+    setSettings(updatedSettings);
+    await updateCompanySettingsInSupabase(updatedSettings);
+    logAuditEventToSupabase('SETTINGS_UPDATED', `Updated company software settings`);
   };
 
   // If user is not authenticated, show Login Screen / Forgot Password Modal
@@ -616,7 +562,7 @@ export default function App() {
 
   return (
     <div className="h-screen h-[100dvh] w-full bg-[#F8F9FA] dark:bg-[#121212] text-slate-900 dark:text-zinc-100 font-sans flex flex-col overflow-hidden">
-      {/* Desktop & Mobile Top Window Navigation */}
+      {/* Top Window Navigation Bar */}
       <TopBar
         currentUser={currentUser}
         onSwitchRole={handleSwitchRole}
@@ -629,6 +575,7 @@ export default function App() {
         onOpenNotificationCenter={() => setShowNotifications(true)}
         onOpenMobileDrawer={() => setShowMobileDrawer(true)}
         unreadAlertsCount={invoices.filter(i => !i.isCancelled && i.balanceDue > 0).length}
+        syncStatus={syncStatus}
       />
 
       {/* Main Body Layout with Sidebar */}
@@ -727,15 +674,22 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'media' && (
-            <MediaGallery
-              pets={pets}
-              customers={customers}
+          {activeTab === 'communication' && (
+            <CommunicationCentre
               invoices={invoices}
               payments={payments}
-              onOpenNewInvoice={() => {
-                setEditingInvoice(null);
-                setShowInvoiceModal(true);
+              customers={customers}
+              pets={pets}
+              settings={settings}
+              currentUser={currentUser}
+              onAddAuditLog={(action, details) => {
+                logAuditEventToSupabase(action, details);
+              }}
+              historyRecords={communicationHistory}
+              onAddHistoryRecord={(record) => {
+                const updated = [record, ...communicationHistory];
+                setCommunicationHistory(updated);
+                saveStoredData('hop_communications_v2', updated);
               }}
             />
           )}
@@ -748,18 +702,7 @@ export default function App() {
               payments={payments}
               currentUser={currentUser}
               onImportSuccess={({ newCustomers, newPets, newInvoices, newPayments }) => {
-                if (newCustomers.length > 0) {
-                  setCustomers(prev => [...newCustomers, ...prev]);
-                }
-                if (newPets.length > 0) {
-                  setPets(prev => [...newPets, ...prev]);
-                }
-                if (newInvoices.length > 0) {
-                  setInvoices(prev => [...newInvoices, ...prev]);
-                }
-                if (newPayments.length > 0) {
-                  setPayments(prev => [...newPayments, ...prev]);
-                }
+                loadProductionDataFromSupabase();
               }}
               onClearDataFirst={() => {
                 setCustomers([]);
@@ -768,7 +711,7 @@ export default function App() {
                 setPayments([]);
               }}
               onAddAuditLog={(action, details) => {
-                createAuditLog(action, details, currentUser);
+                logAuditEventToSupabase(action, details);
               }}
             />
           )}
@@ -810,8 +753,7 @@ export default function App() {
               recurring={recurringList}
               currentUser={currentUser}
               onAddAuditLog={(action, details) => {
-                createAuditLog(action, details, currentUser);
-                setAuditLogs(loadStoredData(STORAGE_KEYS.AUDIT, []));
+                logAuditEventToSupabase(action, details);
               }}
             />
           )}
@@ -821,29 +763,35 @@ export default function App() {
               users={users}
               activeUser={currentUser}
               onSwitchUserRole={handleSwitchRole}
-              onAddUser={u => {
-                const updatedUsers = [...users, u];
-                setUsers(updatedUsers);
-                saveStoredData(STORAGE_KEYS.USERS, updatedUsers);
+              onAddUser={async u => {
+                await updateUserRoleInSupabase(u.id, u.role);
+                const freshUsers = await fetchUsersFromSupabase();
+                setUsers(freshUsers);
               }}
-              onUpdateUser={u => {
-                const updatedUsers = users.map(existing => existing.id === u.id ? u : existing);
-                setUsers(updatedUsers);
-                saveStoredData(STORAGE_KEYS.USERS, updatedUsers);
+              onUpdateUser={async u => {
+                // Save updated user permissions / role to Supabase
+                if (u.permissions) {
+                  for (const [key, val] of Object.entries(u.permissions)) {
+                    await updateUserPermissionInSupabase(u.id, key, val as boolean);
+                  }
+                }
+                await updateUserRoleInSupabase(u.id, u.role);
 
-                // If editing the active logged-in user, immediately update active session state!
+                const freshUsers = await fetchUsersFromSupabase();
+                setUsers(freshUsers);
+
                 if (session && (session.id === u.id || session.username.toLowerCase() === u.username.toLowerCase())) {
-                  setSession(u);
-                  setCurrentUser(u);
-                  saveStoredData(STORAGE_KEYS.SESSION, u);
+                  const updatedActive = freshUsers.find(fu => fu.id === u.id || fu.username.toLowerCase() === u.username.toLowerCase());
+                  if (updatedActive) {
+                    setSession(updatedActive);
+                    setCurrentUser(updatedActive);
+                  }
                 }
 
-                createAuditLog(
+                logAuditEventToSupabase(
                   'ROLE_SWITCHED' as any,
-                  `ADMIN ${currentUser.name} updated permissions for ${u.name} (${u.role})`,
-                  currentUser
+                  `ADMIN ${currentUser.name} updated permissions for ${u.name} (${u.role})`
                 );
-                setAuditLogs(loadStoredData(STORAGE_KEYS.AUDIT, []));
               }}
             />
           )}
@@ -856,7 +804,7 @@ export default function App() {
             <SettingsModal
               settings={settings}
               currentUser={currentUser}
-              onUpdateSettings={setSettings}
+              onUpdateSettings={handleSaveSettings}
               onFactoryReset={factoryResetDatabase}
             />
           )}
@@ -880,6 +828,8 @@ export default function App() {
           userRole={currentUser.role}
           userName={currentUser.name}
           onSaveInvoice={handleSaveInvoice}
+          onAddCustomer={handleAddCustomer}
+          onAddPet={handleAddPet}
           onClose={() => setShowInvoiceModal(false)}
         />
       )}

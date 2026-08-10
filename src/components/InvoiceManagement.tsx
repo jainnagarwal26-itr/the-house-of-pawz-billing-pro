@@ -100,17 +100,25 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   };
 
   // Filtered list
-  const filteredInvoices = invoices.filter(inv => {
-    const matchesSearch = 
-      inv.invoiceNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      inv.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      inv.customerPhone.includes(searchQuery) ||
-      (inv.petName && inv.petName.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredInvoices = invoices
+    .filter(inv => {
+      const matchesSearch = 
+        inv.invoiceNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        inv.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        inv.customerPhone.includes(searchQuery) ||
+        (inv.petName && inv.petName.toLowerCase().includes(searchQuery.toLowerCase()));
 
-    const matchesStatus = statusFilter === 'ALL' || inv.paymentStatus === statusFilter;
+      const matchesStatus = statusFilter === 'ALL' || inv.paymentStatus === statusFilter;
 
-    return matchesSearch && matchesStatus;
-  });
+      return matchesSearch && matchesStatus;
+    })
+    .sort((a, b) => {
+      // Sort by numeric invoice suffix (descending: newest first)
+      const numA = parseInt(a.invoiceNumber.split('/').pop() || '0', 10);
+      const numB = parseInt(b.invoiceNumber.split('/').pop() || '0', 10);
+      return numB - numA;
+    });
+
 
   // Calculate dynamic pagination
   const totalInvoices = filteredInvoices.length;
@@ -195,14 +203,14 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
           <table className="w-full text-left border-collapse table-fixed min-w-[900px]">
             <thead>
               <tr className="bg-slate-100 dark:bg-zinc-800/80 text-slate-700 dark:text-zinc-300 text-[10px] uppercase tracking-wider font-extrabold border-b border-slate-200 dark:border-zinc-800">
-                <th className="py-3 px-3.5 w-[16%]">Invoice Details</th>
-                <th className="py-3 px-3.5 w-[22%]">Customer & Pet</th>
+                <th className="py-3 px-3 w-[18%]">Invoice Details</th>
+                <th className="py-3 px-3 w-[16%]">Customer & Pet</th>
                 <th className="py-3 px-3 text-right w-[11%]">Taxable (₹)</th>
                 <th className="py-3 px-3 text-right w-[10%]">GST (18%)</th>
-                <th className="py-3 px-3 text-right w-[13%]">Grand Total</th>
+                <th className="py-3 px-3 text-right w-[14%]">Grand Total</th>
                 <th className="py-3 px-3 text-right w-[11%]">Balance Due</th>
-                <th className="py-3 px-3 text-center w-[10%]">Status</th>
-                <th className="py-3 px-3 text-center w-[17%] min-w-[150px]">Actions</th>
+                <th className="py-3 px-3 text-center w-[8%]">Status</th>
+                <th className="py-3 px-3 text-center w-[12%] min-w-[130px]">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-zinc-800/80 text-xs">

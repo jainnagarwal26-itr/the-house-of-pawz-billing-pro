@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   X, Plus, Trash2, QrCode, Search, Calculator, 
-  CheckCircle2, AlertCircle, ShieldAlert, Sparkles
+  CheckCircle2, AlertCircle, ShieldAlert, Sparkles, Loader2
 } from 'lucide-react';
 import { 
   Invoice, InvoiceItem, Customer, Pet, CatalogItem, 
@@ -9,6 +9,7 @@ import {
 } from '../types';
 import { CATALOG_ITEMS } from '../lib/storage';
 import { hasPermission } from '../lib/permissions';
+import { fetchNextInvoiceNumberFromDB } from '../lib/invoiceService';
 
 interface InvoiceModalProps {
   invoice?: Invoice | null;
@@ -20,6 +21,8 @@ interface InvoiceModalProps {
   userName: string;
   currentUser?: User | null;
   onSaveInvoice: (invoice: Invoice) => void;
+  onAddCustomer?: (customer: Customer) => void;
+  onAddPet?: (pet: Pet) => void;
   onClose: () => void;
 }
 
@@ -33,11 +36,29 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
   userName,
   currentUser,
   onSaveInvoice,
+  onAddCustomer,
+  onAddPet,
   onClose
 }) => {
   const isEditing = !!invoice;
-  const isAdmin = userRole === 'ADMIN';
-  const canEditInvoiceNumber = hasPermission(currentUser, 'invoices_change_number');
+  const isAdmin = userRole === 'ADMIN' || currentUser?.role === 'ADMIN';
+  const canEditInvoiceNumber = isAdmin || hasPermission(currentUser, 'invoices_change_number');
+
+  // Quick Add Customer State
+  const [showAddCustModal, setShowAddCustModal] = useState<boolean>(false);
+  const [newCustName, setNewCustName] = useState<string>('');
+  const [newCustPhone, setNewCustPhone] = useState<string>('');
+  const [newCustEmail, setNewCustEmail] = useState<string>('');
+  const [newCustAddress, setNewCustAddress] = useState<string>('');
+  const [newCustGSTIN, setNewCustGSTIN] = useState<string>('');
+
+  // Quick Add Pet State
+  const [showAddPetModal, setShowAddPetModal] = useState<boolean>(false);
+  const [newPetName, setNewPetName] = useState<string>('');
+  const [newPetSpecies, setNewPetSpecies] = useState<'Dog' | 'Cat' | 'Bird' | 'Rabbit' | 'Other'>('Dog');
+  const [newPetBreed, setNewPetBreed] = useState<string>('Standard');
+  const [newPetAge, setNewPetAge] = useState<string>('2 Years');
+  const [newPetGender, setNewPetGender] = useState<'Male' | 'Female'>('Male');
 
   // Selected Customer State
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>(invoice?.customerId || customers[0]?.id || '');
@@ -47,16 +68,113 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
   const [customerAddress, setCustomerAddress] = useState<string>(invoice?.customerAddress || customers[0]?.address || '');
   const [customerGSTIN, setCustomerGSTIN] = useState<string>(invoice?.customerGSTIN || customers[0]?.gstin || '');
 
+  // Quick Create Customer Handler
+  const handleQuickCreateCustomer = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCustName.trim() || !newCustPhone.trim()) {
+      alert('Please enter Customer Name and Phone Number.');
+      return;
+    }
+    const newCust: Customer = {
+      id: `CUST-${Date.now().toString().slice(-4)}`,
+      name: newCustName.trim(),
+      phone: newCustPhone.trim(),
+      email: newCustEmail.trim() || `${newCustName.trim().toLowerCase().replace(/\s+/g, '.')}@example.com`,
+      address: newCustAddress.trim() || 'Mumbai, Maharashtra',
+      gstin: newCustGSTIN.trim().toUpperCase(),
+      stateCode: settings.stateCode || '27-Maharashtra',
+      emergencyContact: newCustPhone.trim(),
+      outstandingBalance: 0,
+      advanceBalance: 0,
+      createdAt: new Date().toLocaleDateString('en-IN')
+    };
+
+    if (onAddCustomer) {
+      onAddCustomer(newCust);
+    }
+    setSelectedCustomerId(newCust.id);
+    setCustomerName(newCust.name);
+    setCustomerPhone(newCust.phone);
+    setCustomerEmail(newCust.email);
+    setCustomerAddress(newCust.address);
+    setCustomerGSTIN(newCust.gstin || '');
+
+    setNewCustName('');
+    setNewCustPhone('');
+    setNewCustEmail('');
+    setNewCustAddress('');
+    setNewCustGSTIN('');
+    setShowAddCustModal(false);
+  };
+
+  // Quick Create Pet Handler
+  const handleQuickCreatePet = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPetName.trim()) {
+      alert('Please enter Pet Name.');
+      return;
+    }
+    const currentCust = customers.find(c => c.id === selectedCustomerId);
+    const newPet: Pet = {
+      id: `PET-${Date.now().toString().slice(-4)}`,
+      customerId: selectedCustomerId,
+      customerName: currentCust?.name || customerName,
+      name: newPetName.trim(),
+      species: newPetSpecies,
+      breed: newPetBreed.trim() || 'Standard',
+      age: newPetAge.trim() || '2 Years',
+      gender: newPetGender,
+      vaccinationStatus: 'Up to Date',
+      isBoardingNow: false
+    };
+
+    if (onAddPet) {
+      onAddPet(newPet);
+    }
+    setSelectedPetId(newPet.id);
+    setPetName(newPet.name);
+
+    setNewPetName('');
+    setShowAddPetModal(false);
+  };
+
   // Selected Pet State
   const [selectedPetId, setSelectedPetId] = useState<string>(invoice?.petId || '');
   const [petName, setPetName] = useState<string>(invoice?.petName || '');
 
   // Invoice Meta
+  // NEW INVOICE: number starts empty ('') then is immediately populated
+  // via the Supabase RPC in the useEffect below.
+  // EDIT INVOICE: use the existing invoiceNumber from the invoice prop.
+  // NEVER use Date.now() or Math.random() for invoice numbering.
   const [invoiceNumber, setInvoiceNumber] = useState<string>(
-    invoice?.invoiceNumber || `${settings.invoicePrefix}${Date.now().toString().slice(-6)}`
+    invoice?.invoiceNumber || ''
   );
+  const [invoiceNumberLoading, setInvoiceNumberLoading] = useState<boolean>(!invoice);
   const [validationError, setValidationError] = useState<string>('');
-  
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+
+  // On mount: fetch the next invoice number from Supabase RPC (new invoices only)
+  useEffect(() => {
+    if (!invoice) {
+      // Fetch from DB — fail-closed
+      fetchNextInvoiceNumberFromDB('26-27')
+        .then(num => {
+          setInvoiceNumber(num);
+          setInvoiceNumberLoading(false);
+        })
+        .catch(err => {
+          setInvoiceNumberLoading(false);
+          setValidationError(
+            'Could not fetch a secure invoice number from the database. Please close and reopen this form, or contact Admin.'
+          );
+          console.error('[InvoiceModal] RPC fetchNextInvoiceNumberFromDB failed:', err);
+        });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+
   const todayStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
   const [invoiceDate, setInvoiceDate] = useState<string>(invoice?.invoiceDate || todayStr);
   const [dueDate, setDueDate] = useState<string>(invoice?.dueDate || todayStr);
@@ -235,20 +353,32 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
 
   const balanceDue = Math.max(0, grandTotal - paidAmountInput);
 
-  // Form Submission
-  const handleSubmit = (e: React.FormEvent) => {
+  // Form Submission — async with double-submit protection
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Double-submit guard
+    if (isSubmitting) return;
+
     setValidationError('');
 
     const cleanNum = invoiceNumber.trim();
-    if (!cleanNum) {
-      setValidationError('Invoice number cannot be empty. Please enter a valid invoice number.');
+
+    // Reject if invoice number is not yet loaded (RPC still in progress)
+    if (!cleanNum || invoiceNumberLoading) {
+      setValidationError('Invoice number is still being fetched from the database. Please wait a moment and try again.');
+      return;
+    }
+
+    // Reject if number looks invalid (basic format guard)
+    if (!isEditing && !cleanNum.startsWith('HOP/')) {
+      setValidationError('Invoice number format is invalid. Please close and reopen this form.');
       return;
     }
 
     // Safety Rule #3: Duplicate Invoice Number Uniqueness Validation
     if (allInvoices && allInvoices.length > 0) {
-      const duplicate = allInvoices.find(inv => 
+      const duplicate = allInvoices.find(inv =>
         inv.invoiceNumber.trim().toLowerCase() === cleanNum.toLowerCase() && inv.id !== invoice?.id
       );
       if (duplicate) {
@@ -265,43 +395,53 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
       if (!confirmed) return;
     }
 
-    const savedInvoice: Invoice = {
-      id: invoice?.id || `INV-${Date.now().toString().slice(-6)}`,
-      invoiceNumber: cleanNum,
-      invoiceDate,
-      dueDate,
-      customerId: selectedCustomerId,
-      customerName,
-      customerPhone,
-      customerEmail,
-      customerAddress,
-      customerGSTIN,
-      petId: selectedPetId,
-      petName,
-      placeOfSupply,
-      isInterState,
-      items,
-      subTotal,
-      totalDiscount,
-      taxableAmount,
-      cgstTotal,
-      sgstTotal,
-      igstTotal,
-      totalGst,
-      roundOff,
-      grandTotal,
-      paidAmount: paidAmountInput,
-      balanceDue,
-      paymentStatus,
-      paymentMode,
-      notes,
-      createdByRole: userRole,
-      createdByName: userName,
-      createdAt: invoice?.createdAt || new Date().toISOString()
-    };
+    // Lock — prevent double-submit
+    setIsSubmitting(true);
+    try {
+      const savedInvoice: Invoice = {
+        id: invoice?.id || `INV-${Date.now().toString().slice(-10)}`,
+        invoiceNumber: cleanNum,
+        invoiceDate,
+        dueDate,
+        customerId: selectedCustomerId,
+        customerName,
+        customerPhone,
+        customerEmail,
+        customerAddress,
+        customerGSTIN,
+        petId: selectedPetId,
+        petName,
+        placeOfSupply,
+        isInterState,
+        items,
+        subTotal,
+        totalDiscount,
+        taxableAmount,
+        cgstTotal,
+        sgstTotal,
+        igstTotal,
+        totalGst,
+        roundOff,
+        grandTotal,
+        paidAmount: paidAmountInput,
+        balanceDue,
+        paymentStatus,
+        paymentMode,
+        notes,
+        createdByRole: userRole,
+        createdByName: userName,
+        createdAt: invoice?.createdAt || new Date().toISOString()
+      };
 
-    onSaveInvoice(savedInvoice);
+      await onSaveInvoice(savedInvoice);
+      // onSaveInvoice handles closing the modal on success
+    } catch (err: any) {
+      setValidationError(err?.message || 'Failed to save invoice. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
+
 
   const filteredCatalog = CATALOG_ITEMS.filter(c => 
     c.name.toLowerCase().includes(catalogSearch.toLowerCase()) ||
@@ -326,8 +466,16 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
                   </span>
                 )}
               </h2>
-              <p className="text-[11px] text-slate-400 font-mono">
-                Invoice No: <strong>{invoiceNumber}</strong>
+              <p className="text-[11px] text-slate-400 font-mono flex items-center gap-1">
+                Invoice No:{' '}
+                {invoiceNumberLoading ? (
+                  <span className="flex items-center gap-1 text-amber-400">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    <span>Fetching from DB…</span>
+                  </span>
+                ) : (
+                  <strong>{invoiceNumber || 'Awaiting DB…'}</strong>
+                )}
               </p>
             </div>
           </div>
@@ -364,12 +512,32 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 dark:bg-zinc-800/40 p-4 rounded-xl border border-slate-200 dark:border-zinc-800">
             {/* Customer Details */}
             <div className="space-y-2">
-              <label className="font-bold text-slate-700 dark:text-zinc-200 uppercase tracking-wider text-[10px]">
-                Select Customer:
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="font-bold text-slate-700 dark:text-zinc-200 uppercase tracking-wider text-[10px]">
+                  Select Customer:
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowAddCustModal(true)}
+                  className="px-2 py-0.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-[10px] rounded-md flex items-center gap-1 shadow-xs transition-colors"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>+ New Customer</span>
+                </button>
+              </div>
+
               <select
                 value={selectedCustomerId}
-                onChange={e => setSelectedCustomerId(e.target.value)}
+                onChange={e => {
+                  setSelectedCustomerId(e.target.value);
+                  const c = customers.find(cust => cust.id === e.target.value);
+                  if (c) {
+                    setCustomerName(c.name);
+                    setCustomerPhone(c.phone);
+                    setCustomerAddress(c.address);
+                    setCustomerGSTIN(c.gstin || '');
+                  }
+                }}
                 className="w-full p-2 rounded-lg bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-700 text-xs font-semibold"
               >
                 {customers.map(c => (
@@ -413,21 +581,30 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
                   className="p-2 rounded-lg bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-700 text-xs"
                 />
                 <input
+                  type="email"
+                  placeholder="Customer Email (Optional)"
+                  value={customerEmail}
+                  onChange={e => setCustomerEmail(e.target.value)}
+                  className="p-2 rounded-lg bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-700 text-xs"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <input
                   type="text"
                   placeholder="GSTIN (Optional)"
                   value={customerGSTIN}
                   onChange={e => setCustomerGSTIN(e.target.value)}
                   className="p-2 rounded-lg bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-700 text-xs font-mono uppercase"
                 />
+                <input
+                  type="text"
+                  placeholder="Billing Address"
+                  value={customerAddress}
+                  onChange={e => setCustomerAddress(e.target.value)}
+                  className="p-2 rounded-lg bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-700 text-xs"
+                />
               </div>
-
-              <input
-                type="text"
-                placeholder="Billing Address"
-                value={customerAddress}
-                onChange={e => setCustomerAddress(e.target.value)}
-                className="w-full p-2 rounded-lg bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-700 text-xs"
-              />
             </div>
 
             {/* Pet & Supply Place */}
@@ -438,7 +615,16 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-[10px] text-slate-500 block mb-0.5">Pet Profile:</label>
+                  <div className="flex items-center justify-between mb-0.5">
+                    <label className="text-[10px] text-slate-500 block">Pet Profile:</label>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddPetModal(true)}
+                      className="text-[10px] font-bold text-rose-600 dark:text-rose-400 hover:underline"
+                    >
+                      + Add Pet
+                    </button>
+                  </div>
                   <select
                     value={selectedPetId}
                     onChange={e => {
@@ -785,20 +971,244 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 bg-slate-200 dark:bg-zinc-800 hover:bg-slate-300 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 rounded-xl text-xs font-bold"
+              disabled={isSubmitting}
+              className="px-4 py-2 bg-slate-200 dark:bg-zinc-800 hover:bg-slate-300 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 rounded-xl text-xs font-bold disabled:opacity-50"
             >
               Cancel
             </button>
 
             <button
               type="submit"
-              className="px-6 py-2.5 bg-[#D62828] hover:bg-red-700 text-white font-extrabold rounded-xl text-xs flex items-center space-x-2 shadow-lg shadow-red-900/40 transition-transform active:scale-95"
+              disabled={isSubmitting || invoiceNumberLoading}
+              className={`px-6 py-2.5 font-extrabold rounded-xl text-xs flex items-center space-x-2 shadow-lg transition-all ${
+                isSubmitting || invoiceNumberLoading
+                  ? 'bg-slate-400 cursor-not-allowed text-white opacity-70'
+                  : 'bg-[#D62828] hover:bg-red-700 text-white shadow-red-900/40 active:scale-95'
+              }`}
             >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>{isEditing ? 'Update & Save GST Invoice' : 'Save & Issue GST Invoice'}</span>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Saving Invoice…</span>
+                </>
+              ) : invoiceNumberLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Fetching Invoice No…</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>{isEditing ? 'Update & Save GST Invoice' : 'Save & Issue GST Invoice'}</span>
+                </>
+              )}
             </button>
           </div>
         </form>
+
+        {/* ─── QUICK ADD CUSTOMER INLINE MODAL ───────────────────────── */}
+        {showAddCustModal && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-xs flex items-center justify-center z-[60] p-4">
+            <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl w-full max-w-md border border-slate-200 dark:border-zinc-800 shadow-2xl space-y-4">
+              <div className="flex items-center justify-between border-b pb-3 border-slate-200 dark:border-zinc-800">
+                <h3 className="font-extrabold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                  <Plus className="w-4 h-4 text-rose-600" />
+                  <span>Add New Customer</span>
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setShowAddCustModal(false)}
+                  className="p-1 text-slate-400 hover:text-white"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="space-y-3 text-xs">
+                <div>
+                  <label className="font-bold block mb-1">Full Name *</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Dilnavaz / Rajesh Sharma"
+                    value={newCustName}
+                    onChange={e => setNewCustName(e.target.value)}
+                    className="w-full p-2 bg-slate-50 dark:bg-zinc-800 border rounded-lg border-slate-300 dark:border-zinc-700"
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="font-bold block mb-1">Mobile Phone *</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 9819702638"
+                      value={newCustPhone}
+                      onChange={e => setNewCustPhone(e.target.value)}
+                      className="w-full p-2 bg-slate-50 dark:bg-zinc-800 border rounded-lg border-slate-300 dark:border-zinc-700"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-bold block mb-1">Email Address</label>
+                    <input
+                      type="email"
+                      placeholder="e.g. dilnavaz@example.com"
+                      value={newCustEmail}
+                      onChange={e => setNewCustEmail(e.target.value)}
+                      className="w-full p-2 bg-slate-50 dark:bg-zinc-800 border rounded-lg border-slate-300 dark:border-zinc-700"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="font-bold block mb-1">Billing Address</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Mumbai, Maharashtra"
+                    value={newCustAddress}
+                    onChange={e => setNewCustAddress(e.target.value)}
+                    className="w-full p-2 bg-slate-50 dark:bg-zinc-800 border rounded-lg border-slate-300 dark:border-zinc-700"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold block mb-1">GSTIN (Optional)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 27AMIPB3225A1ZS"
+                    value={newCustGSTIN}
+                    onChange={e => setNewCustGSTIN(e.target.value)}
+                    className="w-full p-2 bg-slate-50 dark:bg-zinc-800 border rounded-lg border-slate-300 dark:border-zinc-700 uppercase font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end space-x-2 pt-2 border-t border-slate-200 dark:border-zinc-800">
+                <button
+                  type="button"
+                  onClick={() => setShowAddCustModal(false)}
+                  className="px-3 py-1.5 bg-slate-200 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 rounded-lg text-xs font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleQuickCreateCustomer}
+                  className="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-extrabold"
+                >
+                  Save & Select Customer
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ─── QUICK ADD PET INLINE MODAL ───────────────────────── */}
+        {showAddPetModal && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-xs flex items-center justify-center z-[60] p-4">
+            <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl w-full max-w-md border border-slate-200 dark:border-zinc-800 shadow-2xl space-y-4">
+              <div className="flex items-center justify-between border-b pb-3 border-slate-200 dark:border-zinc-800">
+                <h3 className="font-extrabold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                  <Plus className="w-4 h-4 text-rose-600" />
+                  <span>Add New Pet for {customerName || 'Customer'}</span>
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setShowAddPetModal(false)}
+                  className="p-1 text-slate-400 hover:text-white"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="space-y-3 text-xs">
+                <div>
+                  <label className="font-bold block mb-1">Pet Name *</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Mojito / Coco / Shadow"
+                    value={newPetName}
+                    onChange={e => setNewPetName(e.target.value)}
+                    className="w-full p-2 bg-slate-50 dark:bg-zinc-800 border rounded-lg border-slate-300 dark:border-zinc-700"
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="font-bold block mb-1">Species</label>
+                    <select
+                      value={newPetSpecies}
+                      onChange={e => setNewPetSpecies(e.target.value as any)}
+                      className="w-full p-2 bg-slate-50 dark:bg-zinc-800 border rounded-lg border-slate-300 dark:border-zinc-700"
+                    >
+                      <option value="Dog">Dog</option>
+                      <option value="Cat">Cat</option>
+                      <option value="Bird">Bird</option>
+                      <option value="Rabbit">Rabbit</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="font-bold block mb-1">Breed</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Golden Retriever / Persian"
+                      value={newPetBreed}
+                      onChange={e => setNewPetBreed(e.target.value)}
+                      className="w-full p-2 bg-slate-50 dark:bg-zinc-800 border rounded-lg border-slate-300 dark:border-zinc-700"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="font-bold block mb-1">Age</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 2 Years"
+                      value={newPetAge}
+                      onChange={e => setNewPetAge(e.target.value)}
+                      className="w-full p-2 bg-slate-50 dark:bg-zinc-800 border rounded-lg border-slate-300 dark:border-zinc-700"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-bold block mb-1">Gender</label>
+                    <select
+                      value={newPetGender}
+                      onChange={e => setNewPetGender(e.target.value as any)}
+                      className="w-full p-2 bg-slate-50 dark:bg-zinc-800 border rounded-lg border-slate-300 dark:border-zinc-700"
+                    >
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end space-x-2 pt-2 border-t border-slate-200 dark:border-zinc-800">
+                <button
+                  type="button"
+                  onClick={() => setShowAddPetModal(false)}
+                  className="px-3 py-1.5 bg-slate-200 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 rounded-lg text-xs font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleQuickCreatePet}
+                  className="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-extrabold"
+                >
+                  Save & Select Pet
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

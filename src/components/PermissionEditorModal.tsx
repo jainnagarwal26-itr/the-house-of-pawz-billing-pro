@@ -131,6 +131,7 @@ export const PermissionEditorModal: React.FC<PermissionEditorModalProps> = ({
       case 'Zap': return <Zap className="w-4 h-4 text-amber-400" />;
       case 'History': return <History className="w-4 h-4 text-cyan-500" />;
       case 'Camera': return <Camera className="w-4 h-4 text-[#D62828]" />;
+      case 'Send': return <Sparkles className="w-4 h-4 text-blue-500" />;
       case 'UserCog': return <UserCog className="w-4 h-4 text-red-500" />;
       case 'Settings': return <Settings className="w-4 h-4 text-slate-500" />;
       default: return <Shield className="w-4 h-4 text-blue-500" />;

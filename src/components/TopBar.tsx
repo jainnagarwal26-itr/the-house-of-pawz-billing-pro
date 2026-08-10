@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { 
-  Search, Sun, Moon, ShieldCheck, UserCheck, Bell, 
-  QrCode, HardDrive, Lock, Calendar, Sparkles, CheckCircle2,
-  Menu, LogOut, User as UserIcon
+  Search, Sun, Moon, Bell, 
+  QrCode, HardDrive, Calendar,
+  Menu, LogOut
 } from 'lucide-react';
 import { User, UserRole } from '../types';
+
+export type DatabaseSyncStatus = 'connected' | 'syncing' | 'offline';
 
 interface TopBarProps {
   currentUser: User;
@@ -18,6 +20,7 @@ interface TopBarProps {
   onOpenNotificationCenter: () => void;
   onOpenMobileDrawer?: () => void;
   unreadAlertsCount: number;
+  syncStatus?: DatabaseSyncStatus;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -31,13 +34,13 @@ export const TopBar: React.FC<TopBarProps> = ({
   onOpenExcelBackup,
   onOpenNotificationCenter,
   onOpenMobileDrawer,
-  unreadAlertsCount
+  unreadAlertsCount,
+  syncStatus = 'connected'
 }) => {
   return (
     <header className="no-print h-14 bg-white/95 dark:bg-[#1a1a1a]/95 border-b border-slate-200 dark:border-zinc-800 backdrop-blur-md px-3 sm:px-4 flex items-center justify-between sticky top-0 z-30 shadow-xs">
       {/* Left: App Identity & FY Badge */}
       <div className="flex items-center space-x-2 sm:space-x-3 min-w-0">
-        {/* Mobile Drawer Trigger Menu Button */}
         <button
           onClick={onOpenMobileDrawer}
           className="md:hidden p-1.5 text-slate-700 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-lg shrink-0"
@@ -46,7 +49,6 @@ export const TopBar: React.FC<TopBarProps> = ({
           <Menu className="w-5 h-5 text-[#D62828]" />
         </button>
 
-        {/* Desktop window control dots decoration */}
         <div className="hidden lg:flex items-center space-x-1.5 mr-1">
           <div className="w-3 h-3 rounded-full bg-red-500 hover:opacity-80 transition-opacity cursor-pointer" title="Close App Preview" />
           <div className="w-3 h-3 rounded-full bg-amber-400 hover:opacity-80 transition-opacity cursor-pointer" title="Minimize Window" />
@@ -72,9 +74,27 @@ export const TopBar: React.FC<TopBarProps> = ({
           <Calendar className="w-3.5 h-3.5 text-[#C9A227]" />
           <span>FY: <strong>2026-27</strong></span>
         </div>
+
+        {/* Supabase Connection Status Badge */}
+        <div className={`hidden lg:flex items-center space-x-1.5 text-xs px-2.5 py-1 rounded-md font-semibold border ${
+          syncStatus === 'connected' ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60' :
+          syncStatus === 'syncing' ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800/60' :
+          'bg-red-50 dark:bg-red-950/40 text-red-800 dark:text-red-300 border-red-200 dark:border-red-800/60'
+        }`}>
+          <span className={`w-2 h-2 rounded-full shrink-0 ${
+            syncStatus === 'connected' ? 'bg-emerald-500 animate-pulse' :
+            syncStatus === 'syncing' ? 'bg-amber-500 animate-spin' :
+            'bg-red-500'
+          }`} />
+          <span>
+            {syncStatus === 'connected' && '🟢 Supabase DB Connected'}
+            {syncStatus === 'syncing' && '🟡 Connecting to Supabase...'}
+            {syncStatus === 'offline' && '🔴 Offline — Supabase Unavailable'}
+          </span>
+        </div>
       </div>
 
-      {/* Middle: Quick Search Bar (Desktop / Tablet) */}
+      {/* Middle: Search Bar */}
       <div className="hidden sm:block flex-1 max-w-md mx-2 sm:mx-4">
         <button
           onClick={onOpenGlobalSearch}
@@ -90,9 +110,8 @@ export const TopBar: React.FC<TopBarProps> = ({
         </button>
       </div>
 
-      {/* Right: Quick Action Controls, Logged In User Pill, Logout */}
+      {/* Right: Quick Action Controls */}
       <div className="flex items-center space-x-1 sm:space-x-2 shrink-0">
-        {/* Search Trigger Icon on Mobile */}
         <button
           onClick={onOpenGlobalSearch}
           className="sm:hidden p-2 text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
@@ -101,7 +120,6 @@ export const TopBar: React.FC<TopBarProps> = ({
           <Search className="w-4 h-4" />
         </button>
 
-        {/* Barcode Scanner Button */}
         <button
           onClick={onOpenBarcodeScanner}
           className="p-2 text-slate-600 dark:text-zinc-300 hover:text-[#D62828] dark:hover:text-red-400 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-lg transition-colors relative"
@@ -110,7 +128,6 @@ export const TopBar: React.FC<TopBarProps> = ({
           <QrCode className="w-4 h-4" />
         </button>
 
-        {/* Excel Backup Button (Admin & Staff) */}
         {(currentUser.role === 'ADMIN' || currentUser.role === 'BILLING_STAFF') && (
           <button
             onClick={onOpenExcelBackup}
@@ -121,7 +138,6 @@ export const TopBar: React.FC<TopBarProps> = ({
           </button>
         )}
 
-        {/* Notifications */}
         <div className="relative">
           <button
             onClick={onOpenNotificationCenter}
@@ -135,7 +151,6 @@ export const TopBar: React.FC<TopBarProps> = ({
           </button>
         </div>
 
-        {/* Dark Mode Toggle */}
         <button
           onClick={onToggleDarkMode}
           className="p-2 text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
@@ -146,7 +161,6 @@ export const TopBar: React.FC<TopBarProps> = ({
 
         <div className="hidden sm:block h-4 w-px bg-slate-200 dark:bg-zinc-700 mx-1" />
 
-        {/* Logged in User Indicator Pill (Required by Spec) */}
         <div className="flex items-center space-x-2 px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-xs shrink-0">
           <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
           <div className="flex items-center space-x-1.5">
@@ -164,7 +178,6 @@ export const TopBar: React.FC<TopBarProps> = ({
           </div>
         </div>
 
-        {/* Logout Button */}
         <button
           onClick={onLogout}
           className="p-1.5 sm:px-3 sm:py-1.5 bg-red-50 hover:bg-red-100 dark:bg-red-950/60 dark:hover:bg-red-900/80 text-[#D62828] dark:text-red-300 rounded-xl text-xs font-bold transition-all flex items-center space-x-1 border border-red-200 dark:border-red-900 shrink-0"
@@ -177,4 +190,3 @@ export const TopBar: React.FC<TopBarProps> = ({
     </header>
   );
 };
-

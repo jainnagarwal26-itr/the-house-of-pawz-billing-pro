@@ -1,4 +1,29 @@
+// ============================================================
+// initialClientData.ts — LEGACY Migration Reference Data
+// Project: The House of Pawz – Billing Pro
+//
+// @LEGACY — NOT IMPORTED BY ANY ACTIVE PRODUCTION MODULE.
+//
+// This file was used during the one-time migration from Google Sheets
+// to Supabase (completed 2026-08-09). All 67 historical invoices and
+// 66 customers/pets have been successfully migrated.
+//
+// PRODUCTION DATA SOURCE: Supabase public.customers, public.pets,
+// public.invoices, public.invoice_items, public.payments
+//
+// THIS FILE:
+//   - Contains historical customer PII (phone numbers, names, GSTINs)
+//     for the period July 2026 to August 2026 ONLY
+//   - Is NOT bundled into the production build (zero active imports)
+//   - MUST NOT be re-imported into any active production component
+//   - MUST NOT be used to seed, update, or overwrite Supabase data again
+//   - Is preserved here for historical audit reference only
+//
+// DO NOT DELETE — required for auditable migration history.
+// ============================================================
+
 import { Customer, Pet, Invoice, Payment } from '../types';
+
 
 export const INITIAL_CUSTOMERS: Customer[] = [
   {

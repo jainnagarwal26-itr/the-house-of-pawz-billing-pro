@@ -129,13 +129,16 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     ]
   },
   {
-    id: 'media_center',
-    title: 'K. Media & PDF Center',
-    description: 'Image compression, document gallery & attachments',
-    iconName: 'Camera',
+    id: 'communication_center',
+    title: 'K. Communication Centre',
+    description: 'WhatsApp, Email, PDF Dispatch, Payment Receipts & Customer Statements',
+    iconName: 'Send',
     permissions: [
-      { key: 'media_center_view', label: 'View Media Gallery', description: 'Browse pet photos and invoice PDF archive' },
-      { key: 'media_center_manage', label: 'Manage Media Files', description: 'Upload, compress, and delete gallery images' }
+      { key: 'communication_center_view', label: 'View Communication Centre', description: 'Access WhatsApp, Email & PDF Communication hub' },
+      { key: 'invoices_whatsapp', label: 'Send Invoice WhatsApp', description: 'Dispatch invoice details via WhatsApp' },
+      { key: 'invoices_email', label: 'Send Invoice Email', description: 'Email digital tax invoices to customers' },
+      { key: 'receipt_share', label: 'Share Payment Receipts', description: 'Send payment receipts via WhatsApp or Email' },
+      { key: 'statement_share', label: 'Share Customer Statements', description: 'Send customer ledger statements via WhatsApp or Email' }
     ]
   },
   {
@@ -209,8 +212,9 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
     import_engine_view: true,
     import_engine_execute: true,
     audit_logs_view: true,
-    media_center_view: true,
-    media_center_manage: true,
+    communication_center_view: true,
+    receipt_share: true,
+    statement_share: true,
     user_management_view: true,
     user_management_edit: true,
     user_management_permissions: true,
@@ -256,8 +260,9 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
     import_engine_view: true,
     import_engine_execute: true,
     audit_logs_view: true,
-    media_center_view: true,
-    media_center_manage: true,
+    communication_center_view: true,
+    receipt_share: true,
+    statement_share: true,
     user_management_view: true,
     user_management_edit: true,
     user_management_permissions: true,
@@ -303,8 +308,9 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
     import_engine_view: false,
     import_engine_execute: false,
     audit_logs_view: false,
-    media_center_view: false,
-    media_center_manage: false,
+    communication_center_view: true,
+    receipt_share: true,
+    statement_share: true,
     user_management_view: false,
     user_management_edit: false,
     user_management_permissions: false,
@@ -350,8 +356,9 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
     import_engine_view: true,
     import_engine_execute: true,
     audit_logs_view: true,
-    media_center_view: true,
-    media_center_manage: true,
+    communication_center_view: true,
+    receipt_share: true,
+    statement_share: true,
     user_management_view: false,
     user_management_edit: false,
     user_management_permissions: false,
@@ -397,8 +404,9 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
     import_engine_view: false,
     import_engine_execute: false,
     audit_logs_view: false,
-    media_center_view: true,
-    media_center_manage: true,
+    communication_center_view: true,
+    receipt_share: true,
+    statement_share: true,
     user_management_view: false,
     user_management_edit: false,
     user_management_permissions: false,
@@ -444,8 +452,9 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
     import_engine_view: false,
     import_engine_execute: false,
     audit_logs_view: false,
-    media_center_view: false,
-    media_center_manage: false,
+    communication_center_view: true,
+    receipt_share: true,
+    statement_share: true,
     user_management_view: false,
     user_management_edit: false,
     user_management_permissions: false,
@@ -491,8 +500,9 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
     import_engine_view: false,
     import_engine_execute: false,
     audit_logs_view: false,
-    media_center_view: false,
-    media_center_manage: false,
+    communication_center_view: true,
+    receipt_share: true,
+    statement_share: true,
     user_management_view: false,
     user_management_edit: false,
     user_management_permissions: false,
@@ -530,7 +540,7 @@ export function getEffectivePermissionDetails(user: User | null | undefined, act
   }
 
   const roleDefaults = DEFAULT_ROLE_PERMISSIONS[user.role] || DEFAULT_ROLE_PERMISSIONS.USER;
-  const roleDefaultVal = roleDefaults[actionKey] ?? (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN');
+  const roleDefaultVal = roleDefaults[actionKey] ?? false;
 
   let hasOverride = false;
   let overrideVal = false;

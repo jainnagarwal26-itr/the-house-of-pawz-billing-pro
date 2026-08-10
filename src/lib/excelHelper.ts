@@ -1,5 +1,22 @@
 import ExcelJS from 'exceljs';
 import { Customer, Pet, Invoice, Payment, User, CompanySettings, AuditLog, RecurringSubscription } from '../types';
+import { supabase } from './supabase';
+
+// ────────────────────────────────────────────────────────────
+// XlsxBackupMetadata — returned by generateAndUploadExcelBackup
+// ────────────────────────────────────────────────────────────
+export interface XlsxBackupMetadata {
+  signedUrl: string;
+  filename: string;
+  sizeKb: number;
+  invoiceCount: number;
+  customerCount: number;
+  petCount: number;
+  invoiceItemCount: number;
+  paymentCount: number;
+  generatedAt: string;
+}
+
 
 async function downloadWorkbook(wb: ExcelJS.Workbook, filename: string) {
   // 1. Generate Buffer
@@ -142,6 +159,44 @@ export async function exportFullDatabaseToExcel(data: {
   auditLogs: AuditLog[];
   recurring: RecurringSubscription[];
 }) {
+  // ─────────────────────────────────────────────────────────────────
+  // STEP 0: Fetch invoice_items from Supabase FIRST — before building
+  // the workbook. This must be done upfront because:
+  //   (a) Callers do not await this async function, so any async fetch
+  //       done mid-workbook would race with downloadWorkbook().
+  //   (b) React state inv.items[] is often empty due to RPC/mapping.
+  //   (c) invoice_number is stored directly on each invoice_items row
+  //       so no internal_invoice_id → invoiceNumber mapping is needed.
+  // ─────────────────────────────────────────────────────────────────
+  let supabaseItemsRows: Array<Record<string, unknown>> = [];
+  try {
+    const { data: rawItems } = await supabase
+      .from('invoice_items')
+      .select('invoice_number, item_type, item_name, hsn_sac, price, quantity, discount_percent, taxable_value, gst_rate, cgst_amount, sgst_amount, igst_amount, item_total')
+      .order('invoice_number', { ascending: true });
+
+    if (rawItems && rawItems.length > 0) {
+      supabaseItemsRows = (rawItems as any[]).map(it => ({
+        'Invoice Number':      it.invoice_number   || '',
+        'Item Type':           it.item_type        || 'SERVICE',
+        'Item Name':           it.item_name        || '',
+        'HSN/SAC':             it.hsn_sac          || '999799',
+        'Rate (INR)':          Number(it.price)            || 0,
+        'Quantity':            Number(it.quantity)         || 1,
+        'Discount (%)':        Number(it.discount_percent) || 0,
+        'Taxable Value (INR)': Number(it.taxable_value)    || 0,
+        'GST Rate (%)':        Number(it.gst_rate)         || 18,
+        'CGST (INR)':          Number(it.cgst_amount)      || 0,
+        'SGST (INR)':          Number(it.sgst_amount)      || 0,
+        'IGST (INR)':          Number(it.igst_amount)      || 0,
+        'Item Total (INR)':    Number(it.item_total)       || 0
+      }));
+    }
+  } catch (err) {
+    console.error('[exportFullDatabaseToExcel] invoice_items fetch failed:', err);
+    // Continue gracefully — sheet will show "No records" rather than crash
+  }
+
   const wb = new ExcelJS.Workbook();
   wb.creator = 'The House of Pawz';
   wb.lastModifiedBy = 'Chirag Jain, CA';
@@ -209,27 +264,13 @@ export async function exportFullDatabaseToExcel(data: {
   addStyledSheet(wb, 'Invoices', invoicesData);
 
   // 4. Invoice_Items Sheet
-  const invoiceItemsData: Array<Record<string, unknown>> = [];
-  data.invoices.forEach(inv => {
-    inv.items.forEach(item => {
-      invoiceItemsData.push({
-        'Invoice Number': inv.invoiceNumber,
-        'Item Type': item.type,
-        'Item Name': item.name,
-        'HSN/SAC': item.hsnSac,
-        'Rate (INR)': item.price,
-        'Quantity': item.qty,
-        'Discount (%)': item.discount,
-        'Taxable Value (INR)': item.taxableValue,
-        'GST Rate (%)': item.gstRate,
-        'CGST (INR)': item.cgstAmount,
-        'SGST (INR)': item.sgstAmount,
-        'IGST (INR)': item.igstAmount,
-        'Item Total (INR)': item.total
-      });
-    });
-  });
-  addStyledSheet(wb, 'Invoice_Items', invoiceItemsData);
+  // ─────────────────────────────────────────────────────────────────
+  // RELIABLE FIX: ALWAYS fetch invoice_items directly from Supabase.
+  // invoice_number column is stored on each row — no ID mapping needed.
+  // This was fetched upfront (before workbook generation) so there is
+  // no async timing issue with the callers that don't await this fn.
+  // ─────────────────────────────────────────────────────────────────
+  addStyledSheet(wb, 'Invoice_Items', supabaseItemsRows);
 
   // 5. Payments Sheet
   const paymentsData = data.payments.map(pay => ({
@@ -391,4 +432,252 @@ export async function exportGSTReportToExcel(invoices: Invoice[], settings: Comp
   addStyledSheet(wb, 'HSN_Summary', hsnRows.length > 0 ? hsnRows : [{ 'Info': 'No HSN Summary data' }]);
 
   await downloadWorkbook(wb, `GSTR1_Report_${settings.companyName.replace(/[^a-zA-Z0-9]/g, '_')}_FY26-27.xlsx`);
+}
+
+// ============================================================
+// generateAndUploadExcelBackup
+// Fetches FRESH data from Supabase → generates XLSX → uploads
+// to private 'backups' bucket → returns signed URL + metadata.
+//
+// IMPORTANT:
+//  - Never reads from React state or localStorage
+//  - Never modifies production data
+//  - If this fails, billing operations are NOT affected
+// ============================================================
+export async function generateAndUploadExcelBackup(): Promise<XlsxBackupMetadata> {
+  // ── Step 1: Fetch FRESH data directly from Supabase ───────────────────
+  const [
+    { data: rawCustomers },
+    { data: rawPets },
+    { data: rawInvoices },
+    { data: rawItems },
+    { data: rawPayments },
+    { data: rawUsers },
+    { data: rawSettingsArr },
+    { data: rawCatalog },
+    { data: rawAudit }
+  ] = await Promise.all([
+    supabase.from('customers').select('*').order('created_at', { ascending: true }),
+    supabase.from('pets').select('*').order('created_at', { ascending: true }),
+    supabase.from('invoices').select('*').order('invoice_number', { ascending: true }),
+    supabase.from('invoice_items').select('*').order('internal_invoice_id', { ascending: true }),
+    supabase.from('payments').select('*').order('created_at', { ascending: true }),
+    supabase.from('users').select('user_id, username, full_name, email, phone, role, is_active, created_at'),
+    supabase.from('company_settings').select('*').limit(1),
+    supabase.from('catalog_items').select('*'),
+    supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(500)
+  ]);
+
+  const customers = rawCustomers || [];
+  const pets = rawPets || [];
+  const invoices = rawInvoices || [];
+  const items = rawItems || [];
+  const payments = rawPayments || [];
+  const users = rawUsers || [];
+  const dbSettings = (rawSettingsArr || [])[0] || {};
+  const catalog = rawCatalog || [];
+  const auditLogs = rawAudit || [];
+
+  // ── Step 2: Build the XLSX workbook ───────────────────────────────────
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'The House of Pawz – Billing Pro';
+  wb.lastModifiedBy = 'Supabase Backup System';
+  wb.created = new Date();
+  wb.modified = new Date();
+
+  // 1. Customers
+  addStyledSheet(wb, 'Customers', customers.map((c: any) => ({
+    'Customer ID': c.customer_id,
+    'Full Name': c.full_name,
+    'Phone': c.phone,
+    'Email': c.email || '',
+    'Address': c.address || '',
+    'GSTIN': c.gstin || 'N/A',
+    'State Code': c.state_code || '',
+    'Emergency Contact': c.emergency_contact || '',
+    'Outstanding Balance (INR)': Number(c.outstanding_balance) || 0,
+    'Advance Balance (INR)': Number(c.advance_balance) || 0,
+    'Created At': c.created_at || ''
+  })));
+
+  // 2. Pets
+  addStyledSheet(wb, 'Pets', pets.map((p: any) => ({
+    'Pet ID': p.pet_id,
+    'Customer ID': p.customer_id,
+    'Customer Name': p.customer_name,
+    'Pet Name': p.pet_name,
+    'Species': p.species || '',
+    'Breed': p.breed || '',
+    'Age': p.age || '',
+    'Gender': p.gender || '',
+    'Vaccination Status': p.vaccination_status || '',
+    'Boarding Now': p.is_boarding_now ? 'Yes' : 'No',
+    'Room No': p.room_no || 'N/A',
+    'Check-In Date': p.check_in_date || '',
+    'Check-Out Date': p.check_out_date || ''
+  })));
+
+  // 3. Invoices
+  addStyledSheet(wb, 'Invoices', invoices.map((i: any) => ({
+    'Invoice Number': i.invoice_number,
+    'Internal Invoice ID': i.internal_invoice_id,
+    'Financial Year': i.financial_year || '',
+    'Invoice Date': i.invoice_date,
+    'Due Date': i.due_date || '',
+    'Customer ID': i.customer_id,
+    'Customer Name': i.customer_name,
+    'Customer Phone': i.customer_phone || '',
+    'Pet Name': i.pet_name || '',
+    'Place of Supply': i.place_of_supply || '',
+    'Is InterState': i.is_inter_state ? 'YES' : 'NO',
+    'Sub Total (INR)': Number(i.sub_total) || 0,
+    'Total Discount (INR)': Number(i.total_discount) || 0,
+    'Taxable Amount (INR)': Number(i.taxable_amount) || 0,
+    'CGST (INR)': Number(i.cgst_total) || 0,
+    'SGST (INR)': Number(i.sgst_total) || 0,
+    'IGST (INR)': Number(i.igst_total) || 0,
+    'Total GST (INR)': Number(i.total_gst) || 0,
+    'Round Off (INR)': Number(i.round_off) || 0,
+    'Grand Total (INR)': Number(i.grand_total) || 0,
+    'Paid Amount (INR)': Number(i.paid_amount) || 0,
+    'Balance Due (INR)': Number(i.balance_due) || 0,
+    'Payment Status': i.payment_status || '',
+    'Payment Mode': i.payment_mode || '',
+    'Is Cancelled': i.is_cancelled ? 'YES' : 'NO',
+    'Created By': `${i.created_by_name || ''} (${i.created_by_role || ''})`,
+    'Created At': i.created_at || ''
+  })));
+
+  // 4. Invoice Items
+  addStyledSheet(wb, 'Invoice_Items', items.map((it: any) => ({
+    'Invoice Number': it.invoice_number,
+    'Internal Invoice ID': it.internal_invoice_id,
+    'Line Item ID': it.line_item_id,
+    'Item Type': it.item_type,
+    'Item Name': it.item_name,
+    'HSN/SAC': it.hsn_sac || '',
+    'Rate (INR)': Number(it.price) || 0,
+    'Quantity': Number(it.quantity) || 1,
+    'Discount (%)': Number(it.discount_percent) || 0,
+    'Discount Amount (INR)': Number(it.discount_amount) || 0,
+    'Taxable Value (INR)': Number(it.taxable_value) || 0,
+    'GST Rate (%)': Number(it.gst_rate) || 18,
+    'CGST (INR)': Number(it.cgst_amount) || 0,
+    'SGST (INR)': Number(it.sgst_amount) || 0,
+    'IGST (INR)': Number(it.igst_amount) || 0,
+    'Item Total (INR)': Number(it.item_total) || 0
+  })));
+
+  // 5. Payments
+  addStyledSheet(wb, 'Payments', payments.map((p: any) => ({
+    'Payment ID': p.payment_id,
+    'Invoice Number': p.invoice_number,
+    'Internal Invoice ID': p.internal_invoice_id,
+    'Customer Name': p.customer_name,
+    'Amount (INR)': Number(p.amount) || 0,
+    'Payment Date': p.payment_date || '',
+    'Payment Mode': p.payment_mode || '',
+    'Transaction Ref': p.transaction_ref || 'N/A',
+    'Received By': p.received_by || '',
+    'Created At': p.created_at || ''
+  })));
+
+  // 6. Users (no passwords ever exported)
+  addStyledSheet(wb, 'Users', users.map((u: any) => ({
+    'User ID': u.user_id,
+    'Username': u.username,
+    'Full Name': u.full_name,
+    'Email': u.email || '',
+    'Phone': u.phone || '',
+    'Role': u.role,
+    'Status': u.is_active ? 'Active' : 'Inactive',
+    'Created At': u.created_at || ''
+  })));
+
+  // 7. Company Settings
+  addStyledSheet(wb, 'Company_Settings', dbSettings ? [{
+    'Company Name': dbSettings.company_name || '',
+    'Tagline': dbSettings.tagline || '',
+    'Address': dbSettings.address || '',
+    'City State Zip': dbSettings.city_state_zip || '',
+    'Phone': dbSettings.phone || '',
+    'Email': dbSettings.email || '',
+    'GSTIN': dbSettings.gstin || '',
+    'State Code': dbSettings.state_code || '',
+    'Bank Name': dbSettings.bank_name || '',
+    'Account No': dbSettings.account_no || '',
+    'IFSC Code': dbSettings.ifsc_code || '',
+    'UPI ID': dbSettings.upi_id || '',
+    'Invoice Prefix': dbSettings.invoice_prefix || '',
+    'Financial Year': dbSettings.financial_year || ''
+  }] : []);
+
+  // 8. Catalog Items
+  addStyledSheet(wb, 'Catalog_Items', catalog.map((c: any) => ({
+    'Item ID': c.item_id || c.id || '',
+    'Type': c.type || c.item_type || '',
+    'Name': c.name || c.item_name || '',
+    'Category': c.category || '',
+    'HSN/SAC': c.hsn_sac || '',
+    'Price (INR)': Number(c.price) || 0,
+    'GST Rate (%)': Number(c.gst_rate) || 18,
+    'Unit': c.unit || '',
+    'Stock Qty': Number(c.stock_qty) || 0
+  })));
+
+  // 9. Audit Logs
+  addStyledSheet(wb, 'Audit_Logs', auditLogs.map((l: any) => ({
+    'Log ID': l.log_id,
+    'Timestamp': l.timestamp || '',
+    'User ID': l.user_id || '',
+    'Username': l.username || '',
+    'Role': l.role || '',
+    'Action': l.action || '',
+    'Details': l.details || '',
+    'Created At': l.created_at || ''
+  })));
+
+  // ── Step 3: Generate buffer ────────────────────────────────────────────
+  const buffer = await wb.xlsx.writeBuffer();
+  const sizeKb = Math.round((buffer as ArrayBuffer).byteLength / 1024);
+
+  // ── Step 4: Timestamped filename and upload ────────────────────────────
+  const now = new Date();
+  // Format: YYYYMMDD_HHmmss
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  const datePart = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  const filename = `HOP_Billing_Backup_2026-27_${datePart}.xlsx`;
+  const storagePath = `backups/${filename}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from('backups')
+    .upload(storagePath, buffer as ArrayBuffer, {
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      upsert: false
+    });
+
+  if (uploadError) {
+    throw new Error(`XLSX Storage upload failed: ${uploadError.message}`);
+  }
+
+  // ── Step 5: Generate 1-hour signed URL ────────────────────────────────
+  const { data: signedData, error: signedError } = await supabase.storage
+    .from('backups')
+    .createSignedUrl(storagePath, 3600); // 1 hour expiry
+
+  if (signedError || !signedData?.signedUrl) {
+    throw new Error(`Signed URL generation failed: ${signedError?.message}`);
+  }
+
+  return {
+    signedUrl: signedData.signedUrl,
+    filename,
+    sizeKb,
+    invoiceCount: invoices.length,
+    customerCount: customers.length,
+    petCount: pets.length,
+    invoiceItemCount: items.length,
+    paymentCount: payments.length,
+    generatedAt: now.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'medium' })
+  };
 }

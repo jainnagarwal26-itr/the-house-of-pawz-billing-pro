@@ -6,8 +6,8 @@ import {
 export const DEFAULT_COMPANY_SETTINGS: CompanySettings = {
   companyName: 'The House of Pawz',
   tagline: 'Luxury Pet Boarding, Daycare, Training & Spa',
-  address: 'Plot 42, Pawz Avenue, Green Meadows, Sector 14',
-  cityStateZip: 'Mumbai, Maharashtra - 400053',
+  address: 'Bungalow No. 164, Aram Nagar 1, Versova, Andheri West',
+  cityStateZip: 'Mumbai, Maharashtra - 400061',
   phone: '+91 98200 12345 / +91 98200 67890',
   email: 'billing@thehouseofpawz.com',
   gstin: '27AABCT1234H1Z5',
@@ -31,51 +31,49 @@ export const DEFAULT_COMPANY_SETTINGS: CompanySettings = {
   ]
 };
 
+// ============================================================
+// SECURITY NOTE: SYSTEM_USERS is a UI-only fallback reference.
+// Passwords, PINs and recovery keys have been removed from
+// frontend source. Authentication is handled exclusively by
+// Supabase Auth (supabase.auth.signInWithPassword).
+// DO NOT add credentials back into this object.
+// ============================================================
 export const SYSTEM_USERS: User[] = [
   {
     id: 'USR-ADMIN-001',
     name: 'Chirag Jain',
-    username: 'Chirag Jain',
-    password: 'Chirag@2026',
+    username: 'chirag.jain@thehouseofpawz.com',
     role: 'ADMIN',
     email: 'chirag.jain@thehouseofpawz.com',
     phone: '+91 98197 02638',
     designation: 'Admin / CA',
     avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=faces',
-    lastLogin: '2026-08-09 11:00 AM',
-    isActive: true,
-    pinCode: '1234',
-    recoveryKey: 'RECOVER-CHIRAG-2026'
+    lastLogin: '',
+    isActive: true
   },
   {
     id: 'USR-USER-002',
     name: 'Poonam Bharti',
-    username: 'Poonam Bharti',
-    password: 'Poonam@123',
+    username: 'poonam.bharti@thehouseofpawz.com',
     role: 'USER',
     email: 'poonam.bharti@thehouseofpawz.com',
     phone: '+91 98200 12345',
     designation: 'Billing Operator',
     avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100&h=100&fit=crop&crop=faces',
-    lastLogin: '2026-08-09 10:30 AM',
-    isActive: true,
-    pinCode: '1234',
-    recoveryKey: 'RECOVER-POONAM-123'
+    lastLogin: '',
+    isActive: true
   },
   {
     id: 'USR-STAFF-003',
     name: 'Billing Staff',
-    username: 'Staff',
-    password: 'Staff@2026',
+    username: 'staff.billing@thehouseofpawz.com',
     role: 'BILLING_STAFF',
     email: 'staff.billing@thehouseofpawz.com',
     phone: '+91 98765 43210',
     designation: 'Billing / CA Staff',
     avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=100&h=100&fit=crop&crop=faces',
-    lastLogin: '2026-08-09 09:15 AM',
-    isActive: true,
-    pinCode: '1234',
-    recoveryKey: 'RECOVER-STAFF-2026'
+    lastLogin: '',
+    isActive: true
   }
 ];
 
@@ -237,6 +235,13 @@ export function cleanupObsoleteCache(): void {
   }
 }
 
+/**
+ * @legacy — DO NOT USE in new code.
+ * This function writes audit logs to localStorage only.
+ * The production audit system uses Supabase public.audit_logs
+ * via logAuditEventToSupabase() in src/lib/auditService.ts.
+ * This function remains for backward-compatibility only.
+ */
 export function createAuditLog(
   action: AuditLog['action'], 
   details: string, 
