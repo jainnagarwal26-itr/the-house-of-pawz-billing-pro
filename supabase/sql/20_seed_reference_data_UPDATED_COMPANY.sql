@@ -191,6 +191,7 @@ BEGIN
         INSERT INTO auth.users (
             id, instance_id, aud, role, email, encrypted_password,
             email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
+            confirmation_token, recovery_token, email_change_token_new, email_change, phone_change_token, reauthentication_token,
             created_at, updated_at
         )
         VALUES (
@@ -203,6 +204,7 @@ BEGIN
             NOW(),
             '{"provider":"email","providers":["email"]}'::jsonb,
             '{"full_name":"Chirag Jain"}'::jsonb,
+            '', '', '', '', '', '',
             NOW(),
             NOW()
         );
@@ -214,6 +216,7 @@ BEGIN
         INSERT INTO auth.users (
             id, instance_id, aud, role, email, encrypted_password,
             email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
+            confirmation_token, recovery_token, email_change_token_new, email_change, phone_change_token, reauthentication_token,
             created_at, updated_at
         )
         VALUES (
@@ -226,6 +229,7 @@ BEGIN
             NOW(),
             '{"provider":"email","providers":["email"]}'::jsonb,
             '{"full_name":"Poonam Bharti"}'::jsonb,
+            '', '', '', '', '', '',
             NOW(),
             NOW()
         );
@@ -237,6 +241,7 @@ BEGIN
         INSERT INTO auth.users (
             id, instance_id, aud, role, email, encrypted_password,
             email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
+            confirmation_token, recovery_token, email_change_token_new, email_change, phone_change_token, reauthentication_token,
             created_at, updated_at
         )
         VALUES (
@@ -249,6 +254,7 @@ BEGIN
             NOW(),
             '{"provider":"email","providers":["email"]}'::jsonb,
             '{"full_name":"Staff"}'::jsonb,
+            '', '', '', '', '', '',
             NOW(),
             NOW()
         );
