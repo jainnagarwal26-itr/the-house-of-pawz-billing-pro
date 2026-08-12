@@ -65,7 +65,7 @@ export const BatchInvoicePrintPreview: React.FC<BatchInvoicePrintPreviewProps> =
         {/* Printable Area containing all selected invoices */}
         <div className="invoice-print-area print-container p-6 sm:p-10 overflow-y-auto flex-1 bg-white text-slate-900 font-sans text-xs select-text">
           {invoices.map((invoice, idx) => (
-            <div key={invoice.id || idx} className={idx < invoices.length - 1 ? 'page-break mb-12 pb-8 border-b-4 border-slate-900' : ''}>
+            <div key={invoice.id || idx} className={`batch-single-invoice-card ${idx < invoices.length - 1 ? 'page-break border-b-4 border-slate-900 mb-8 pb-8' : ''}`}>
               {/* Header & Company Details */}
               <div className="flex flex-col sm:flex-row items-start justify-between pb-6 border-b-2 border-slate-900 gap-4">
                 <div>
