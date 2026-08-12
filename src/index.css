@@ -134,6 +134,11 @@
     break-inside: avoid !important;
     page-break-inside: avoid !important;
   }
+
+  .page-break {
+    break-after: page !important;
+    page-break-after: always !important;
+  }
 }
 
 

@@ -129,7 +129,7 @@ export const InvoicePrintPreview: React.FC<InvoicePrintPreviewProps> = ({
         </div>
 
         {/* Invoice Document Body (Print Target Area) */}
-        <div className="invoice-print-area p-6 sm:p-10 overflow-y-auto flex-1 bg-white text-slate-900 font-sans text-xs select-text">
+        <div className="invoice-print-area print-container p-6 sm:p-10 overflow-y-auto flex-1 bg-white text-slate-900 font-sans text-xs select-text">
           {/* Header & Company Details */}
           <div className="flex flex-col sm:flex-row items-start justify-between pb-6 border-b-2 border-slate-900 gap-4">
             <div>

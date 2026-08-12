@@ -24,8 +24,8 @@ export const SettingsModal: React.FC<SettingsProps> = ({ settings, currentUser, 
   const [ifscCode, setIfscCode] = useState(settings.ifscCode);
   const [branch, setBranch] = useState(settings.branch || 'Four Bungalow, Andheri (W).');
   const [upiId, setUpiId] = useState(settings.upiId);
-  const [logoPath, setLogoPath] = useState(settings.logoPath || '/Logo.jpg');
-  const [signaturePath, setSignaturePath] = useState(settings.signaturePath || '/Signature.jpg');
+  const [logoPath, setLogoPath] = useState(settings.logoPath || 'https://dxvnemdmgdckdfzilnkr.supabase.co/storage/v1/object/public/company-assets/Logo.jpg');
+  const [signaturePath, setSignaturePath] = useState(settings.signaturePath || 'https://dxvnemdmgdckdfzilnkr.supabase.co/storage/v1/object/public/signatures/Signature.jpg');
   const [invoicePrefix, setInvoicePrefix] = useState(settings.invoicePrefix);
 
   const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -45,8 +45,8 @@ export const SettingsModal: React.FC<SettingsProps> = ({ settings, currentUser, 
       setIfscCode(settings.ifscCode || '');
       setBranch(settings.branch || 'Four Bungalow, Andheri (W).');
       setUpiId(settings.upiId || '');
-      setLogoPath(settings.logoPath || '/Logo.jpg');
-      setSignaturePath(settings.signaturePath || '/Signature.jpg');
+      setLogoPath(settings.logoPath || 'https://dxvnemdmgdckdfzilnkr.supabase.co/storage/v1/object/public/company-assets/Logo.jpg');
+      setSignaturePath(settings.signaturePath || 'https://dxvnemdmgdckdfzilnkr.supabase.co/storage/v1/object/public/signatures/Signature.jpg');
       setInvoicePrefix(settings.invoicePrefix || 'HOP/26-27/');
     }
   }, [settings]);

@@ -7,6 +7,7 @@ import {
 import { Invoice, Customer, Pet, CompanySettings, UserRole, formatINR, PaymentStatus, User } from '../types';
 import { hasPermission } from '../lib/permissions';
 import { InvoicePrintPreview } from './InvoicePrintPreview';
+import { BatchInvoicePrintPreview } from './BatchInvoicePrintPreview';
 import { AdminApprovalModal } from './AdminApprovalModal';
 
 interface InvoiceManagementProps {
@@ -43,6 +44,10 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | PaymentStatus>('ALL');
 
+  // Multi-select Batch Invoices State
+  const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<string[]>([]);
+  const [showBatchPrintPreview, setShowBatchPrintPreview] = useState(false);
+
   // Pagination State (Default: 10 per page)
   const [currentPage, setCurrentPage] = useState<number>(1);
   const pageSize = 10;
@@ -63,6 +68,15 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   } | null>(null);
 
   const handleTriggerAction = (type: 'EDIT' | 'CANCEL' | 'SHARE', inv: Invoice) => {
+    // WhatsApp sharing is accessible directly for ALL roles (Admin, User, Staff)
+    if (type === 'SHARE') {
+      const message = encodeURIComponent(
+        `Hello ${inv.customerName},\nHere is your Tax Invoice ${inv.invoiceNumber} from The House of Pawz.\nGrand Total: ₹${inv.grandTotal.toFixed(2)}\nPaid: ₹${inv.paidAmount.toFixed(2)}\nBalance: ₹${inv.balanceDue.toFixed(2)}\nThank you for trusting us with ${inv.petName || 'your pet'}!`
+      );
+      window.open(`https://wa.me/91${inv.customerPhone.replace(/[^0-9]/g, '')}?text=${message}`, '_blank');
+      return;
+    }
+
     if (isAdmin) {
       if (type === 'EDIT') onOpenEditModal(inv);
       if (type === 'CANCEL') {
@@ -70,14 +84,8 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
           onCancelInvoice(inv.id);
         }
       }
-      if (type === 'SHARE') {
-        const message = encodeURIComponent(
-          `Hello ${inv.customerName},\nHere is your Tax Invoice ${inv.invoiceNumber} from The House of Pawz.\nGrand Total: ₹${inv.grandTotal.toFixed(2)}\nPaid: ₹${inv.paidAmount.toFixed(2)}\nBalance: ₹${inv.balanceDue.toFixed(2)}\nThank you for trusting us with ${inv.petName || 'your pet'}!`
-        );
-        window.open(`https://wa.me/91${inv.customerPhone.replace(/[^0-9]/g, '')}?text=${message}`, '_blank');
-      }
     } else {
-      // Non-admin billing staff -> trigger Admin PIN Approval Modal
+      // Non-admin billing staff -> trigger Admin PIN Approval Modal for edit/cancel
       setApprovalRequest({ type, invoice: inv });
     }
   };
@@ -128,6 +136,25 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   const endIndex = Math.min(startIndex + pageSize, totalInvoices);
   const paginatedInvoices = filteredInvoices.slice(startIndex, endIndex);
 
+  // Multi-select helpers
+  const isAllSelected = paginatedInvoices.length > 0 && paginatedInvoices.every(inv => selectedInvoiceIds.includes(inv.id));
+
+  const handleToggleSelectAll = () => {
+    if (isAllSelected) {
+      const paginatedSet = new Set(paginatedInvoices.map(i => i.id));
+      setSelectedInvoiceIds(prev => prev.filter(id => !paginatedSet.has(id)));
+    } else {
+      const paginatedSet = new Set(paginatedInvoices.map(i => i.id));
+      setSelectedInvoiceIds(prev => Array.from(new Set([...prev, ...paginatedSet])));
+    }
+  };
+
+  const handleToggleSelectRow = (id: string) => {
+    setSelectedInvoiceIds(prev =>
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
   return (
     <div className="p-3 sm:p-6 space-y-4 sm:space-y-6 max-w-7xl mx-auto">
       {/* Top Banner & Title */}
@@ -162,6 +189,37 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Floating Batch Selection Banner */}
+      {selectedInvoiceIds.length > 0 && (
+        <div className="bg-slate-900 text-white p-3.5 sm:p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xl border border-slate-800">
+          <div className="flex items-center space-x-3">
+            <span className="bg-[#D62828] text-white text-xs font-extrabold px-2.5 py-1 rounded-lg font-mono">
+              {selectedInvoiceIds.length} Selected
+            </span>
+            <span className="text-xs text-slate-300 font-semibold">
+              Select multiple invoices to download or print together in a single batch PDF.
+            </span>
+          </div>
+
+          <div className="flex items-center space-x-2 shrink-0">
+            <button
+              onClick={() => setShowBatchPrintPreview(true)}
+              className="px-4 py-2 bg-[#D62828] hover:bg-red-700 text-white font-extrabold rounded-xl text-xs flex items-center space-x-1.5 shadow-md transition-colors"
+            >
+              <Printer className="w-4 h-4" />
+              <span>Print / Download Batch PDF ({selectedInvoiceIds.length})</span>
+            </button>
+
+            <button
+              onClick={() => setSelectedInvoiceIds([])}
+              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold rounded-xl text-xs transition-colors"
+            >
+              Clear Selection
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Search & Filter Controls */}
       <div className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -200,9 +258,18 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
       {/* Invoices Table */}
       <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse table-fixed min-w-[900px]">
+          <table className="w-full text-left border-collapse table-fixed min-w-[950px]">
             <thead>
               <tr className="bg-slate-100 dark:bg-zinc-800/80 text-slate-700 dark:text-zinc-300 text-[10px] uppercase tracking-wider font-extrabold border-b border-slate-200 dark:border-zinc-800">
+                <th className="py-3 px-3 w-[4%] text-center">
+                  <input
+                    type="checkbox"
+                    checked={isAllSelected}
+                    onChange={handleToggleSelectAll}
+                    className="rounded border-slate-300 text-[#D62828] focus:ring-[#D62828] cursor-pointer"
+                    title="Select All Invoices on Page"
+                  />
+                </th>
                 <th className="py-3 px-3 w-[18%]">Invoice Details</th>
                 <th className="py-3 px-3 w-[16%]">Customer & Pet</th>
                 <th className="py-3 px-3 text-right w-[11%]">Taxable (₹)</th>
@@ -219,8 +286,17 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                   key={inv.id}
                   className={`hover:bg-slate-50/80 dark:hover:bg-zinc-800/40 transition-colors ${
                     inv.isCancelled ? 'opacity-50 bg-red-50/20 dark:bg-red-950/10' : ''
-                  }`}
+                  } ${selectedInvoiceIds.includes(inv.id) ? 'bg-red-50/30 dark:bg-red-950/20' : ''}`}
                 >
+                  {/* Select Checkbox */}
+                  <td className="p-3 text-center">
+                    <input
+                      type="checkbox"
+                      checked={selectedInvoiceIds.includes(inv.id)}
+                      onChange={() => handleToggleSelectRow(inv.id)}
+                      className="rounded border-slate-300 text-[#D62828] focus:ring-[#D62828] cursor-pointer"
+                    />
+                  </td>
                   {/* Invoice Number & Date */}
                   <td className="p-3">
                     <span className="font-mono font-bold text-slate-900 dark:text-white block">
@@ -453,6 +529,15 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
             setIsAutoDownloadPDF(false);
           }}
           onShareWhatsApp={() => handleTriggerAction('SHARE', selectedInvoiceForPreview)}
+        />
+      )}
+
+      {/* Batch Multi-Invoice Print Preview Modal */}
+      {showBatchPrintPreview && (
+        <BatchInvoicePrintPreview
+          invoices={filteredInvoices.filter(inv => selectedInvoiceIds.includes(inv.id))}
+          settings={settings}
+          onClose={() => setShowBatchPrintPreview(false)}
         />
       )}
     </div>
