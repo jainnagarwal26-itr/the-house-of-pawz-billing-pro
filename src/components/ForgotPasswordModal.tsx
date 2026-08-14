@@ -148,9 +148,9 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
                   onChange={e => setSelectedRole(e.target.value as UserRole)}
                   className="w-full p-2.5 rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-300 dark:border-zinc-700 font-bold"
                 >
-                  <option value="ADMIN">ADMIN (Chirag Jain)</option>
-                  <option value="USER">USER (Poonam Bharti)</option>
-                  <option value="BILLING_STAFF">BILLING STAFF (Staff)</option>
+                  <option value="ADMIN">ADMIN (Shruti Roy)</option>
+                  <option value="BILLING_STAFF">STAFF (HOP Staff)</option>
+                  <option value="ACCOUNTANT">ACCOUNTANT (Chirag Jain)</option>
                 </select>
               </div>
 

@@ -107,9 +107,9 @@ export const UserManagement: React.FC<UserManagementProps> = ({
 
   const getRoleLabel = (r: UserRole) => {
     switch (r) {
-      case 'ADMIN': return 'ADMIN (Admin / CA)';
-      case 'USER': return 'USER (Billing Operator)';
-      case 'BILLING_STAFF': return 'BILLING STAFF (CA Staff)';
+      case 'ACCOUNTANT': return 'ACCOUNTANT (Full Control)';
+      case 'ADMIN': return 'ADMIN (Limited Admin)';
+      case 'BILLING_STAFF': return 'STAFF (Billing Staff)';
       case 'SUPER_ADMIN': return 'Super Admin';
       default: return r;
     }
@@ -117,6 +117,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({
 
   const getRoleBadgeColor = (r: UserRole) => {
     switch (r) {
+      case 'ACCOUNTANT': return 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-950 dark:text-purple-300';
       case 'ADMIN': return 'bg-red-100 text-[#D62828] border-red-300 dark:bg-red-950 dark:text-red-300';
       case 'USER': return 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950 dark:text-blue-300';
       case 'BILLING_STAFF': return 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300';

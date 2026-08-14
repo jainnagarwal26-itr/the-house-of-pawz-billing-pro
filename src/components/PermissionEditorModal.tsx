@@ -139,22 +139,22 @@ export const PermissionEditorModal: React.FC<PermissionEditorModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-xs flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
-      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl max-w-4xl w-full shadow-2xl overflow-hidden my-auto flex flex-col max-h-[94vh]">
+    <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-50 p-3 sm:p-4 overflow-y-auto">
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-4xl w-full shadow-2xl overflow-hidden text-slate-100 my-auto max-h-[92vh] flex flex-col">
         
         {/* Top Header */}
-        <div className="bg-slate-900 text-white p-4 flex items-center justify-between border-b border-slate-800 shrink-0">
+        <div className="bg-slate-950 p-4 sm:p-6 border-b border-slate-800 flex items-center justify-between shrink-0">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#D62828] to-red-700 text-white flex items-center justify-center font-bold shadow-md">
-              <UserCog className="w-5 h-5" />
+            <div className="w-10 h-10 rounded-2xl bg-[#D62828] text-white flex items-center justify-center font-bold shadow-md">
+              <Shield className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center space-x-2">
                 <h3 className="font-extrabold text-base tracking-tight">{targetUser.name}</h3>
                 <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border ${
+                  targetUser.role === 'ACCOUNTANT' ? 'bg-purple-950 text-purple-300 border-purple-800' :
                   targetUser.role === 'ADMIN' ? 'bg-red-950 text-red-300 border-red-800' :
-                  targetUser.role === 'BILLING_STAFF' ? 'bg-emerald-950 text-emerald-300 border-emerald-800' :
-                  'bg-blue-950 text-blue-300 border-blue-800'
+                  'bg-emerald-950 text-emerald-300 border-emerald-800'
                 }`}>
                   {targetUser.role}
                 </span>

@@ -558,29 +558,33 @@ https://www.wisdomcentre.co.in/`;
             <span>Payment Receipts</span>
           </button>
 
-          <button
-            onClick={() => setActiveTab('statements')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 shrink-0 ${
-              activeTab === 'statements'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            <Users className="w-3.5 h-3.5" />
-            <span>Customer Statements</span>
-          </button>
+          {hasPermission(currentUser, 'statement_share') && (
+            <button
+              onClick={() => setActiveTab('statements')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 shrink-0 ${
+                activeTab === 'statements'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <Users className="w-3.5 h-3.5" />
+              <span>Customer Statements</span>
+            </button>
+          )}
 
-          <button
-            onClick={() => setActiveTab('history')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 shrink-0 ${
-              activeTab === 'history'
-                ? 'bg-slate-900 text-white shadow-xs'
-                : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            <Clock className="w-3.5 h-3.5" />
-            <span>Communication History</span>
-          </button>
+          {(currentUser?.role === 'ACCOUNTANT' || currentUser?.role === 'SUPER_ADMIN' || hasPermission(currentUser, 'audit_logs_view')) && (
+            <button
+              onClick={() => setActiveTab('history')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 shrink-0 ${
+                activeTab === 'history'
+                  ? 'bg-slate-900 text-white shadow-xs'
+                  : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <Clock className="w-3.5 h-3.5" />
+              <span>Communication History</span>
+            </button>
+          )}
         </div>
 
         {/* Search Bar */}

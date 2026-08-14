@@ -13,11 +13,11 @@ export async function loginWithSupabase(emailInput: string, passwordInput: strin
     let authEmail = cleanInput;
 
     // Map common username inputs to full email addresses
-    if (cleanInput === 'chirag' || cleanInput === 'chirag jain') {
+    if (cleanInput === 'chirag' || cleanInput === 'chirag jain' || cleanInput === 'accountant') {
       authEmail = 'chirag@thehouseofpawz.com';
-    } else if (cleanInput === 'poonam' || cleanInput === 'poonam bharti') {
-      authEmail = 'poonam@thehouseofpawz.com';
-    } else if (cleanInput === 'staff') {
+    } else if (cleanInput === 'shruti' || cleanInput === 'shruti roy' || cleanInput === 'admin') {
+      authEmail = 'shruti@thehouseofpawz.com';
+    } else if (cleanInput === 'staff' || cleanInput === 'hop staff') {
       authEmail = 'staff@thehouseofpawz.com';
     }
 
@@ -83,8 +83,8 @@ export async function fetchUserProfileByAuthId(authId: string): Promise<{ user: 
       role: u.role as UserRole,
       email: u.email || '',
       phone: u.phone || '',
-      designation: u.role === 'ADMIN' ? 'Admin / CA' : u.role === 'BILLING_STAFF' ? 'Billing / CA Staff' : 'Billing Operator',
-      avatar: u.role === 'ADMIN' ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=faces' : 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100&h=100&fit=crop&crop=faces',
+      designation: u.role === 'ACCOUNTANT' ? 'Accountant / Full Control' : u.role === 'ADMIN' ? 'Admin' : u.role === 'BILLING_STAFF' ? 'Billing Staff' : u.role,
+      avatar: u.role === 'ACCOUNTANT' ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=faces' : u.role === 'ADMIN' ? 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=100&h=100&fit=crop&crop=faces' : 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100&h=100&fit=crop&crop=faces',
       lastLogin: new Date().toISOString(),
       isActive: u.is_active,
       permissions: userPermissions

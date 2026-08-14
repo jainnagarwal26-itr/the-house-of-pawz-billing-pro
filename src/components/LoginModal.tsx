@@ -18,7 +18,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   onOpenForgotPassword
 }) => {
   const [selectedRole, setSelectedRole] = useState<UserRole>('ADMIN');
-  const [loginId, setLoginId] = useState('Chirag Jain');
+  const [loginId, setLoginId] = useState('Shruti Roy');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
@@ -30,11 +30,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     setErrorMessage('');
     setPassword('');
     if (role === 'ADMIN') {
-      setLoginId('Chirag Jain');
-    } else if (role === 'USER') {
-      setLoginId('Poonam Bharti');
+      setLoginId('Shruti Roy');
     } else if (role === 'BILLING_STAFF') {
-      setLoginId('Staff');
+      setLoginId('HOP Staff');
+    } else if (role === 'ACCOUNTANT') {
+      setLoginId('Chirag Jain');
     }
   };
 
@@ -48,12 +48,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
     // Map username/ID to auth email if username entered
     let authEmail = cleanId;
-    if (cleanId === 'chirag jain' || cleanId === 'chirag') {
-      authEmail = 'chirag@thehouseofpawz.com';
-    } else if (cleanId === 'poonam bharti' || cleanId === 'poonam') {
-      authEmail = 'poonam@thehouseofpawz.com';
-    } else if (cleanId === 'staff') {
+    if (cleanId === 'shruti roy' || cleanId === 'shruti' || cleanId === 'admin') {
+      authEmail = 'shruti@thehouseofpawz.com';
+    } else if (cleanId === 'hop staff' || cleanId === 'staff') {
       authEmail = 'staff@thehouseofpawz.com';
+    } else if (cleanId === 'chirag jain' || cleanId === 'chirag' || cleanId === 'accountant') {
+      authEmail = 'chirag@thehouseofpawz.com';
     }
 
     const { user: supabaseUser, error } = await loginWithSupabase(authEmail, cleanPass);
@@ -111,21 +111,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               >
                 <ShieldCheck className="w-5 h-5" />
                 <span className="text-[11px] leading-none font-bold">ADMIN</span>
-                <span className="text-[9px] text-slate-400 font-normal">Admin / CA</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleRoleSelect('USER')}
-                className={`p-2.5 rounded-xl border flex flex-col items-center justify-center space-y-1 transition-all ${
-                  selectedRole === 'USER'
-                    ? 'bg-blue-50 dark:bg-blue-950/80 border-blue-600 text-blue-600 font-bold ring-2 ring-blue-500/20'
-                    : 'bg-slate-50 dark:bg-zinc-800/60 border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-400 hover:bg-slate-100'
-                }`}
-              >
-                <UserCheck className="w-5 h-5" />
-                <span className="text-[11px] leading-none font-bold">USER</span>
-                <span className="text-[9px] text-slate-400 font-normal">Operator</span>
+                <span className="text-[9px] text-slate-400 font-normal">Limited Admin</span>
               </button>
 
               <button
@@ -140,6 +126,20 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                 <Building2 className="w-5 h-5" />
                 <span className="text-[11px] leading-none font-bold">STAFF</span>
                 <span className="text-[9px] text-slate-400 font-normal">Billing Staff</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleRoleSelect('ACCOUNTANT')}
+                className={`p-2.5 rounded-xl border flex flex-col items-center justify-center space-y-1 transition-all ${
+                  selectedRole === 'ACCOUNTANT'
+                    ? 'bg-purple-50 dark:bg-purple-950/80 border-purple-600 text-purple-600 font-bold ring-2 ring-purple-500/20'
+                    : 'bg-slate-50 dark:bg-zinc-800/60 border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-400 hover:bg-slate-100'
+                }`}
+              >
+                <UserCheck className="w-5 h-5" />
+                <span className="text-[11px] leading-none font-bold">ACCOUNTANT</span>
+                <span className="text-[9px] text-slate-400 font-normal">Full Control</span>
               </button>
             </div>
           </div>

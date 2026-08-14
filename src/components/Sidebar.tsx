@@ -38,7 +38,7 @@ interface SidebarProps {
 }
 
 export function isTabAllowedForUser(tab: ActiveTab, user?: User | null, userRole?: UserRole): boolean {
-  const role = userRole || user?.role || 'USER';
+  const role = userRole || user?.role || 'BILLING_STAFF';
   
   if (user) {
     const tabPermissionMap: Record<ActiveTab, string> = {
@@ -60,15 +60,15 @@ export function isTabAllowedForUser(tab: ActiveTab, user?: User | null, userRole
     if (key) return hasPermission(user, key);
   }
 
-  if (role === 'ADMIN' || role === 'SUPER_ADMIN') return true;
-  if (role === 'USER' || role === 'BILLING_USER') {
-    return ['dashboard', 'invoices', 'customers', 'pets', 'communication', 'payments'].includes(tab);
+  if (role === 'ACCOUNTANT' || role === 'SUPER_ADMIN') return true;
+  if (role === 'ADMIN') {
+    return ['dashboard', 'customers', 'pets', 'communication', 'payments'].includes(tab);
   }
   if (role === 'BILLING_STAFF') {
-    return ['dashboard', 'invoices', 'recurring', 'customers', 'pets', 'communication', 'smart_import', 'payments', 'gst_reports', 'excel', 'audit'].includes(tab);
+    return ['pets'].includes(tab);
   }
 
-  return ['dashboard', 'invoices', 'customers', 'pets', 'communication'].includes(tab);
+  return ['pets'].includes(tab);
 }
 
 // Backwards compatibility alias

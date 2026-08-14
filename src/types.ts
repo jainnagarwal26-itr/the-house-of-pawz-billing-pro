@@ -1,4 +1,4 @@
-export type UserRole = 'ADMIN' | 'USER' | 'BILLING_STAFF' | 'SUPER_ADMIN' | 'MANAGER' | 'RECEPTION' | 'BILLING_USER';
+export type UserRole = 'ADMIN' | 'USER' | 'BILLING_STAFF' | 'SUPER_ADMIN' | 'MANAGER' | 'RECEPTION' | 'BILLING_USER' | 'ACCOUNTANT';
 
 export interface PermissionChangeRecord {
   id: string;

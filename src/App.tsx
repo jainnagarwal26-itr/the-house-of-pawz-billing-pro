@@ -227,6 +227,12 @@ export default function App() {
 
   // Action Handler: Save GST Invoice
   const handleSaveInvoice = async (savedInv: Invoice) => {
+    const isEdit = invoices.some(i => i.id === savedInv.id);
+    const requiredPermission = isEdit ? 'invoices_edit' : 'invoices_create';
+    if (!hasPermission(currentUser, requiredPermission)) {
+      throw new Error(`Access Denied: You do not have permission to ${isEdit ? 'edit' : 'create'} invoices.`);
+    }
+
     const res = await createInvoiceInSupabase(savedInv);
     if (res.error) {
       // Throw so InvoiceModal's try/catch catches it and shows validationError

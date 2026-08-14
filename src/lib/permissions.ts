@@ -178,7 +178,7 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
 
 // Default Permission Matrices per Role
 export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>> = {
-  ADMIN: {
+  ACCOUNTANT: {
     dashboard_view: true,
     invoices_view: true,
     invoices_create: true,
@@ -224,6 +224,54 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
     settings_factory_reset: true,
     reports_view: true,
     reports_export: true
+  },
+
+  ADMIN: {
+    dashboard_view: true,
+    invoices_view: false,
+    invoices_create: true,
+    invoices_edit: false,
+    invoices_delete: false,
+    invoices_change_number: false,
+    invoices_cancel: false,
+    invoices_download_pdf: true,
+    invoices_print: true,
+    invoices_whatsapp: true,
+    invoices_email: true,
+    customers_view: true,
+    customers_create: true,
+    customers_edit: true,
+    customers_delete: false,
+    pets_view: true,
+    pets_create: true,
+    pets_edit: true,
+    pets_delete: false,
+    pets_checkin_checkout: true,
+    boarding_view: false,
+    boarding_manage: false,
+    payments_view: true,
+    payments_record: true,
+    payments_delete: false,
+    gst_reports_view: false,
+    gst_reports_export: false,
+    excel_db_view: false,
+    excel_db_export: false,
+    excel_db_restore: false,
+    import_engine_view: false,
+    import_engine_execute: false,
+    audit_logs_view: false,
+    communication_center_view: true,
+    receipt_share: true,
+    statement_share: false,
+    user_management_view: false,
+    user_management_edit: false,
+    user_management_permissions: false,
+    user_management_reset_password: false,
+    settings_view: false,
+    settings_edit: false,
+    settings_factory_reset: false,
+    reports_view: false,
+    reports_export: false
   },
 
   SUPER_ADMIN: {
@@ -275,30 +323,30 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
   },
 
   USER: {
-    dashboard_view: true,
-    invoices_view: true,
-    invoices_create: true,
-    invoices_edit: true,
+    dashboard_view: false,
+    invoices_view: false,
+    invoices_create: false,
+    invoices_edit: false,
     invoices_delete: false,
     invoices_change_number: false,
     invoices_cancel: false,
-    invoices_download_pdf: true,
-    invoices_print: true,
-    invoices_whatsapp: true,
-    invoices_email: true,
-    customers_view: true,
-    customers_create: true,
-    customers_edit: true,
+    invoices_download_pdf: false,
+    invoices_print: false,
+    invoices_whatsapp: false,
+    invoices_email: false,
+    customers_view: false,
+    customers_create: false,
+    customers_edit: false,
     customers_delete: false,
-    pets_view: true,
-    pets_create: true,
-    pets_edit: true,
+    pets_view: false,
+    pets_create: false,
+    pets_edit: false,
     pets_delete: false,
-    pets_checkin_checkout: true,
-    boarding_view: true,
+    pets_checkin_checkout: false,
+    boarding_view: false,
     boarding_manage: false,
-    payments_view: true,
-    payments_record: true,
+    payments_view: false,
+    payments_record: false,
     payments_delete: false,
     gst_reports_view: false,
     gst_reports_export: false,
@@ -308,9 +356,9 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
     import_engine_view: false,
     import_engine_execute: false,
     audit_logs_view: false,
-    communication_center_view: true,
-    receipt_share: true,
-    statement_share: true,
+    communication_center_view: false,
+    receipt_share: false,
+    statement_share: false,
     user_management_view: false,
     user_management_edit: false,
     user_management_permissions: false,
@@ -323,42 +371,42 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
   },
 
   BILLING_STAFF: {
-    dashboard_view: true,
-    invoices_view: true,
+    dashboard_view: false,
+    invoices_view: false,
     invoices_create: true,
-    invoices_edit: true,
-    invoices_delete: true,
-    invoices_change_number: true,
-    invoices_cancel: true,
+    invoices_edit: false,
+    invoices_delete: false,
+    invoices_change_number: false,
+    invoices_cancel: false,
     invoices_download_pdf: true,
     invoices_print: true,
-    invoices_whatsapp: true,
-    invoices_email: true,
+    invoices_whatsapp: false,
+    invoices_email: false,
     customers_view: true,
     customers_create: true,
-    customers_edit: true,
-    customers_delete: true,
+    customers_edit: false,
+    customers_delete: false,
     pets_view: true,
     pets_create: true,
     pets_edit: true,
-    pets_delete: true,
+    pets_delete: false,
     pets_checkin_checkout: true,
-    boarding_view: true,
-    boarding_manage: true,
-    payments_view: true,
-    payments_record: true,
-    payments_delete: true,
-    gst_reports_view: true,
-    gst_reports_export: true,
-    excel_db_view: true,
-    excel_db_export: true,
+    boarding_view: false,
+    boarding_manage: false,
+    payments_view: false,
+    payments_record: false,
+    payments_delete: false,
+    gst_reports_view: false,
+    gst_reports_export: false,
+    excel_db_view: false,
+    excel_db_export: false,
     excel_db_restore: false,
-    import_engine_view: true,
-    import_engine_execute: true,
-    audit_logs_view: true,
-    communication_center_view: true,
-    receipt_share: true,
-    statement_share: true,
+    import_engine_view: false,
+    import_engine_execute: false,
+    audit_logs_view: false,
+    communication_center_view: false,
+    receipt_share: false,
+    statement_share: false,
     user_management_view: false,
     user_management_edit: false,
     user_management_permissions: false,
@@ -366,8 +414,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
     settings_view: false,
     settings_edit: false,
     settings_factory_reset: false,
-    reports_view: true,
-    reports_export: true
+    reports_view: false,
+    reports_export: false
   },
 
   MANAGER: {
@@ -539,7 +587,32 @@ export function getEffectivePermissionDetails(user: User | null | undefined, act
     };
   }
 
-  const roleDefaults = DEFAULT_ROLE_PERMISSIONS[user.role] || DEFAULT_ROLE_PERMISSIONS.USER;
+  // Security Rule: Unknown permission keys return FALSE for ALL roles
+  const validKeys = DEFAULT_ROLE_PERMISSIONS.ACCOUNTANT;
+  if (!(actionKey in validKeys)) {
+    return {
+      effective: false,
+      roleDefault: false,
+      isOverridden: false,
+      source: 'ROLE_DEFAULT',
+      state: 'DENIED',
+      overrideState: 'DEFAULT'
+    };
+  }
+
+  // ACCOUNTANT & SUPER_ADMIN have full privileges for valid defined permissions
+  if (user.role === 'ACCOUNTANT' || user.role === 'SUPER_ADMIN') {
+    return {
+      effective: true,
+      roleDefault: true,
+      isOverridden: false,
+      source: 'ROLE_DEFAULT',
+      state: 'ALLOWED',
+      overrideState: 'DEFAULT'
+    };
+  }
+
+  const roleDefaults = DEFAULT_ROLE_PERMISSIONS[user.role] || DEFAULT_ROLE_PERMISSIONS.BILLING_STAFF;
   const roleDefaultVal = roleDefaults[actionKey] ?? false;
 
   let hasOverride = false;

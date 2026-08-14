@@ -5,6 +5,7 @@ import {
   Menu, LogOut
 } from 'lucide-react';
 import { User, UserRole } from '../types';
+import { hasPermission } from '../lib/permissions';
 
 export type DatabaseSyncStatus = 'connected' | 'syncing' | 'offline';
 
@@ -128,7 +129,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           <QrCode className="w-4 h-4" />
         </button>
 
-        {(currentUser.role === 'ADMIN' || currentUser.role === 'BILLING_STAFF') && (
+        {hasPermission(currentUser, 'excel_db_view') && (
           <button
             onClick={onOpenExcelBackup}
             className="hidden sm:block p-2 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 rounded-lg transition-colors relative"
@@ -169,9 +170,9 @@ export const TopBar: React.FC<TopBarProps> = ({
             </span>
             <span className="text-slate-400">•</span>
             <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded font-mono ${
+              currentUser.role === 'ACCOUNTANT' ? 'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300 border border-purple-200 dark:border-purple-900' :
               currentUser.role === 'ADMIN' ? 'bg-red-100 text-[#D62828] dark:bg-red-950 dark:text-red-300 border border-red-200 dark:border-red-900' :
-              currentUser.role === 'BILLING_STAFF' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900' :
-              'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-900'
+              'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900'
             }`}>
               {currentUser.role}
             </span>
