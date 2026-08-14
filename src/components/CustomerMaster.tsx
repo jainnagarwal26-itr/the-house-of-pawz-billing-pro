@@ -51,6 +51,10 @@ export const CustomerMaster: React.FC<CustomerMasterProps> = ({
   };
 
   const openEditModal = (c: Customer) => {
+    if (!hasPermission(currentUser, 'customers_edit')) {
+      alert('Access Denied: You do not have permission to edit customer records.');
+      return;
+    }
     setEditingCustomer(c);
     setName(c.name);
     setPhone(c.phone);
@@ -80,8 +84,18 @@ export const CustomerMaster: React.FC<CustomerMasterProps> = ({
     };
 
     if (editingCustomer) {
+      if (!hasPermission(currentUser, 'customers_edit')) {
+        alert('Access Denied: You do not have permission to edit customer records.');
+        setShowModal(false);
+        return;
+      }
       onEditCustomer(custData);
     } else {
+      if (!hasPermission(currentUser, 'customers_create')) {
+        alert('Access Denied: You do not have permission to create new customer records.');
+        setShowModal(false);
+        return;
+      }
       onAddCustomer(custData);
     }
     setShowModal(false);

@@ -240,7 +240,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
     invoices_email: true,
     customers_view: true,
     customers_create: true,
-    customers_edit: true,
+    customers_edit: false,
     customers_delete: false,
     pets_view: true,
     pets_create: true,

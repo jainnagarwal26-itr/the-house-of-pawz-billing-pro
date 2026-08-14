@@ -111,7 +111,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               >
                 <ShieldCheck className="w-5 h-5" />
                 <span className="text-[11px] leading-none font-bold">ADMIN</span>
-                <span className="text-[9px] text-slate-400 font-normal">Limited Admin</span>
               </button>
 
               <button
@@ -139,7 +138,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               >
                 <UserCheck className="w-5 h-5" />
                 <span className="text-[11px] leading-none font-bold">ACCOUNTANT</span>
-                <span className="text-[9px] text-slate-400 font-normal">Full Control</span>
               </button>
             </div>
           </div>
