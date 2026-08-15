@@ -927,15 +927,21 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
                     <span>View & Manage</span>
                   </button>
 
-                  {b.status === 'COMPLETED' && !b.invoiceId && hasPermission(currentUser, 'invoices_create') && hasPermission(currentUser, 'pick_drop_edit') && (
+                  {b.status === 'COMPLETED' && !b.invoiceId && hasPermission(currentUser, 'invoices_create') && (
                     <button
                       onClick={() => onGenerateInvoiceForBooking(b)}
                       className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer"
                       title="Convert to GST Invoice"
                     >
                       <FileText className="w-3.5 h-3.5" />
-                      <span>Invoice</span>
+                      <span>Generate GST Invoice</span>
                     </button>
+                  )}
+
+                  {b.invoiceNumber && (
+                    <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 dark:bg-emerald-950/60 px-2 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                      Invoice: #{b.invoiceNumber}
+                    </span>
                   )}
                 </div>
               </div>
@@ -2107,8 +2113,28 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
                 <p><strong>Vehicle:</strong> {selectedBooking.vehicleNumber || 'Unassigned'}</p>
                 <p><strong>Base Fare:</strong> {formatINR(selectedBooking.baseCharge)}</p>
                 <p><strong>Total Fare:</strong> <strong className="text-[#D62828]">{formatINR(selectedBooking.subtotal)}</strong></p>
-                {selectedBooking.invoiceNumber && (
-                  <p className="text-emerald-600 font-bold">GST Invoice: #{selectedBooking.invoiceNumber}</p>
+                {selectedBooking.invoiceNumber ? (
+                  <div className="pt-1">
+                    <span className="text-emerald-600 font-bold bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800 inline-block">
+                      GST Invoice: #{selectedBooking.invoiceNumber}
+                    </span>
+                    <p className="text-[9px] text-slate-400 mt-0.5 italic">Finalized invoice modifications restricted to Accountant.</p>
+                  </div>
+                ) : (
+                  selectedBooking.status === 'COMPLETED' && hasPermission(currentUser, 'invoices_create') && (
+                    <div className="pt-1">
+                      <button
+                        onClick={() => {
+                          onGenerateInvoiceForBooking(selectedBooking);
+                          setSelectedBooking(null);
+                        }}
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                        <span>Generate Final GST Invoice</span>
+                      </button>
+                    </div>
+                  )
                 )}
               </div>
             </div>
