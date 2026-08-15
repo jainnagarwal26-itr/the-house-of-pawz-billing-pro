@@ -274,23 +274,24 @@ export const PetMaster: React.FC<PetMasterProps> = ({
               {(() => {
                 const petTrips = pickDropBookings.filter(b => b.petId === p.id);
                 if (petTrips.length === 0) return null;
+                const completedTrips = petTrips.filter(b => b.status === 'COMPLETED');
                 const lastTrip = petTrips[0];
                 return (
-                  <div className="pt-2 border-t border-slate-100 dark:border-zinc-800/80 text-[10px]">
-                    <div className="flex items-center justify-between font-bold text-slate-500 mb-0.5">
+                  <div className="pt-2 border-t border-slate-100 dark:border-zinc-800/80 text-[10px] space-y-1">
+                    <div className="flex items-center justify-between font-bold text-slate-500">
                       <span className="flex items-center gap-1">
                         <Car className="w-3 h-3 text-[#D62828]" /> Transit History:
                       </span>
-                      <span className="text-[#D62828]">{petTrips.length} Trips</span>
+                      <span className="text-[#D62828] font-black">{petTrips.length} Total ({completedTrips.length} Completed)</span>
                     </div>
-                    <div className="bg-slate-50 dark:bg-zinc-800/60 p-1.5 rounded text-[10px] space-y-0.5">
-                      <div className="flex justify-between">
-                        <span className="font-medium text-slate-700 dark:text-zinc-300">{lastTrip.serviceType}</span>
+                    <div className="bg-slate-50 dark:bg-zinc-800/60 p-2 rounded-lg text-[10px] space-y-0.5">
+                      <div className="flex justify-between font-medium text-slate-700 dark:text-zinc-300">
+                        <span>Last: {lastTrip.serviceType}</span>
                         <span className="font-bold text-emerald-600">{formatINR(lastTrip.subtotal)}</span>
                       </div>
                       <div className="flex justify-between text-[9px] text-slate-400">
-                        <span>{lastTrip.pickupDate}</span>
-                        <span className="uppercase font-bold">{lastTrip.status}</span>
+                        <span>{lastTrip.pickupDate} ({lastTrip.preferredPickupTime})</span>
+                        <span className="uppercase font-bold text-indigo-600">{lastTrip.status}</span>
                       </div>
                     </div>
                   </div>

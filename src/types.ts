@@ -333,13 +333,17 @@ export interface PickDropVehicle {
 
 export type PricingRuleType = 
   | 'FIXED' 
+  | 'ONE_WAY' 
+  | 'ROUND_TRIP' 
   | 'PER_KM' 
   | 'PER_PET' 
   | 'WAITING' 
   | 'NIGHT' 
+  | 'HOLIDAY' 
   | 'EMERGENCY' 
   | 'ADDITIONAL' 
-  | 'ROUND_TRIP';
+  | 'ADDITIONAL_STOP' 
+  | 'MULTI_PET';
 
 export interface PickDropPricingRule {
   id: string;
@@ -350,6 +354,36 @@ export interface PickDropPricingRule {
   effectiveFrom?: string;
   notes?: string;
   createdAt?: string;
+}
+
+export type RecurringTransitPattern = 'DAILY' | 'ALTERNATE_DAYS' | 'WEEKLY' | 'CUSTOM_DAYS';
+
+export interface PickDropRecurringSchedule {
+  id: string;
+  scheduleId: string; // e.g. REC-PND-0001
+  customerId: string;
+  customerName: string;
+  customerPhone: string;
+  petId: string;
+  petName: string;
+  serviceType: PickDropServiceType;
+  pickupAddress: string;
+  dropAddress: string;
+  preferredPickupTime: string;
+  preferredDropTime: string;
+  pattern: RecurringTransitPattern;
+  daysOfWeek?: number[]; // [1, 2, 3, 4, 5] (1 = Mon ... 7 = Sun)
+  startDate: string;
+  endDate?: string;
+  driverId?: string;
+  driverName?: string;
+  vehicleId?: string;
+  vehicleNumber?: string;
+  estimatedBaseCharge: number;
+  isActive: boolean;
+  notes?: string;
+  createdAt: string;
+  lastGeneratedDate?: string;
 }
 
 export interface PickDropStatusHistory {
@@ -364,6 +398,7 @@ export interface PickDropStatusHistory {
 export interface PickDropBooking {
   id: string;
   bookingId: string; // e.g. PND-2627-0001
+  recurringScheduleId?: string; // Linked recurring parent if auto-generated
   customerId: string;
   customerName: string;
   customerPhone: string;
@@ -411,6 +446,13 @@ export interface PickDropBooking {
   deliveredBy?: string;
 
   // Financials & Pricing Calculation
+  distanceKm?: number;
+  additionalPetsCount?: number;
+  additionalStopsCount?: number;
+  waitingMinutes?: number;
+  isNight?: boolean;
+  isHoliday?: boolean;
+  isEmergency?: boolean;
   baseCharge: number;
   additionalCharges: number;
   waitingCharges: number;

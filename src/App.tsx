@@ -35,7 +35,7 @@ import { Footer } from './components/Footer';
 import { PickDropManager } from './components/PickDropManager';
 
 import { 
-  PickDropBooking, PickDropDriver, PickDropVehicle, PickDropPricingRule, PickDropStatus 
+  PickDropBooking, PickDropDriver, PickDropVehicle, PickDropPricingRule, PickDropStatus, PickDropRecurringSchedule 
 } from './types';
 
 // Supabase Production Services
@@ -59,7 +59,10 @@ import {
   fetchPickDropVehicles, 
   savePickDropVehicle, 
   fetchPickDropPricingRules, 
-  savePickDropPricingRule 
+  savePickDropPricingRule,
+  fetchPickDropRecurringSchedules,
+  savePickDropRecurringSchedule,
+  deletePickDropRecurringSchedule
 } from './lib/pickDropService';
 
 export default function App() {
@@ -112,6 +115,7 @@ export default function App() {
   const [pickDropDrivers, setPickDropDrivers] = useState<PickDropDriver[]>([]);
   const [pickDropVehicles, setPickDropVehicles] = useState<PickDropVehicle[]>([]);
   const [pickDropPricingRules, setPickDropPricingRules] = useState<PickDropPricingRule[]>([]);
+  const [pickDropRecurringSchedules, setPickDropRecurringSchedules] = useState<PickDropRecurringSchedule[]>([]);
 
   // UI State
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
@@ -148,7 +152,8 @@ export default function App() {
         dbPickDropBookings,
         dbDrivers,
         dbVehicles,
-        dbPricingRules
+        dbPricingRules,
+        dbRecurringSchedules
       ] = await Promise.all([
         fetchCustomersFromSupabase(),
         fetchPetsFromSupabase(),
@@ -160,7 +165,8 @@ export default function App() {
         fetchPickDropBookingsFromSupabase(),
         fetchPickDropDrivers(),
         fetchPickDropVehicles(),
-        fetchPickDropPricingRules()
+        fetchPickDropPricingRules(),
+        fetchPickDropRecurringSchedules()
       ]);
 
       if (dbCustomers.length > 0) setCustomers(dbCustomers);
@@ -174,6 +180,7 @@ export default function App() {
       if (dbDrivers) setPickDropDrivers(dbDrivers);
       if (dbVehicles) setPickDropVehicles(dbVehicles);
       if (dbPricingRules) setPickDropPricingRules(dbPricingRules);
+      if (dbRecurringSchedules) setPickDropRecurringSchedules(dbRecurringSchedules);
 
       // NOTE: Historical migration (Invoices 000001–000067) is complete.
       // The auto-trigger has been intentionally removed. Do NOT re-add it.
@@ -644,6 +651,28 @@ export default function App() {
     logAuditEventToSupabase('PRICING_RULE_SAVED', `Saved pricing rule ${rule.ruleName} (Rate: ₹${rule.rate})`);
   };
 
+  const handleSavePickDropRecurringSchedule = async (schedule: PickDropRecurringSchedule) => {
+    if (!hasPermission(currentUser, 'pick_drop_recurring_edit')) {
+      alert('Access Denied: You do not have permission to manage recurring transit schedules.');
+      return;
+    }
+    const res = await savePickDropRecurringSchedule(schedule);
+    if (res.data) {
+      setPickDropRecurringSchedules(prev => [res.data!, ...prev.filter(s => s.scheduleId !== schedule.scheduleId)]);
+    }
+    logAuditEventToSupabase('RECURRING_TRANSIT_SAVED', `Saved recurring schedule ${schedule.scheduleId} for ${schedule.customerName}`);
+  };
+
+  const handleDeletePickDropRecurringSchedule = async (scheduleId: string) => {
+    if (!hasPermission(currentUser, 'pick_drop_recurring_edit') && !hasPermission(currentUser, 'pick_drop_delete')) {
+      alert('Access Denied: You do not have permission to delete recurring schedules.');
+      return;
+    }
+    await deletePickDropRecurringSchedule(scheduleId);
+    setPickDropRecurringSchedules(prev => prev.filter(s => s.scheduleId !== scheduleId));
+    logAuditEventToSupabase('RECURRING_TRANSIT_DELETED', `Deleted recurring schedule ${scheduleId}`);
+  };
+
   const handleGenerateInvoiceForPickDropBooking = async (booking: PickDropBooking) => {
     const todayStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
     const cust = customers.find(c => c.id === booking.customerId);
@@ -928,6 +957,7 @@ export default function App() {
               drivers={pickDropDrivers}
               vehicles={pickDropVehicles}
               pricingRules={pickDropPricingRules}
+              recurringSchedules={pickDropRecurringSchedules}
               customers={customers}
               pets={pets}
               currentUser={currentUser}
@@ -938,6 +968,8 @@ export default function App() {
               onSaveDriver={handleSavePickDropDriver}
               onSaveVehicle={handleSavePickDropVehicle}
               onSavePricingRule={handleSavePickDropPricingRule}
+              onSaveRecurringSchedule={handleSavePickDropRecurringSchedule}
+              onDeleteRecurringSchedule={handleDeletePickDropRecurringSchedule}
               onGenerateInvoiceForBooking={handleGenerateInvoiceForPickDropBooking}
             />
           )}

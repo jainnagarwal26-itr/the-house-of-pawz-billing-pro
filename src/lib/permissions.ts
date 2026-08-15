@@ -188,7 +188,10 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
       { key: 'pick_drop_status_update', label: 'Update Trip Status', description: 'Mark arrived, confirm pet pickup, mark delivered & complete trip' },
       { key: 'pick_drop_pricing_view', label: 'View Pricing Rules', description: 'Inspect base and per-km pricing matrix' },
       { key: 'pick_drop_pricing_edit', label: 'Edit Pricing Rules', description: 'Configure and update dynamic pricing rules' },
-      { key: 'pick_drop_reports_view', label: 'View Trip Analytics', description: 'Access Pick & Drop trip summary statistics' }
+      { key: 'pick_drop_reports_view', label: 'View Trip Analytics', description: 'Access Pick & Drop trip summary statistics' },
+      { key: 'pick_drop_recurring_view', label: 'View Recurring Transit', description: 'Inspect recurring Pick & Drop subscription schedules' },
+      { key: 'pick_drop_recurring_edit', label: 'Manage Recurring Transit', description: 'Create and generate recurring Pick & Drop trips' },
+      { key: 'pick_drop_reports_export', label: 'Export Transit Reports', description: 'Download CSV reports for trips, fleet and revenue' }
     ]
   }
 ];
@@ -249,7 +252,10 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
     pick_drop_status_update: true,
     pick_drop_pricing_view: true,
     pick_drop_pricing_edit: true,
-    pick_drop_reports_view: true
+    pick_drop_reports_view: true,
+    pick_drop_recurring_view: true,
+    pick_drop_recurring_edit: true,
+    pick_drop_reports_export: true
   },
 
   ADMIN: {
@@ -306,7 +312,10 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
     pick_drop_status_update: true,
     pick_drop_pricing_view: true,
     pick_drop_pricing_edit: false,
-    pick_drop_reports_view: true
+    pick_drop_reports_view: true,
+    pick_drop_recurring_view: true,
+    pick_drop_recurring_edit: true,
+    pick_drop_reports_export: true
   },
 
   SUPER_ADMIN: {
@@ -363,7 +372,10 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
     pick_drop_status_update: true,
     pick_drop_pricing_view: true,
     pick_drop_pricing_edit: true,
-    pick_drop_reports_view: true
+    pick_drop_reports_view: true,
+    pick_drop_recurring_view: true,
+    pick_drop_recurring_edit: true,
+    pick_drop_reports_export: true
   },
 
   USER: {
@@ -420,7 +432,10 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
     pick_drop_status_update: false,
     pick_drop_pricing_view: false,
     pick_drop_pricing_edit: false,
-    pick_drop_reports_view: false
+    pick_drop_reports_view: false,
+    pick_drop_recurring_view: false,
+    pick_drop_recurring_edit: false,
+    pick_drop_reports_export: false
   },
 
   BILLING_STAFF: {
@@ -477,7 +492,10 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
     pick_drop_status_update: true,
     pick_drop_pricing_view: true,
     pick_drop_pricing_edit: false,
-    pick_drop_reports_view: false
+    pick_drop_reports_view: false,
+    pick_drop_recurring_view: false,
+    pick_drop_recurring_edit: false,
+    pick_drop_reports_export: false
   },
 
   MANAGER: {
