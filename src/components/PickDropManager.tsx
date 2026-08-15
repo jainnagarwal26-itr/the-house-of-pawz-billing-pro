@@ -370,6 +370,10 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
     const extraPayload: Partial<PickDropBooking> = {};
 
     if (statusActionType === 'DRIVER_ASSIGNED') {
+      if (!hasPermission(currentUser, 'pick_drop_assign')) {
+        alert('Access Denied: You do not have permission to assign drivers or vehicles.');
+        return;
+      }
       const drv = drivers.find(d => d.driverId === selectedDriverId);
       const veh = vehicles.find(v => v.vehicleId === selectedVehicleId);
       if (drv) {
@@ -488,31 +492,35 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
           <span>Trips & Schedules ({bookings.length})</span>
         </button>
 
-        <button
-          onClick={() => setActiveSubTab('drivers')}
-          className={`pb-2.5 px-3 border-b-2 transition-all flex items-center gap-1.5 cursor-pointer ${
-            activeSubTab === 'drivers'
-              ? 'border-[#D62828] text-[#D62828]'
-              : 'border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white'
-          }`}
-        >
-          <UserIcon className="w-4 h-4" />
-          <span>Drivers Master ({drivers.length})</span>
-        </button>
+        {(hasPermission(currentUser, 'pick_drop_assign') || hasPermission(currentUser, 'pick_drop_edit')) && (
+          <button
+            onClick={() => setActiveSubTab('drivers')}
+            className={`pb-2.5 px-3 border-b-2 transition-all flex items-center gap-1.5 cursor-pointer ${
+              activeSubTab === 'drivers'
+                ? 'border-[#D62828] text-[#D62828]'
+                : 'border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <UserIcon className="w-4 h-4" />
+            <span>Drivers Master ({drivers.length})</span>
+          </button>
+        )}
 
-        <button
-          onClick={() => setActiveSubTab('vehicles')}
-          className={`pb-2.5 px-3 border-b-2 transition-all flex items-center gap-1.5 cursor-pointer ${
-            activeSubTab === 'vehicles'
-              ? 'border-[#D62828] text-[#D62828]'
-              : 'border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white'
-          }`}
-        >
-          <Truck className="w-4 h-4" />
-          <span>Vehicles Master ({vehicles.length})</span>
-        </button>
+        {(hasPermission(currentUser, 'pick_drop_assign') || hasPermission(currentUser, 'pick_drop_edit')) && (
+          <button
+            onClick={() => setActiveSubTab('vehicles')}
+            className={`pb-2.5 px-3 border-b-2 transition-all flex items-center gap-1.5 cursor-pointer ${
+              activeSubTab === 'vehicles'
+                ? 'border-[#D62828] text-[#D62828]'
+                : 'border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <Truck className="w-4 h-4" />
+            <span>Vehicles Master ({vehicles.length})</span>
+          </button>
+        )}
 
-        {hasPermission(currentUser, 'pick_drop_pricing_view') && (
+        {hasPermission(currentUser, 'pick_drop_pricing_edit') && (
           <button
             onClick={() => setActiveSubTab('pricing')}
             className={`pb-2.5 px-3 border-b-2 transition-all flex items-center gap-1.5 cursor-pointer ${
@@ -657,7 +665,7 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
                     <span>View & Manage</span>
                   </button>
 
-                  {b.status === 'COMPLETED' && !b.invoiceId && (
+                  {b.status === 'COMPLETED' && !b.invoiceId && hasPermission(currentUser, 'invoices_create') && hasPermission(currentUser, 'pick_drop_edit') && (
                     <button
                       onClick={() => onGenerateInvoiceForBooking(b)}
                       className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer"
@@ -1145,7 +1153,7 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
                   </button>
                 )}
 
-                {['REQUESTED', 'CONFIRMED'].includes(selectedBooking.status) && (
+                {['REQUESTED', 'CONFIRMED'].includes(selectedBooking.status) && hasPermission(currentUser, 'pick_drop_assign') && (
                   <button
                     onClick={() => {
                       setStatusActionType('DRIVER_ASSIGNED');
