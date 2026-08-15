@@ -4,7 +4,7 @@ import {
   FileSpreadsheet, HardDrive, UserCog, History, Settings, 
   Repeat, PlusCircle, Lock, ShieldCheck, UserCheck, ChevronRight,
   ChevronLeft, PanelLeftClose, PanelLeftOpen, HelpCircle, Download,
-  Menu, X, Sparkles, Shield, Camera, Image as ImageIcon, Zap
+  Menu, X, Sparkles, Shield, Camera, Image as ImageIcon, Zap, Car
 } from 'lucide-react';
 import { UserRole, User } from '../types';
 import { hasPermission } from '../lib/permissions';
@@ -15,6 +15,7 @@ export type ActiveTab =
   | 'recurring'
   | 'customers' 
   | 'pets' 
+  | 'pick_drop'
   | 'communication'
   | 'smart_import'
   | 'payments' 
@@ -47,6 +48,7 @@ export function isTabAllowedForUser(tab: ActiveTab, user?: User | null, userRole
       recurring: 'boarding_view',
       customers: 'customers_view',
       pets: 'pets_view',
+      pick_drop: 'pick_drop_view',
       communication: 'communication_center_view',
       smart_import: 'import_engine_view',
       payments: 'payments_view',
@@ -62,13 +64,13 @@ export function isTabAllowedForUser(tab: ActiveTab, user?: User | null, userRole
 
   if (role === 'ACCOUNTANT' || role === 'SUPER_ADMIN') return true;
   if (role === 'ADMIN') {
-    return ['dashboard', 'customers', 'pets', 'communication', 'payments'].includes(tab);
+    return ['dashboard', 'customers', 'pets', 'pick_drop', 'communication', 'payments'].includes(tab);
   }
   if (role === 'BILLING_STAFF') {
-    return ['pets'].includes(tab);
+    return ['pets', 'pick_drop'].includes(tab);
   }
 
-  return ['pets'].includes(tab);
+  return ['pets', 'pick_drop'].includes(tab);
 }
 
 // Backwards compatibility alias
@@ -123,6 +125,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       adminOnly: false,
       badge: activeBoardingCount > 0 ? `${activeBoardingCount}` : null,
       badgeColor: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200'
+    },
+    {
+      id: 'pick_drop' as ActiveTab,
+      label: 'Pick & Drop',
+      icon: Car,
+      adminOnly: false,
+      badge: 'VAN',
+      badgeColor: 'bg-red-600 text-white font-mono'
     },
     {
       id: 'communication' as ActiveTab,

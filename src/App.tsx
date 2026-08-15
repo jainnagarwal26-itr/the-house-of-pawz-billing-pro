@@ -32,6 +32,11 @@ import { NotificationPanel } from './components/NotificationPanel';
 import { LoginModal } from './components/LoginModal';
 import { ForgotPasswordModal } from './components/ForgotPasswordModal';
 import { Footer } from './components/Footer';
+import { PickDropManager } from './components/PickDropManager';
+
+import { 
+  PickDropBooking, PickDropDriver, PickDropVehicle, PickDropPricingRule, PickDropStatus 
+} from './types';
 
 // Supabase Production Services
 import { fetchActiveSessionUser, logoutSupabase } from './lib/authService';
@@ -43,6 +48,19 @@ import { fetchPaymentsFromSupabase, recordPaymentInSupabase } from './lib/paymen
 import { fetchCompanySettingsFromSupabase, updateCompanySettingsInSupabase } from './lib/settingsService';
 import { fetchUsersFromSupabase, updateUserPermissionInSupabase, updateUserRoleInSupabase } from './lib/userService';
 import { fetchAuditLogsFromSupabase, logAuditEventToSupabase } from './lib/auditService';
+import { 
+  fetchPickDropBookingsFromSupabase, 
+  createPickDropBookingInSupabase, 
+  updatePickDropBookingStatus, 
+  updatePickDropBooking, 
+  deletePickDropBooking, 
+  fetchPickDropDrivers, 
+  savePickDropDriver, 
+  fetchPickDropVehicles, 
+  savePickDropVehicle, 
+  fetchPickDropPricingRules, 
+  savePickDropPricingRule 
+} from './lib/pickDropService';
 
 export default function App() {
   // Database Connection State
@@ -89,6 +107,12 @@ export default function App() {
   );
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
 
+  // Pick & Drop Collections
+  const [pickDropBookings, setPickDropBookings] = useState<PickDropBooking[]>([]);
+  const [pickDropDrivers, setPickDropDrivers] = useState<PickDropDriver[]>([]);
+  const [pickDropVehicles, setPickDropVehicles] = useState<PickDropVehicle[]>([]);
+  const [pickDropPricingRules, setPickDropPricingRules] = useState<PickDropPricingRule[]>([]);
+
   // UI State
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
@@ -120,7 +144,11 @@ export default function App() {
         dbPayments,
         dbSettings,
         dbUsers,
-        dbAuditLogs
+        dbAuditLogs,
+        dbPickDropBookings,
+        dbDrivers,
+        dbVehicles,
+        dbPricingRules
       ] = await Promise.all([
         fetchCustomersFromSupabase(),
         fetchPetsFromSupabase(),
@@ -128,7 +156,11 @@ export default function App() {
         fetchPaymentsFromSupabase(),
         fetchCompanySettingsFromSupabase(),
         fetchUsersFromSupabase(),
-        fetchAuditLogsFromSupabase()
+        fetchAuditLogsFromSupabase(),
+        fetchPickDropBookingsFromSupabase(),
+        fetchPickDropDrivers(),
+        fetchPickDropVehicles(),
+        fetchPickDropPricingRules()
       ]);
 
       if (dbCustomers.length > 0) setCustomers(dbCustomers);
@@ -138,6 +170,10 @@ export default function App() {
       if (dbSettings) setSettings(dbSettings);
       if (dbUsers.length > 0) setUsers(dbUsers);
       if (dbAuditLogs.length > 0) setAuditLogs(dbAuditLogs);
+      if (dbPickDropBookings) setPickDropBookings(dbPickDropBookings);
+      if (dbDrivers) setPickDropDrivers(dbDrivers);
+      if (dbVehicles) setPickDropVehicles(dbVehicles);
+      if (dbPricingRules) setPickDropPricingRules(dbPricingRules);
 
       // NOTE: Historical migration (Invoices 000001–000067) is complete.
       // The auto-trigger has been intentionally removed. Do NOT re-add it.
@@ -524,6 +560,210 @@ export default function App() {
     setActiveTab('invoices');
   };
 
+  // ─── PICK & DROP ACTION HANDLERS ───────────────────────
+  const handleAddPickDropBooking = async (booking: PickDropBooking) => {
+    if (!hasPermission(currentUser, 'pick_drop_create')) {
+      alert('Access Denied: You do not have permission to book Pick & Drop trips.');
+      return;
+    }
+    const res = await createPickDropBookingInSupabase(booking, currentUser);
+    if (res.data) {
+      setPickDropBookings(prev => [res.data!, ...prev.filter(b => b.bookingId !== booking.bookingId)]);
+    }
+    logAuditEventToSupabase('PICK_DROP_BOOKED', `Created Pick & Drop Booking #${booking.bookingId} for ${booking.customerName}`);
+  };
+
+  const handleUpdatePickDropStatus = async (
+    bookingId: string, 
+    newStatus: PickDropStatus, 
+    note: string | undefined, 
+    extraPayload?: Partial<PickDropBooking>
+  ) => {
+    if (!hasPermission(currentUser, 'pick_drop_status_update')) {
+      alert('Access Denied: You do not have permission to update trip status.');
+      return;
+    }
+    await updatePickDropBookingStatus(bookingId, newStatus, note, currentUser, extraPayload);
+    setPickDropBookings(prev => prev.map(b => b.bookingId === bookingId ? { ...b, ...extraPayload, status: newStatus } : b));
+    logAuditEventToSupabase('PICK_DROP_STATUS_CHANGED', `Trip #${bookingId} status updated to ${newStatus}${note ? ` (${note})` : ''}`);
+  };
+
+  const handleUpdatePickDropBooking = async (booking: PickDropBooking) => {
+    if (!hasPermission(currentUser, 'pick_drop_edit')) {
+      alert('Access Denied: You do not have permission to edit trip details.');
+      return;
+    }
+    await updatePickDropBooking(booking, currentUser);
+    setPickDropBookings(prev => prev.map(b => b.bookingId === booking.bookingId ? booking : b));
+    logAuditEventToSupabase('PICK_DROP_EDITED', `Updated Pick & Drop Booking #${booking.bookingId}`);
+  };
+
+  const handleDeletePickDropBooking = async (bookingId: string) => {
+    if (!hasPermission(currentUser, 'pick_drop_delete')) {
+      alert('Access Denied: You do not have permission to delete bookings.');
+      return;
+    }
+    await deletePickDropBooking(bookingId);
+    setPickDropBookings(prev => prev.filter(b => b.bookingId !== bookingId));
+    logAuditEventToSupabase('PICK_DROP_DELETED', `Deleted Pick & Drop Booking #${bookingId}`);
+  };
+
+  const handleSavePickDropDriver = async (driver: PickDropDriver) => {
+    if (!hasPermission(currentUser, 'pick_drop_edit') && !hasPermission(currentUser, 'settings_edit')) {
+      alert('Access Denied: You do not have permission to manage drivers.');
+      return;
+    }
+    const res = await savePickDropDriver(driver);
+    if (res.data) {
+      setPickDropDrivers(prev => [res.data!, ...prev.filter(d => d.driverId !== driver.driverId)]);
+    }
+    logAuditEventToSupabase('DRIVER_SAVED', `Saved driver ${driver.name} (${driver.driverId})`);
+  };
+
+  const handleSavePickDropVehicle = async (vehicle: PickDropVehicle) => {
+    if (!hasPermission(currentUser, 'pick_drop_edit') && !hasPermission(currentUser, 'settings_edit')) {
+      alert('Access Denied: You do not have permission to manage vehicles.');
+      return;
+    }
+    const res = await savePickDropVehicle(vehicle);
+    if (res.data) {
+      setPickDropVehicles(prev => [res.data!, ...prev.filter(v => v.vehicleId !== vehicle.vehicleId)]);
+    }
+    logAuditEventToSupabase('VEHICLE_SAVED', `Saved vehicle ${vehicle.vehicleNumber} (${vehicle.vehicleId})`);
+  };
+
+  const handleSavePickDropPricingRule = async (rule: PickDropPricingRule) => {
+    if (!hasPermission(currentUser, 'pick_drop_pricing_edit')) {
+      alert('Access Denied: You do not have permission to edit pricing rules.');
+      return;
+    }
+    const res = await savePickDropPricingRule(rule);
+    if (res.data) {
+      setPickDropPricingRules(prev => [res.data!, ...prev.filter(r => r.id !== rule.id && r.ruleName !== rule.ruleName)]);
+    }
+    logAuditEventToSupabase('PRICING_RULE_SAVED', `Saved pricing rule ${rule.ruleName} (Rate: ₹${rule.rate})`);
+  };
+
+  const handleGenerateInvoiceForPickDropBooking = async (booking: PickDropBooking) => {
+    const todayStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const cust = customers.find(c => c.id === booking.customerId);
+    const nextInvNumber = await fetchNextInvoiceNumberFromDB('26-27');
+
+    const items: any[] = [];
+
+    // Line 1: Base Pick & Drop Charge
+    if (booking.baseCharge > 0) {
+      items.push({
+        id: `ITEM-PND-1-${Date.now().toString().slice(-6)}`,
+        type: 'SERVICE',
+        name: `Pick & Drop Transit Service (${booking.serviceType})`,
+        hsnSac: '996411',
+        price: booking.baseCharge,
+        qty: 1,
+        discount: 0,
+        discountAmount: 0,
+        taxableValue: booking.baseCharge,
+        gstRate: 18,
+        cgstRate: 9,
+        cgstAmount: Math.round(booking.baseCharge * 0.09 * 100) / 100,
+        sgstRate: 9,
+        sgstAmount: Math.round(booking.baseCharge * 0.09 * 100) / 100,
+        igstRate: 0,
+        igstAmount: 0,
+        total: Math.round(booking.baseCharge * 1.18 * 100) / 100
+      });
+    }
+
+    // Line 2: Distance & Additional Surcharges
+    if (booking.additionalCharges > 0) {
+      items.push({
+        id: `ITEM-PND-2-${Date.now().toString().slice(-6)}`,
+        type: 'SERVICE',
+        name: `Transportation Distance & Additional Surcharges`,
+        hsnSac: '996411',
+        price: booking.additionalCharges,
+        qty: 1,
+        discount: 0,
+        discountAmount: 0,
+        taxableValue: booking.additionalCharges,
+        gstRate: 18,
+        cgstRate: 9,
+        cgstAmount: Math.round(booking.additionalCharges * 0.09 * 100) / 100,
+        sgstRate: 9,
+        sgstAmount: Math.round(booking.additionalCharges * 0.09 * 100) / 100,
+        igstRate: 0,
+        igstAmount: 0,
+        total: Math.round(booking.additionalCharges * 1.18 * 100) / 100
+      });
+    }
+
+    // Line 3: Waiting Charges
+    if (booking.waitingCharges > 0) {
+      items.push({
+        id: `ITEM-PND-3-${Date.now().toString().slice(-6)}`,
+        type: 'SERVICE',
+        name: `Driver Waiting & Halting Charges`,
+        hsnSac: '996411',
+        price: booking.waitingCharges,
+        qty: 1,
+        discount: 0,
+        discountAmount: 0,
+        taxableValue: booking.waitingCharges,
+        gstRate: 18,
+        cgstRate: 9,
+        cgstAmount: Math.round(booking.waitingCharges * 0.09 * 100) / 100,
+        sgstRate: 9,
+        sgstAmount: Math.round(booking.waitingCharges * 0.09 * 100) / 100,
+        igstRate: 0,
+        igstAmount: 0,
+        total: Math.round(booking.waitingCharges * 1.18 * 100) / 100
+      });
+    }
+
+    const subTotal = items.reduce((acc, i) => acc + i.taxableValue, 0);
+    const cgstTotal = items.reduce((acc, i) => acc + i.cgstAmount, 0);
+    const sgstTotal = items.reduce((acc, i) => acc + i.sgstAmount, 0);
+    const grandTotal = Math.round((subTotal + cgstTotal + sgstTotal) * 100) / 100;
+
+    const draftInv: Invoice = {
+      id: `INV-PND-${Date.now().toString().slice(-8)}`,
+      invoiceNumber: nextInvNumber,
+      invoiceDate: todayStr,
+      dueDate: todayStr,
+      customerId: booking.customerId,
+      customerName: booking.customerName,
+      customerPhone: booking.customerPhone || cust?.phone || '+91 98000 00000',
+      customerEmail: cust?.email || '',
+      customerAddress: booking.pickupAddress || cust?.address || 'Mumbai, MH',
+      customerGSTIN: cust?.gstin || '',
+      petId: booking.petId,
+      petName: booking.petName,
+      placeOfSupply: settings.stateCode,
+      isInterState: false,
+      items,
+      subTotal,
+      totalDiscount: 0,
+      taxableAmount: subTotal,
+      cgstTotal,
+      sgstTotal,
+      igstTotal: 0,
+      totalGst: cgstTotal + sgstTotal,
+      roundOff: 0,
+      grandTotal,
+      paidAmount: 0,
+      balanceDue: grandTotal,
+      paymentStatus: 'UNPAID',
+      paymentMode: 'UPI',
+      notes: `Generated from Pick & Drop Booking #${booking.bookingId} (${booking.serviceType})`,
+      createdByRole: currentUser.role,
+      createdByName: currentUser.name,
+      createdAt: new Date().toISOString()
+    };
+
+    setEditingInvoice(draftInv);
+    setShowInvoiceModal(true);
+  };
+
   // Excel Full Export
   const handleExportFullExcel = () => {
     exportFullDatabaseToExcel({
@@ -661,6 +901,7 @@ export default function App() {
             <CustomerMaster
               customers={customers}
               pets={pets}
+              pickDropBookings={pickDropBookings}
               currentUser={currentUser}
               onAddCustomer={handleAddCustomer}
               onEditCustomer={handleEditCustomer}
@@ -672,11 +913,32 @@ export default function App() {
             <PetMaster
               pets={pets}
               customers={customers}
+              pickDropBookings={pickDropBookings}
               currentUser={currentUser}
               onAddPet={handleAddPet}
               onEditPet={handleEditPet}
               onDeletePet={handleDeletePet}
               onToggleBoarding={handleToggleBoarding}
+            />
+          )}
+
+          {activeTab === 'pick_drop' && (
+            <PickDropManager
+              bookings={pickDropBookings}
+              drivers={pickDropDrivers}
+              vehicles={pickDropVehicles}
+              pricingRules={pickDropPricingRules}
+              customers={customers}
+              pets={pets}
+              currentUser={currentUser}
+              onAddBooking={handleAddPickDropBooking}
+              onUpdateStatus={handleUpdatePickDropStatus}
+              onUpdateBooking={handleUpdatePickDropBooking}
+              onDeleteBooking={handleDeletePickDropBooking}
+              onSaveDriver={handleSavePickDropDriver}
+              onSaveVehicle={handleSavePickDropVehicle}
+              onSavePricingRule={handleSavePickDropPricingRule}
+              onGenerateInvoiceForBooking={handleGenerateInvoiceForPickDropBooking}
             />
           )}
 

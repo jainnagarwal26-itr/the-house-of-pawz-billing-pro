@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import { 
   Dog, Search, Plus, CheckCircle2, AlertTriangle, 
-  Calendar, Edit, Trash2, LogIn, LogOut, QrCode 
+  Calendar, Edit, Trash2, LogIn, LogOut, QrCode, Car 
 } from 'lucide-react';
-import { Pet, Customer, User } from '../types';
+import { Pet, Customer, User, PickDropBooking, formatINR } from '../types';
 import { hasPermission } from '../lib/permissions';
 
 interface PetMasterProps {
   pets: Pet[];
   customers: Customer[];
+  pickDropBookings?: PickDropBooking[];
   currentUser?: User | null;
   onAddPet: (pet: Pet) => void;
   onEditPet: (pet: Pet) => void;
@@ -19,6 +20,7 @@ interface PetMasterProps {
 export const PetMaster: React.FC<PetMasterProps> = ({
   pets,
   customers,
+  pickDropBookings = [],
   currentUser,
   onAddPet,
   onEditPet,
@@ -267,6 +269,33 @@ export const PetMaster: React.FC<PetMasterProps> = ({
                   {p.feedingPreferences && <p><strong>Diet:</strong> {p.feedingPreferences}</p>}
                 </div>
               )}
+
+              {/* Pick & Drop History */}
+              {(() => {
+                const petTrips = pickDropBookings.filter(b => b.petId === p.id);
+                if (petTrips.length === 0) return null;
+                const lastTrip = petTrips[0];
+                return (
+                  <div className="pt-2 border-t border-slate-100 dark:border-zinc-800/80 text-[10px]">
+                    <div className="flex items-center justify-between font-bold text-slate-500 mb-0.5">
+                      <span className="flex items-center gap-1">
+                        <Car className="w-3 h-3 text-[#D62828]" /> Transit History:
+                      </span>
+                      <span className="text-[#D62828]">{petTrips.length} Trips</span>
+                    </div>
+                    <div className="bg-slate-50 dark:bg-zinc-800/60 p-1.5 rounded text-[10px] space-y-0.5">
+                      <div className="flex justify-between">
+                        <span className="font-medium text-slate-700 dark:text-zinc-300">{lastTrip.serviceType}</span>
+                        <span className="font-bold text-emerald-600">{formatINR(lastTrip.subtotal)}</span>
+                      </div>
+                      <div className="flex justify-between text-[9px] text-slate-400">
+                        <span>{lastTrip.pickupDate}</span>
+                        <span className="uppercase font-bold">{lastTrip.status}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Boarding Status & Toggle */}

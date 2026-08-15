@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import { 
   Users, Search, Plus, Phone, Mail, MapPin, 
-  IndianRupee, Edit, Trash2, CheckCircle2 
+  IndianRupee, Edit, Trash2, CheckCircle2, Car 
 } from 'lucide-react';
-import { Customer, Pet, formatINR, User } from '../types';
+import { Customer, Pet, formatINR, User, PickDropBooking } from '../types';
 import { hasPermission } from '../lib/permissions';
 
 interface CustomerMasterProps {
   customers: Customer[];
   pets: Pet[];
+  pickDropBookings?: PickDropBooking[];
   currentUser?: User | null;
   onAddCustomer: (customer: Customer) => void;
   onEditCustomer: (customer: Customer) => void;
@@ -18,6 +19,7 @@ interface CustomerMasterProps {
 export const CustomerMaster: React.FC<CustomerMasterProps> = ({
   customers,
   pets,
+  pickDropBookings = [],
   currentUser,
   onAddCustomer,
   onEditCustomer,
@@ -221,6 +223,29 @@ export const CustomerMaster: React.FC<CustomerMasterProps> = ({
                     )}
                   </div>
                 </div>
+
+                {/* Pick & Drop Summary */}
+                {(() => {
+                  const custTrips = pickDropBookings.filter(b => b.customerId === c.id);
+                  if (custTrips.length === 0) return null;
+                  const completedTrips = custTrips.filter(b => b.status === 'COMPLETED');
+                  const totalSpent = completedTrips.reduce((acc, b) => acc + (b.subtotal || 0), 0);
+                  const lastTrip = custTrips[0];
+                  return (
+                    <div className="pt-2 border-t border-slate-100 dark:border-zinc-800/80">
+                      <div className="flex items-center justify-between text-[10px] mb-1">
+                        <span className="text-slate-400 font-bold uppercase flex items-center gap-1">
+                          <Car className="w-3 h-3 text-[#D62828]" /> Pick & Drop ({custTrips.length} Trips):
+                        </span>
+                        <span className="font-bold text-emerald-600 dark:text-emerald-400">{formatINR(totalSpent)}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-[10px] text-slate-500">
+                        <span>Completed: <strong className="text-slate-700 dark:text-zinc-300">{completedTrips.length}</strong></span>
+                        <span>Last: <strong className="text-slate-700 dark:text-zinc-300">{lastTrip?.pickupDate || 'N/A'}</strong></span>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               <div className="pt-3 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-between">

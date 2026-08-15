@@ -275,3 +275,156 @@ export interface CommunicationRecord {
   status: 'Opened' | 'Downloaded' | 'Composer Opened';
   notes?: string;
 }
+
+// ==========================================
+// PICK & DROP MODULE V1 TYPES
+// ==========================================
+
+export type PickDropStatus = 
+  | 'REQUESTED' 
+  | 'CONFIRMED' 
+  | 'DRIVER_ASSIGNED' 
+  | 'ON_THE_WAY' 
+  | 'PET_PICKED_UP' 
+  | 'IN_TRANSIT' 
+  | 'DELIVERED' 
+  | 'COMPLETED' 
+  | 'CANCELLED' 
+  | 'PICKUP_FAILED' 
+  | 'DROP_FAILED';
+
+export type PickDropServiceType = 
+  | 'One Way Pickup' 
+  | 'One Way Drop' 
+  | 'Pickup + Drop' 
+  | 'Round Trip' 
+  | 'Home → HOP' 
+  | 'HOP → Home' 
+  | 'Home → HOP → Home';
+
+export interface PickDropDriver {
+  id: string;
+  driverId: string; // e.g. DRV-001
+  name: string;
+  mobile: string;
+  alternateMobile?: string;
+  licenseNumber?: string;
+  licenseExpiry?: string;
+  emergencyContact?: string;
+  isActive: boolean;
+  notes?: string;
+  createdAt?: string;
+}
+
+export interface PickDropVehicle {
+  id: string;
+  vehicleId: string; // e.g. VEH-001
+  vehicleNumber: string;
+  vehicleType: string; // 'Van' | 'Car' | 'EV' | 'Auto'
+  capacity: number;
+  isAc: boolean;
+  isPetFriendly: boolean;
+  isActive: boolean;
+  insuranceExpiry?: string;
+  pucExpiry?: string;
+  notes?: string;
+  createdAt?: string;
+}
+
+export type PricingRuleType = 
+  | 'FIXED' 
+  | 'PER_KM' 
+  | 'PER_PET' 
+  | 'WAITING' 
+  | 'NIGHT' 
+  | 'EMERGENCY' 
+  | 'ADDITIONAL' 
+  | 'ROUND_TRIP';
+
+export interface PickDropPricingRule {
+  id: string;
+  ruleName: string;
+  ruleType: PricingRuleType;
+  rate: number;
+  isActive: boolean;
+  effectiveFrom?: string;
+  notes?: string;
+  createdAt?: string;
+}
+
+export interface PickDropStatusHistory {
+  id: string;
+  bookingId: string;
+  status: PickDropStatus;
+  changedBy: string;
+  changedAt: string;
+  notes?: string;
+}
+
+export interface PickDropBooking {
+  id: string;
+  bookingId: string; // e.g. PND-2627-0001
+  customerId: string;
+  customerName: string;
+  customerPhone: string;
+  petId: string;
+  petName: string;
+  petSpecies?: string;
+  petBreed?: string;
+  petWeight?: string;
+  petHandlingNotes?: string;
+  serviceType: PickDropServiceType;
+  
+  // Pickup Details
+  pickupAddress: string;
+  pickupLandmark?: string;
+  pickupDate: string;
+  preferredPickupTime: string;
+  pickupTimeWindow?: string;
+  pickupContactPerson?: string;
+  pickupMapsLink?: string;
+  
+  // Drop Details
+  dropAddress: string;
+  dropLandmark?: string;
+  dropDate: string;
+  preferredDropTime: string;
+  dropContactPerson?: string;
+  dropMapsLink?: string;
+
+  // Assignment
+  driverId?: string;
+  driverName?: string;
+  vehicleId?: string;
+  vehicleNumber?: string;
+
+  // Status & Tracking Lifecycle
+  status: PickDropStatus;
+  actualPickupTime?: string;
+  pickupConfirmedBy?: string;
+  pickupNote?: string;
+  actualDeliveryTime?: string;
+  deliveredTo?: string;
+  receiverName?: string;
+  receiverRelationship?: string;
+  deliveryNote?: string;
+  deliveredBy?: string;
+
+  // Financials & Pricing Calculation
+  baseCharge: number;
+  additionalCharges: number;
+  waitingCharges: number;
+  subtotal: number;
+  invoiceId?: string;
+  invoiceNumber?: string;
+
+  // Notes
+  customerNotes?: string;
+  internalStaffNotes?: string;
+  createdBy?: string;
+  createdAt: string;
+  updatedAt?: string;
+
+  // Linked History
+  timeline?: PickDropStatusHistory[];
+}

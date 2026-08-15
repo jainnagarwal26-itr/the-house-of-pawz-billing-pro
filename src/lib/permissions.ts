@@ -173,6 +173,23 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
       { key: 'reports_view', label: 'View Business Reports', description: 'Access revenue and client growth reports' },
       { key: 'reports_export', label: 'Export Reports', description: 'Download CSV/Excel business reports' }
     ]
+  },
+  {
+    id: 'pick_drop',
+    title: 'O. Pick & Drop Service',
+    description: 'Pet transportation, driver/vehicle allocation & trip lifecycle',
+    iconName: 'Car',
+    permissions: [
+      { key: 'pick_drop_view', label: 'View Pick & Drop', description: 'Access Pick & Drop dashboard, bookings, and trip schedules' },
+      { key: 'pick_drop_create', label: 'Book New Trip', description: 'Create and register new Pick & Drop transportation bookings' },
+      { key: 'pick_drop_edit', label: 'Edit Trip Details', description: 'Modify addresses, dates, preferred times, and notes' },
+      { key: 'pick_drop_delete', label: 'Delete Trip', description: 'Permanently remove booking records' },
+      { key: 'pick_drop_assign', label: 'Assign Driver & Vehicle', description: 'Allocate drivers and vehicles to scheduled trips' },
+      { key: 'pick_drop_status_update', label: 'Update Trip Status', description: 'Mark arrived, confirm pet pickup, mark delivered & complete trip' },
+      { key: 'pick_drop_pricing_view', label: 'View Pricing Rules', description: 'Inspect base and per-km pricing matrix' },
+      { key: 'pick_drop_pricing_edit', label: 'Edit Pricing Rules', description: 'Configure and update dynamic pricing rules' },
+      { key: 'pick_drop_reports_view', label: 'View Trip Analytics', description: 'Access Pick & Drop trip summary statistics' }
+    ]
   }
 ];
 
@@ -223,7 +240,16 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
     settings_edit: true,
     settings_factory_reset: true,
     reports_view: true,
-    reports_export: true
+    reports_export: true,
+    pick_drop_view: true,
+    pick_drop_create: true,
+    pick_drop_edit: true,
+    pick_drop_delete: true,
+    pick_drop_assign: true,
+    pick_drop_status_update: true,
+    pick_drop_pricing_view: true,
+    pick_drop_pricing_edit: true,
+    pick_drop_reports_view: true
   },
 
   ADMIN: {
@@ -271,7 +297,16 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
     settings_edit: false,
     settings_factory_reset: false,
     reports_view: false,
-    reports_export: false
+    reports_export: false,
+    pick_drop_view: true,
+    pick_drop_create: true,
+    pick_drop_edit: true,
+    pick_drop_delete: false,
+    pick_drop_assign: true,
+    pick_drop_status_update: true,
+    pick_drop_pricing_view: true,
+    pick_drop_pricing_edit: false,
+    pick_drop_reports_view: true
   },
 
   SUPER_ADMIN: {
@@ -319,7 +354,16 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
     settings_edit: true,
     settings_factory_reset: true,
     reports_view: true,
-    reports_export: true
+    reports_export: true,
+    pick_drop_view: true,
+    pick_drop_create: true,
+    pick_drop_edit: true,
+    pick_drop_delete: true,
+    pick_drop_assign: true,
+    pick_drop_status_update: true,
+    pick_drop_pricing_view: true,
+    pick_drop_pricing_edit: true,
+    pick_drop_reports_view: true
   },
 
   USER: {
@@ -367,7 +411,16 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
     settings_edit: false,
     settings_factory_reset: false,
     reports_view: false,
-    reports_export: false
+    reports_export: false,
+    pick_drop_view: false,
+    pick_drop_create: false,
+    pick_drop_edit: false,
+    pick_drop_delete: false,
+    pick_drop_assign: false,
+    pick_drop_status_update: false,
+    pick_drop_pricing_view: false,
+    pick_drop_pricing_edit: false,
+    pick_drop_reports_view: false
   },
 
   BILLING_STAFF: {
@@ -415,7 +468,16 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
     settings_edit: false,
     settings_factory_reset: false,
     reports_view: false,
-    reports_export: false
+    reports_export: false,
+    pick_drop_view: true,
+    pick_drop_create: true,
+    pick_drop_edit: false,
+    pick_drop_delete: false,
+    pick_drop_assign: true,
+    pick_drop_status_update: true,
+    pick_drop_pricing_view: true,
+    pick_drop_pricing_edit: false,
+    pick_drop_reports_view: false
   },
 
   MANAGER: {
