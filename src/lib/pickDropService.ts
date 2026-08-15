@@ -389,6 +389,21 @@ export async function fetchPickDropBookingsFromSupabase(): Promise<PickDropBooki
       isHoliday: !!b.is_holiday,
       isEmergency: !!b.is_emergency,
       recurringScheduleId: b.recurring_schedule_id,
+      emergencyContact: b.emergency_contact,
+      bookingSource: b.booking_source || 'Phone',
+      priority: b.priority || 'Normal',
+      preferredVehicleType: b.preferred_vehicle_type,
+      preferredDriverId: b.preferred_driver_id,
+      statusChangedBy: b.status_changed_by,
+      statusChangedAt: b.status_changed_at,
+      operationalNote: b.operational_note,
+      delayReason: b.delay_reason,
+      cancellationReason: b.cancellation_reason,
+      failureReason: b.failure_reason,
+      estimatedPickupTime: b.estimated_pickup_time,
+      estimatedDeliveryTime: b.estimated_delivery_time,
+      delayMinutes: Number(b.delay_minutes) || 0,
+      delayStatus: b.delay_status || 'ON_TIME',
       invoiceId: b.invoice_id,
       invoiceNumber: b.invoice_number,
       customerNotes: b.customer_notes,
@@ -422,6 +437,11 @@ export async function createPickDropBookingInSupabase(
       pet_breed: booking.petBreed || '',
       pet_weight: booking.petWeight || '',
       pet_handling_notes: booking.petHandlingNotes || '',
+      emergency_contact: booking.emergencyContact || null,
+      booking_source: booking.bookingSource || 'Phone',
+      priority: booking.priority || 'Normal',
+      preferred_vehicle_type: booking.preferredVehicleType || null,
+      preferred_driver_id: booking.preferredDriverId || null,
       service_type: booking.serviceType,
       pickup_address: booking.pickupAddress,
       pickup_landmark: booking.pickupLandmark || '',
@@ -441,6 +461,13 @@ export async function createPickDropBookingInSupabase(
       vehicle_id: booking.vehicleId || null,
       vehicle_number: booking.vehicleNumber || null,
       status: booking.status || 'REQUESTED',
+      status_changed_by: user.name || user.username,
+      status_changed_at: new Date().toISOString(),
+      operational_note: booking.operationalNote || null,
+      estimated_pickup_time: booking.estimatedPickupTime || booking.preferredPickupTime,
+      estimated_delivery_time: booking.estimatedDeliveryTime || booking.preferredDropTime,
+      delay_minutes: booking.delayMinutes || 0,
+      delay_status: booking.delayStatus || 'ON_TIME',
       distance_km: booking.distanceKm || 0,
       additional_pets_count: booking.additionalPetsCount || 0,
       additional_stops_count: booking.additionalStopsCount || 0,
@@ -512,6 +539,16 @@ export async function updatePickDropBookingStatus(
     if (extraPayload?.receiverRelationship !== undefined) updateFields.receiver_relationship = extraPayload.receiverRelationship;
     if (extraPayload?.deliveryNote !== undefined) updateFields.delivery_note = extraPayload.deliveryNote;
     if (extraPayload?.deliveredBy !== undefined) updateFields.delivered_by = extraPayload.deliveredBy;
+    if (extraPayload?.statusChangedBy !== undefined) updateFields.status_changed_by = extraPayload.statusChangedBy;
+    if (extraPayload?.statusChangedAt !== undefined) updateFields.status_changed_at = extraPayload.statusChangedAt;
+    if (extraPayload?.operationalNote !== undefined) updateFields.operational_note = extraPayload.operationalNote;
+    if (extraPayload?.delayReason !== undefined) updateFields.delay_reason = extraPayload.delayReason;
+    if (extraPayload?.cancellationReason !== undefined) updateFields.cancellation_reason = extraPayload.cancellationReason;
+    if (extraPayload?.failureReason !== undefined) updateFields.failure_reason = extraPayload.failureReason;
+    if (extraPayload?.estimatedPickupTime !== undefined) updateFields.estimated_pickup_time = extraPayload.estimatedPickupTime;
+    if (extraPayload?.estimatedDeliveryTime !== undefined) updateFields.estimated_delivery_time = extraPayload.estimatedDeliveryTime;
+    if (extraPayload?.delayMinutes !== undefined) updateFields.delay_minutes = extraPayload.delayMinutes;
+    if (extraPayload?.delayStatus !== undefined) updateFields.delay_status = extraPayload.delayStatus;
     if (extraPayload?.invoiceId !== undefined) updateFields.invoice_id = extraPayload.invoiceId;
     if (extraPayload?.invoiceNumber !== undefined) updateFields.invoice_number = extraPayload.invoiceNumber;
 
@@ -562,6 +599,11 @@ export async function updatePickDropBooking(
       pet_breed: booking.petBreed || '',
       pet_weight: booking.petWeight || '',
       pet_handling_notes: booking.petHandlingNotes || '',
+      emergency_contact: booking.emergencyContact || null,
+      booking_source: booking.bookingSource || 'Phone',
+      priority: booking.priority || 'Normal',
+      preferred_vehicle_type: booking.preferredVehicleType || null,
+      preferred_driver_id: booking.preferredDriverId || null,
       service_type: booking.serviceType,
       pickup_address: booking.pickupAddress,
       pickup_landmark: booking.pickupLandmark || '',
@@ -580,6 +622,10 @@ export async function updatePickDropBooking(
       driver_name: booking.driverName || null,
       vehicle_id: booking.vehicleId || null,
       vehicle_number: booking.vehicleNumber || null,
+      estimated_pickup_time: booking.estimatedPickupTime || booking.preferredPickupTime,
+      estimated_delivery_time: booking.estimatedDeliveryTime || booking.preferredDropTime,
+      delay_minutes: booking.delayMinutes || 0,
+      delay_status: booking.delayStatus || 'ON_TIME',
       base_charge: booking.baseCharge,
       additional_charges: booking.additionalCharges,
       waiting_charges: booking.waitingCharges,
@@ -1193,4 +1239,224 @@ export function exportPickDropRevenueCSV(bookings: PickDropBooking[]) {
 
   const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
   downloadCSV(csv, `HOP_PickDrop_Revenue_Report_${new Date().toISOString().split('T')[0]}.csv`);
+}
+
+// ==========================================
+// PHASE 3: ETA & DELAY CALCULATION ENGINE
+// ==========================================
+
+export function calculateDelayStatus(
+  scheduledTime: string,
+  actualTime?: string
+): { delayMinutes: number; delayStatus: 'ON_TIME' | 'DELAYED' | 'MAJOR_DELAY' | 'COMPLETED' } {
+  if (!scheduledTime) return { delayMinutes: 0, delayStatus: 'ON_TIME' };
+  if (!actualTime) return { delayMinutes: 0, delayStatus: 'ON_TIME' };
+
+  try {
+    const parseTimeToMinutes = (timeStr: string): number => {
+      const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+      if (!match) return 0;
+      let hours = parseInt(match[1], 10);
+      const minutes = parseInt(match[2], 10);
+      const period = match[3]?.toUpperCase();
+
+      if (period === 'PM' && hours < 12) hours += 12;
+      if (period === 'AM' && hours === 12) hours = 0;
+
+      return hours * 60 + minutes;
+    };
+
+    const scheduledMins = parseTimeToMinutes(scheduledTime);
+    let actualMins = 0;
+
+    if (actualTime.includes('T')) {
+      const date = new Date(actualTime);
+      actualMins = date.getHours() * 60 + date.getMinutes();
+    } else {
+      actualMins = parseTimeToMinutes(actualTime);
+    }
+
+    const diffMinutes = actualMins - scheduledMins;
+
+    if (diffMinutes <= 10) {
+      return { delayMinutes: Math.max(0, diffMinutes), delayStatus: 'ON_TIME' };
+    } else if (diffMinutes <= 30) {
+      return { delayMinutes: diffMinutes, delayStatus: 'DELAYED' };
+    } else {
+      return { delayMinutes: diffMinutes, delayStatus: 'MAJOR_DELAY' };
+    }
+  } catch {
+    return { delayMinutes: 0, delayStatus: 'ON_TIME' };
+  }
+}
+
+// ==========================================
+// PHASE 3: DRIVER & VEHICLE PERFORMANCE
+// ==========================================
+
+export interface DriverPerformanceMetrics {
+  totalTrips: number;
+  completedTrips: number;
+  cancelledTrips: number;
+  failedPickups: number;
+  failedDeliveries: number;
+  onTimeTrips: number;
+  delayedTrips: number;
+  totalRevenue: number;
+  activeTrips: number;
+  completionRate: number;
+  rating: 'Excellent' | 'Good' | 'Average' | 'Needs Attention';
+}
+
+export function calculateDriverPerformance(
+  driverId: string,
+  bookings: PickDropBooking[]
+): DriverPerformanceMetrics {
+  const driverBookings = bookings.filter(b => b.driverId === driverId);
+  const total = driverBookings.length;
+  const completed = driverBookings.filter(b => b.status === 'COMPLETED').length;
+  const cancelled = driverBookings.filter(b => b.status === 'CANCELLED').length;
+  const failedPickups = driverBookings.filter(b => b.status === 'PICKUP_FAILED').length;
+  const failedDeliveries = driverBookings.filter(b => b.status === 'DROP_FAILED').length;
+  const activeTrips = driverBookings.filter(b => ['DRIVER_ASSIGNED', 'ON_THE_WAY', 'PET_PICKED_UP', 'IN_TRANSIT'].includes(b.status)).length;
+  const delayed = driverBookings.filter(b => b.delayStatus === 'DELAYED' || b.delayStatus === 'MAJOR_DELAY').length;
+  const onTime = Math.max(0, completed - delayed);
+  const revenue = driverBookings.filter(b => b.status === 'COMPLETED').reduce((acc, b) => acc + (b.subtotal || 0), 0);
+
+  const completionRate = total > 0 ? Math.round((completed / total) * 100) : 100;
+  let rating: 'Excellent' | 'Good' | 'Average' | 'Needs Attention' = 'Good';
+
+  if (total === 0) rating = 'Good';
+  else if (completionRate >= 95 && delayed === 0) rating = 'Excellent';
+  else if (completionRate >= 85) rating = 'Good';
+  else if (completionRate >= 70) rating = 'Average';
+  else rating = 'Needs Attention';
+
+  return {
+    totalTrips: total,
+    completedTrips: completed,
+    cancelledTrips: cancelled,
+    failedPickups,
+    failedDeliveries,
+    onTimeTrips: onTime,
+    delayedTrips: delayed,
+    totalRevenue: revenue,
+    activeTrips,
+    completionRate,
+    rating
+  };
+}
+
+export interface VehiclePerformanceMetrics {
+  totalTrips: number;
+  completedTrips: number;
+  activeTrips: number;
+  utilizationRate: number;
+  totalRevenue: number;
+  insuranceStatus: 'VALID' | 'EXPIRING_SOON' | 'EXPIRED';
+  pucStatus: 'VALID' | 'EXPIRING_SOON' | 'EXPIRED';
+}
+
+export function calculateVehiclePerformance(
+  vehicle: PickDropVehicle,
+  bookings: PickDropBooking[]
+): VehiclePerformanceMetrics {
+  const vehBookings = bookings.filter(b => b.vehicleId === vehicle.vehicleId);
+  const total = vehBookings.length;
+  const completed = vehBookings.filter(b => b.status === 'COMPLETED').length;
+  const activeTrips = vehBookings.filter(b => ['DRIVER_ASSIGNED', 'ON_THE_WAY', 'PET_PICKED_UP', 'IN_TRANSIT'].includes(b.status)).length;
+  const revenue = vehBookings.filter(b => b.status === 'COMPLETED').reduce((acc, b) => acc + (b.subtotal || 0), 0);
+  const utilizationRate = Math.min(100, Math.round((total / 10) * 100)); // normalized scale
+
+  const checkExpiry = (expiryDateStr?: string): 'VALID' | 'EXPIRING_SOON' | 'EXPIRED' => {
+    if (!expiryDateStr) return 'VALID';
+    const now = new Date();
+    const expiry = new Date(expiryDateStr);
+    const diffDays = Math.round((expiry.getTime() - now.getTime()) / (1000 * 3600 * 24));
+
+    if (diffDays < 0) return 'EXPIRED';
+    if (diffDays <= 30) return 'EXPIRING_SOON';
+    return 'VALID';
+  };
+
+  return {
+    totalTrips: total,
+    completedTrips: completed,
+    activeTrips,
+    utilizationRate,
+    totalRevenue: revenue,
+    insuranceStatus: checkExpiry(vehicle.insuranceExpiry),
+    pucStatus: checkExpiry(vehicle.pucExpiry)
+  };
+}
+
+// ==========================================
+// PHASE 3: LIGHTWEIGHT ESTIMATES / QUOTATIONS
+// ==========================================
+
+export function generatePickDropEstimate(
+  booking: Partial<PickDropBooking>,
+  priceBreakdown: any,
+  validityDays: number = 7
+): any {
+  const validUntil = new Date();
+  validUntil.setDate(validUntil.getDate() + validityDays);
+
+  return {
+    estimateId: `EST-PND-${Date.now().toString().slice(-6)}`,
+    bookingId: booking.bookingId,
+    customerId: booking.customerId || '',
+    customerName: booking.customerName || 'Customer',
+    customerPhone: booking.customerPhone || '',
+    petId: booking.petId || '',
+    petName: booking.petName || 'Pet',
+    serviceType: booking.serviceType || 'One Way Pickup',
+    pickupAddress: booking.pickupAddress || '',
+    dropAddress: booking.dropAddress || '',
+    pickupDate: booking.pickupDate || new Date().toISOString().split('T')[0],
+    preferredPickupTime: booking.preferredPickupTime || '10:00 AM',
+    distanceKm: booking.distanceKm || 0,
+    baseCharge: priceBreakdown.baseCharge,
+    additionalCharges: priceBreakdown.additionalCharges,
+    waitingCharges: priceBreakdown.waitingCharges,
+    subtotal: priceBreakdown.subtotal,
+    gstAmount: priceBreakdown.gstAmount,
+    grandTotal: priceBreakdown.grandTotal,
+    validUntil: validUntil.toISOString().split('T')[0],
+    createdAt: new Date().toISOString(),
+    createdBy: booking.createdBy || 'HOP Admin'
+  };
+}
+
+// ==========================================
+// PHASE 3: LIGHTWEIGHT COMMUNICATIONS
+// ==========================================
+
+export async function logPickDropCommunication(record: {
+  communicationType: 'BOOKING_CONFIRMED' | 'DRIVER_ASSIGNED' | 'PICKUP_NOTIFIED' | 'DELIVERY_NOTIFIED' | 'INVOICE_NOTIFIED';
+  bookingId: string;
+  customerId: string;
+  customerName?: string;
+  customerPhone?: string;
+  sentBy: string;
+  status: 'SENT' | 'FAILED' | 'PENDING';
+  notes?: string;
+}): Promise<void> {
+  try {
+    const payload = {
+      communication_type: record.communicationType,
+      booking_id: record.bookingId,
+      customer_id: record.customerId,
+      customer_name: record.customerName || null,
+      customer_phone: record.customerPhone || null,
+      sent_at: new Date().toISOString(),
+      sent_by: record.sentBy,
+      status: record.status,
+      notes: record.notes || null
+    };
+
+    await supabase.from('pick_drop_communications').insert([payload]);
+  } catch (err) {
+    console.warn('Pick & Drop communication logging fallback notice:', err);
+  }
 }

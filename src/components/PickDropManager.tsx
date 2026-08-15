@@ -1,5 +1,5 @@
 // ============================================================
-// PickDropManager.tsx — Pick & Drop Transportation Hub (Phase 2)
+// PickDropManager.tsx — Pick & Drop Transportation Hub (Phase 3 Premium)
 // Project: The House of Pawz – Billing Pro
 // ============================================================
 
@@ -10,7 +10,8 @@ import {
   ArrowRight, CheckCircle2, ShieldCheck, Tag, ExternalLink,
   ChevronRight, RefreshCw, FileText, IndianRupee, Truck,
   Navigation, Eye, Edit3, Trash2, Check, AlertCircle, Info,
-  Download, FileSpreadsheet, Repeat, ShieldAlert, Layers
+  Download, FileSpreadsheet, Repeat, ShieldAlert, Layers,
+  Send, Award, Star, Activity, Sparkles, Printer, MessageSquare
 } from 'lucide-react';
 import { 
   PickDropBooking, 
@@ -22,6 +23,11 @@ import {
   PickDropRecurringSchedule,
   RecurringTransitPattern,
   PricingRuleType,
+  BookingSource,
+  BookingPriority,
+  DelayStatus,
+  PickDropEstimate,
+  PickDropCommunicationRecord,
   Customer, 
   Pet, 
   User, 
@@ -37,7 +43,12 @@ import {
   exportPickDropTripsCSV,
   exportPickDropDriversCSV,
   exportPickDropVehiclesCSV,
-  exportPickDropRevenueCSV
+  exportPickDropRevenueCSV,
+  calculateDelayStatus,
+  calculateDriverPerformance,
+  calculateVehiclePerformance,
+  generatePickDropEstimate,
+  logPickDropCommunication
 } from '../lib/pickDropService';
 
 interface PickDropManagerProps {
@@ -72,6 +83,17 @@ const SERVICE_TYPES: PickDropServiceType[] = [
   'Home → HOP → Home'
 ];
 
+const BOOKING_SOURCES: BookingSource[] = [
+  'Phone',
+  'WhatsApp',
+  'Website',
+  'Walk-in',
+  'Existing Customer',
+  'Staff',
+  'Admin',
+  'Other'
+];
+
 export const PickDropManager: React.FC<PickDropManagerProps> = ({
   bookings,
   drivers,
@@ -103,6 +125,7 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
   const [driverFilter, setDriverFilter] = useState<string>('ALL');
   const [vehicleFilter, setVehicleFilter] = useState<string>('ALL');
   const [billingFilter, setBillingFilter] = useState<string>('ALL');
+  const [priorityFilter, setPriorityFilter] = useState<string>('ALL');
 
   // Scheduler filter
   const [schedulerView, setSchedulerView] = useState<'today' | 'tomorrow' | 'week' | 'custom'>('today');
@@ -111,6 +134,8 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
   // Modals
   const [showNewBookingModal, setShowNewBookingModal] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<PickDropBooking | null>(null);
+  const [showEstimateModal, setShowEstimateModal] = useState(false);
+  const [activeEstimate, setActiveEstimate] = useState<PickDropEstimate | null>(null);
   const [showDriverModal, setShowDriverModal] = useState(false);
   const [editingDriver, setEditingDriver] = useState<PickDropDriver | null>(null);
   const [showVehicleModal, setShowVehicleModal] = useState(false);
@@ -123,13 +148,14 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
   // Status Action Modal State
   const [statusActionType, setStatusActionType] = useState<PickDropStatus | null>(null);
   const [statusActionNote, setStatusActionNote] = useState('');
+  const [delayReason, setDelayReason] = useState('');
+  const [cancellationReason, setCancellationReason] = useState('');
   const [selectedDriverId, setSelectedDriverId] = useState('');
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
   const [receiverName, setReceiverName] = useState('');
   const [receiverRel, setReceiverRel] = useState('');
-  const [driverConflictWarning, setDriverConflictWarning] = useState<string | null>(null);
 
-  // New Booking Form State
+  // New Booking Form State (Phase 3 Premium Fields)
   const [formCustomerId, setFormCustomerId] = useState('');
   const [formPetId, setFormPetId] = useState('');
   const [formServiceType, setFormServiceType] = useState<PickDropServiceType>('One Way Pickup');
@@ -143,6 +169,10 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
   const [formDropDate, setFormDropDate] = useState(new Date().toISOString().split('T')[0]);
   const [formDropTime, setFormDropTime] = useState('05:00 PM');
   const [formDropMaps, setFormDropMaps] = useState('');
+  const [formEmergencyContact, setFormEmergencyContact] = useState('');
+  const [formBookingSource, setFormBookingSource] = useState<BookingSource>('Phone');
+  const [formPriority, setFormPriority] = useState<BookingPriority>('Normal');
+  const [formPreferredVehicleType, setFormPreferredVehicleType] = useState('Van');
   const [formDriverId, setFormDriverId] = useState('');
   const [formVehicleId, setFormVehicleId] = useState('');
   const [formDistanceKm, setFormDistanceKm] = useState<number>(0);
@@ -207,6 +237,7 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
     if (selectedCust) {
       setFormPickupAddress(selectedCust.address || '');
       setFormDropAddress(selectedCust.address || '');
+      setFormEmergencyContact(selectedCust.phone || '');
       const custPets = pets.filter(p => p.customerId === custId);
       if (custPets.length > 0) {
         setFormPetId(custPets[0].id);
@@ -239,14 +270,14 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
       formWaitingMins,
       formAdditionalPets,
       formIsNight,
-      formIsEmergency,
+      formIsEmergency || formPriority === 'Emergency',
       pricingRules,
       formIsHoliday,
       formAdditionalStops
     );
   }, [
     formServiceType, formDistanceKm, formWaitingMins, formAdditionalPets,
-    formIsNight, formIsEmergency, formIsHoliday, formAdditionalStops, pricingRules
+    formIsNight, formIsEmergency, formPriority, formIsHoliday, formAdditionalStops, pricingRules
   ]);
 
   // Today string YYYY-MM-DD
@@ -279,6 +310,9 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
       // Status
       if (statusFilter !== 'ALL' && b.status !== statusFilter) return false;
 
+      // Priority
+      if (priorityFilter !== 'ALL' && b.priority !== priorityFilter) return false;
+
       // Service Type
       if (serviceTypeFilter !== 'ALL' && b.serviceType !== serviceTypeFilter) return false;
 
@@ -299,7 +333,7 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
 
       return true;
     });
-  }, [bookings, searchQuery, statusFilter, serviceTypeFilter, driverFilter, vehicleFilter, billingFilter, dateFilter, todayStr, tomorrowStr]);
+  }, [bookings, searchQuery, statusFilter, priorityFilter, serviceTypeFilter, driverFilter, vehicleFilter, billingFilter, dateFilter, todayStr, tomorrowStr]);
 
   // Scheduler Filtered Bookings
   const schedulerBookings = useMemo(() => {
@@ -339,6 +373,7 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
 
     const activeTrips = bookings.filter(b => ['DRIVER_ASSIGNED', 'ON_THE_WAY', 'PET_PICKED_UP', 'IN_TRANSIT'].includes(b.status)).length;
     const unassignedTrips = bookings.filter(b => ['REQUESTED', 'CONFIRMED'].includes(b.status)).length;
+    const delayedTrips = bookings.filter(b => b.delayStatus === 'DELAYED' || b.delayStatus === 'MAJOR_DELAY').length;
 
     return {
       todayTotal: todayTrips.length,
@@ -357,7 +392,8 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
       invoicedBilling,
       pendingInvoicing,
       activeTrips,
-      unassignedTrips
+      unassignedTrips,
+      delayedTrips
     };
   }, [bookings, todayStr]);
 
@@ -388,6 +424,31 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
       default:
         return <span className="bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-full text-[10px] font-bold">{status}</span>;
     }
+  };
+
+  // ETA Delay Indicator
+  const getDelayIndicator = (booking: PickDropBooking) => {
+    if (booking.status === 'COMPLETED') {
+      return <span className="text-[9px] text-emerald-600 font-bold flex items-center gap-0.5">🔵 Completed</span>;
+    }
+    if (booking.delayStatus === 'MAJOR_DELAY') {
+      return <span className="text-[9px] text-red-600 font-bold flex items-center gap-0.5 animate-bounce">🔴 Major Delay ({booking.delayMinutes}m)</span>;
+    }
+    if (booking.delayStatus === 'DELAYED') {
+      return <span className="text-[9px] text-amber-600 font-bold flex items-center gap-0.5">🟡 Delayed ({booking.delayMinutes}m)</span>;
+    }
+    return <span className="text-[9px] text-emerald-600 font-bold flex items-center gap-0.5">🟢 On Time</span>;
+  };
+
+  // Priority Badge Helper
+  const getPriorityBadge = (priority?: BookingPriority) => {
+    if (priority === 'Emergency') {
+      return <span className="bg-red-100 text-red-700 font-black text-[9px] px-1.5 py-0.5 rounded border border-red-300">EMERGENCY</span>;
+    }
+    if (priority === 'High') {
+      return <span className="bg-amber-100 text-amber-800 font-bold text-[9px] px-1.5 py-0.5 rounded">HIGH</span>;
+    }
+    return null;
   };
 
   // Submit New Booking
@@ -430,6 +491,11 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
       petSpecies: selectedPet.species || 'Dog',
       petBreed: selectedPet.breed || '',
       petWeight: selectedPet.weight ? `${selectedPet.weight} kg` : '',
+      emergencyContact: formEmergencyContact || selectedCust.phone,
+      bookingSource: formBookingSource,
+      priority: formPriority,
+      preferredVehicleType: formPreferredVehicleType,
+      preferredDriverId: formDriverId || undefined,
       serviceType: formServiceType,
       pickupAddress: formPickupAddress,
       pickupLandmark: formPickupLandmark,
@@ -446,13 +512,19 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
       vehicleId: selectedVehicle?.vehicleId,
       vehicleNumber: selectedVehicle?.vehicleNumber,
       status: selectedDriver ? 'DRIVER_ASSIGNED' : 'REQUESTED',
+      statusChangedBy: currentUser.name || currentUser.username,
+      statusChangedAt: new Date().toISOString(),
+      estimatedPickupTime: formPickupTime,
+      estimatedDeliveryTime: formDropTime,
+      delayMinutes: 0,
+      delayStatus: 'ON_TIME',
       distanceKm: formDistanceKm,
       additionalPetsCount: formAdditionalPets,
       additionalStopsCount: formAdditionalStops,
       waitingMinutes: formWaitingMins,
       isNight: formIsNight,
       isHoliday: formIsHoliday,
-      isEmergency: formIsEmergency,
+      isEmergency: formIsEmergency || formPriority === 'Emergency',
       baseCharge: priceBreakdown.baseCharge,
       additionalCharges: priceBreakdown.additionalCharges,
       waitingCharges: priceBreakdown.waitingCharges,
@@ -464,6 +536,19 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
     };
 
     await onAddBooking(newBooking);
+
+    // Lightweight text-only confirmation notification logging
+    await logPickDropCommunication({
+      communicationType: 'BOOKING_CONFIRMED',
+      bookingId: nextId,
+      customerId: selectedCust.id,
+      customerName: selectedCust.name,
+      customerPhone: selectedCust.phone,
+      sentBy: currentUser.name || currentUser.username,
+      status: 'SENT',
+      notes: `Booking confirmation registered via ${formBookingSource}`
+    });
+
     setShowNewBookingModal(false);
   };
 
@@ -528,7 +613,11 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
       return;
     }
 
-    const extraPayload: Partial<PickDropBooking> = {};
+    const extraPayload: Partial<PickDropBooking> = {
+      statusChangedBy: currentUser.name || currentUser.username,
+      statusChangedAt: new Date().toISOString(),
+      operationalNote: statusActionNote || undefined
+    };
 
     if (statusActionType === 'DRIVER_ASSIGNED') {
       if (!hasPermission(currentUser, 'pick_drop_assign')) {
@@ -553,21 +642,76 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
         extraPayload.vehicleId = veh.vehicleId;
         extraPayload.vehicleNumber = veh.vehicleNumber;
       }
+
+      // Notification log
+      await logPickDropCommunication({
+        communicationType: 'DRIVER_ASSIGNED',
+        bookingId: selectedBooking.bookingId,
+        customerId: selectedBooking.customerId,
+        customerName: selectedBooking.customerName,
+        customerPhone: selectedBooking.customerPhone,
+        sentBy: currentUser.name || currentUser.username,
+        status: 'SENT',
+        notes: `Driver ${drv?.name} allocated`
+      });
     }
 
     if (statusActionType === 'PET_PICKED_UP') {
-      extraPayload.actualPickupTime = new Date().toISOString();
+      const actualPickupTime = new Date().toISOString();
+      extraPayload.actualPickupTime = actualPickupTime;
       extraPayload.pickupConfirmedBy = currentUser.name || currentUser.username;
       extraPayload.pickupNote = statusActionNote || 'Pet picked up safely';
+
+      // Calculate ETA delay
+      const delayCheck = calculateDelayStatus(selectedBooking.preferredPickupTime, actualPickupTime);
+      extraPayload.delayMinutes = delayCheck.delayMinutes;
+      extraPayload.delayStatus = delayCheck.delayStatus;
+
+      // Notification log
+      await logPickDropCommunication({
+        communicationType: 'PICKUP_NOTIFIED',
+        bookingId: selectedBooking.bookingId,
+        customerId: selectedBooking.customerId,
+        customerName: selectedBooking.customerName,
+        customerPhone: selectedBooking.customerPhone,
+        sentBy: currentUser.name || currentUser.username,
+        status: 'SENT',
+        notes: 'Pet successfully picked up'
+      });
     }
 
     if (statusActionType === 'DELIVERED') {
-      extraPayload.actualDeliveryTime = new Date().toISOString();
+      const actualDeliveryTime = new Date().toISOString();
+      extraPayload.actualDeliveryTime = actualDeliveryTime;
       extraPayload.deliveredTo = receiverName || selectedBooking.customerName;
       extraPayload.receiverName = receiverName || selectedBooking.customerName;
       extraPayload.receiverRelationship = receiverRel || 'Self';
       extraPayload.deliveryNote = statusActionNote || 'Pet delivered safely';
       extraPayload.deliveredBy = currentUser.name || currentUser.username;
+
+      // Notification log
+      await logPickDropCommunication({
+        communicationType: 'DELIVERY_NOTIFIED',
+        bookingId: selectedBooking.bookingId,
+        customerId: selectedBooking.customerId,
+        customerName: selectedBooking.customerName,
+        customerPhone: selectedBooking.customerPhone,
+        sentBy: currentUser.name || currentUser.username,
+        status: 'SENT',
+        notes: `Pet safely delivered to ${receiverName || selectedBooking.customerName}`
+      });
+    }
+
+    if (statusActionType === 'CANCELLED') {
+      extraPayload.cancellationReason = cancellationReason || statusActionNote || 'Cancelled by customer';
+    }
+
+    if (statusActionType === 'PICKUP_FAILED' || statusActionType === 'DROP_FAILED') {
+      extraPayload.failureReason = statusActionNote || 'Customer or recipient unavailable';
+    }
+
+    if (delayReason) {
+      extraPayload.delayReason = delayReason;
     }
 
     await onUpdateStatus(selectedBooking.bookingId, statusActionType, statusActionNote, extraPayload);
@@ -580,7 +724,8 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
 
     setStatusActionType(null);
     setStatusActionNote('');
-    setDriverConflictWarning(null);
+    setDelayReason('');
+    setCancellationReason('');
   };
 
   return (
@@ -595,7 +740,7 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
             Pick & Drop Transportation Hub
           </h1>
           <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">
-            Door-to-door safe pet taxi, automated route scheduling, driver workload tracking & invoicing.
+            Safe pet taxi, route scheduler, driver conflict checks & GST invoice generation.
           </p>
         </div>
 
@@ -810,6 +955,18 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
                   <option value="PICKUP_FAILED">Pickup Failed</option>
                 </select>
 
+                {/* Priority Filter */}
+                <select
+                  value={priorityFilter}
+                  onChange={e => setPriorityFilter(e.target.value)}
+                  className="p-1.5 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl font-bold"
+                >
+                  <option value="ALL">All Priorities</option>
+                  <option value="Normal">Normal</option>
+                  <option value="High">High Priority</option>
+                  <option value="Emergency">Emergency Priority</option>
+                </select>
+
                 {/* Service Type Filter */}
                 <select
                   value={serviceTypeFilter}
@@ -877,10 +1034,14 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
                             RECURRING
                           </span>
                         )}
+                        {getPriorityBadge(b.priority)}
                       </div>
                       <span className="text-[10px] text-slate-400 block">{b.serviceType}</span>
                     </div>
-                    {getStatusBadge(b.status)}
+                    <div className="flex flex-col items-end gap-1">
+                      {getStatusBadge(b.status)}
+                      {getDelayIndicator(b)}
+                    </div>
                   </div>
 
                   <div className="pt-2 space-y-1.5 text-xs">
@@ -891,10 +1052,13 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
                       </span>
                       <span className="text-[11px] text-slate-500 font-mono">{b.customerPhone}</span>
                     </div>
-                    <div className="text-[11px] text-slate-600 dark:text-zinc-400 flex items-center gap-1.5">
-                      <span>🐾</span>
-                      <strong className="text-slate-700 dark:text-zinc-200">{b.petName}</strong>
-                      {b.petBreed ? ` (${b.petBreed})` : ''}
+                    <div className="text-[11px] text-slate-600 dark:text-zinc-400 flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <span>🐾</span>
+                        <strong className="text-slate-700 dark:text-zinc-200">{b.petName}</strong>
+                        {b.petBreed ? ` (${b.petBreed})` : ''}
+                      </div>
+                      <span className="text-[10px] text-slate-400">Via: {b.bookingSource || 'Phone'}</span>
                     </div>
                   </div>
 
@@ -927,6 +1091,30 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
                     <span>View & Manage</span>
                   </button>
 
+                  <button
+                    onClick={() => {
+                      const breakdown = calculatePickDropPrice(
+                        b.serviceType,
+                        b.distanceKm || 0,
+                        b.waitingMinutes || 0,
+                        b.additionalPetsCount || 0,
+                        b.isNight || false,
+                        b.isEmergency || false,
+                        pricingRules,
+                        b.isHoliday || false,
+                        b.additionalStopsCount || 0
+                      );
+                      const estimate = generatePickDropEstimate(b, breakdown);
+                      setActiveEstimate(estimate);
+                      setShowEstimateModal(true);
+                    }}
+                    className="px-2 py-1.5 bg-purple-50 dark:bg-purple-950/60 hover:bg-purple-100 text-purple-700 dark:text-purple-300 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
+                    title="Generate Estimate Quotation"
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>Estimate</span>
+                  </button>
+
                   {b.status === 'COMPLETED' && !b.invoiceId && hasPermission(currentUser, 'invoices_create') && (
                     <button
                       onClick={() => onGenerateInvoiceForBooking(b)}
@@ -934,13 +1122,13 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
                       title="Convert to GST Invoice"
                     >
                       <FileText className="w-3.5 h-3.5" />
-                      <span>Generate GST Invoice</span>
+                      <span>Invoice</span>
                     </button>
                   )}
 
                   {b.invoiceNumber && (
                     <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 dark:bg-emerald-950/60 px-2 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800">
-                      Invoice: #{b.invoiceNumber}
+                      #{b.invoiceNumber}
                     </span>
                   )}
                 </div>
@@ -1025,6 +1213,7 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
                         <span className="font-bold text-slate-900 dark:text-white">{b.customerName}</span>
                         <span className="text-slate-400">🐾 {b.petName}</span>
                         <span className="text-[10px] font-mono text-slate-400">({b.bookingId})</span>
+                        {getPriorityBadge(b.priority)}
                       </div>
                       <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
                         <span className="truncate max-w-[200px]">📍 {b.pickupAddress}</span>
@@ -1044,7 +1233,10 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
                       </div>
                     </div>
 
-                    {getStatusBadge(b.status)}
+                    <div className="flex flex-col items-end gap-1">
+                      {getStatusBadge(b.status)}
+                      {getDelayIndicator(b)}
+                    </div>
 
                     <button
                       onClick={() => setSelectedBooking(b)}
@@ -1160,14 +1352,14 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
       )}
 
       {/* ---------------------------------------------------- */}
-      {/* SUB-TAB 4: DRIVERS MASTER */}
+      {/* SUB-TAB 4: DRIVERS MASTER & PERFORMANCE */}
       {/* ---------------------------------------------------- */}
       {activeSubTab === 'drivers' && (hasPermission(currentUser, 'pick_drop_assign') || hasPermission(currentUser, 'pick_drop_edit')) && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-sm font-black text-slate-900 dark:text-white">Authorized Transit Drivers</h2>
-              <p className="text-xs text-slate-500">Manage trained pet handlers, track real-time trip workloads and licensing.</p>
+              <h2 className="text-sm font-black text-slate-900 dark:text-white">Authorized Transit Drivers & Performance</h2>
+              <p className="text-xs text-slate-500">Trained pet handlers, real-time trip workloads, on-time rates and performance scores.</p>
             </div>
 
             {hasPermission(currentUser, 'pick_drop_edit') && (
@@ -1194,10 +1386,7 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {drivers.map(d => {
-              const driverBookings = bookings.filter(b => b.driverId === d.driverId);
-              const todayDriverTrips = driverBookings.filter(b => b.pickupDate === todayStr);
-              const completedTrips = driverBookings.filter(b => b.status === 'COMPLETED');
-              const activeDriverTrip = driverBookings.find(b => ['DRIVER_ASSIGNED', 'ON_THE_WAY', 'PET_PICKED_UP', 'IN_TRANSIT'].includes(b.status));
+              const perf = calculateDriverPerformance(d.driverId, bookings);
 
               return (
                 <div key={d.driverId} className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-slate-200 dark:border-zinc-800 space-y-3">
@@ -1215,24 +1404,44 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
                         {d.mobile}
                       </p>
                     </div>
+
+                    <div className="text-right">
+                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${
+                        perf.rating === 'Excellent' ? 'bg-emerald-100 text-emerald-800' :
+                        perf.rating === 'Good' ? 'bg-blue-100 text-blue-800' :
+                        perf.rating === 'Average' ? 'bg-amber-100 text-amber-800' :
+                        'bg-red-100 text-red-800'
+                      }`}>
+                        ★ {perf.rating}
+                      </span>
+                    </div>
                   </div>
 
-                  {/* Workload Metric Chips */}
-                  <div className="grid grid-cols-3 gap-1.5 bg-slate-50 dark:bg-zinc-800/60 p-2 rounded-xl text-center text-[10px]">
+                  {/* Performance Metric Chips */}
+                  <div className="grid grid-cols-4 gap-1.5 bg-slate-50 dark:bg-zinc-800/60 p-2 rounded-xl text-center text-[10px]">
                     <div>
-                      <span className="text-slate-400 block">Today's</span>
-                      <strong className="text-slate-900 dark:text-white">{todayDriverTrips.length}</strong>
+                      <span className="text-slate-400 block">Total Trips</span>
+                      <strong className="text-slate-900 dark:text-white">{perf.totalTrips}</strong>
                     </div>
                     <div>
                       <span className="text-slate-400 block">Completed</span>
-                      <strong className="text-emerald-600">{completedTrips.length}</strong>
+                      <strong className="text-emerald-600">{perf.completedTrips}</strong>
                     </div>
                     <div>
-                      <span className="text-slate-400 block">Active Now</span>
-                      <strong className={activeDriverTrip ? 'text-indigo-600' : 'text-slate-400'}>
-                        {activeDriverTrip ? '1 Trip' : 'Idle'}
+                      <span className="text-slate-400 block">On-Time</span>
+                      <strong className="text-blue-600">{perf.onTimeTrips}</strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block">Active</span>
+                      <strong className={perf.activeTrips > 0 ? 'text-indigo-600 font-black' : 'text-slate-400'}>
+                        {perf.activeTrips}
                       </strong>
                     </div>
+                  </div>
+
+                  <div className="flex justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-100 dark:border-zinc-800">
+                    <span>Revenue Generated:</span>
+                    <strong className="text-emerald-600">{formatINR(perf.totalRevenue)}</strong>
                   </div>
 
                   {d.notes && <p className="text-[11px] text-slate-500 italic">{d.notes}</p>}
@@ -1244,14 +1453,14 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
       )}
 
       {/* ---------------------------------------------------- */}
-      {/* SUB-TAB 5: VEHICLES MASTER */}
+      {/* SUB-TAB 5: VEHICLES MASTER & COMPLIANCE */}
       {/* ---------------------------------------------------- */}
       {activeSubTab === 'vehicles' && (hasPermission(currentUser, 'pick_drop_assign') || hasPermission(currentUser, 'pick_drop_edit')) && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-sm font-black text-slate-900 dark:text-white">Registered Fleet Vehicles</h2>
-              <p className="text-xs text-slate-500">Monitor vehicle capacity, climate control, safety cages, and PUC/Insurance validity.</p>
+              <h2 className="text-sm font-black text-slate-900 dark:text-white">Registered Fleet Vehicles & Compliance</h2>
+              <p className="text-xs text-slate-500">Monitor vehicle capacity, climate control, safety cages, and Insurance/PUC validity.</p>
             </div>
 
             {hasPermission(currentUser, 'pick_drop_edit') && (
@@ -1279,8 +1488,7 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {vehicles.map(v => {
-              const vehBookings = bookings.filter(b => b.vehicleId === v.vehicleId);
-              const completedTrips = vehBookings.filter(b => b.status === 'COMPLETED').length;
+              const perf = calculateVehiclePerformance(v, bookings);
 
               return (
                 <div key={v.vehicleId} className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-slate-200 dark:border-zinc-800 space-y-2.5">
@@ -1302,17 +1510,27 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
 
                   {/* Document Expiry Warnings */}
                   <div className="space-y-1 text-[11px] bg-slate-50 dark:bg-zinc-800/60 p-2 rounded-xl">
-                    <div className="flex justify-between">
+                    <div className="flex justify-between items-center">
                       <span className="text-slate-500">Insurance Expiry:</span>
-                      <span className="font-mono font-bold text-slate-800 dark:text-zinc-200">{v.insuranceExpiry || 'N/A'}</span>
+                      <span className="flex items-center gap-1 font-mono font-bold">
+                        {perf.insuranceStatus === 'EXPIRED' && <span className="text-red-600">🔴 Expired</span>}
+                        {perf.insuranceStatus === 'EXPIRING_SOON' && <span className="text-amber-600">🟡 Expiring Soon</span>}
+                        {perf.insuranceStatus === 'VALID' && <span className="text-emerald-600">🟢 Valid</span>}
+                        <span>({v.insuranceExpiry || 'N/A'})</span>
+                      </span>
                     </div>
-                    <div className="flex justify-between">
+                    <div className="flex justify-between items-center">
                       <span className="text-slate-500">PUC Expiry:</span>
-                      <span className="font-mono font-bold text-slate-800 dark:text-zinc-200">{v.pucExpiry || 'N/A'}</span>
+                      <span className="flex items-center gap-1 font-mono font-bold">
+                        {perf.pucStatus === 'EXPIRED' && <span className="text-red-600">🔴 Expired</span>}
+                        {perf.pucStatus === 'EXPIRING_SOON' && <span className="text-amber-600">🟡 Expiring Soon</span>}
+                        {perf.pucStatus === 'VALID' && <span className="text-emerald-600">🟢 Valid</span>}
+                        <span>({v.pucExpiry || 'N/A'})</span>
+                      </span>
                     </div>
                     <div className="flex justify-between pt-1 border-t border-slate-200 dark:border-zinc-700">
                       <span className="text-slate-500">Completed Trips:</span>
-                      <strong className="text-emerald-600">{completedTrips}</strong>
+                      <strong className="text-emerald-600">{perf.completedTrips} (Rev: {formatINR(perf.totalRevenue)})</strong>
                     </div>
                   </div>
 
@@ -1428,7 +1646,7 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
       )}
 
       {/* ---------------------------------------------------- */}
-      {/* MODAL: NEW BOOKING (WITH ADVANCED PRICE PREVIEW) */}
+      {/* MODAL: NEW BOOKING (WITH PREMIUM PHASE 3 FIELDS) */}
       {/* ---------------------------------------------------- */}
       {showNewBookingModal && (
         <div className="fixed inset-0 bg-black/75 backdrop-blur-xs flex items-center justify-center z-50 p-4 overflow-y-auto">
@@ -1480,18 +1698,46 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
                 </div>
               </div>
 
-              {/* Service Type */}
-              <div>
-                <label className="block font-bold text-slate-600 dark:text-zinc-400 mb-1">Service Type *</label>
-                <select
-                  value={formServiceType}
-                  onChange={e => setFormServiceType(e.target.value as PickDropServiceType)}
-                  className="w-full p-2 rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 font-bold"
-                >
-                  {SERVICE_TYPES.map(st => (
-                    <option key={st} value={st}>{st}</option>
-                  ))}
-                </select>
+              {/* Service Type & Priority */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-600 dark:text-zinc-400 mb-1">Service Type *</label>
+                  <select
+                    value={formServiceType}
+                    onChange={e => setFormServiceType(e.target.value as PickDropServiceType)}
+                    className="w-full p-2 rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 font-bold"
+                  >
+                    {SERVICE_TYPES.map(st => (
+                      <option key={st} value={st}>{st}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-600 dark:text-zinc-400 mb-1">Booking Source</label>
+                  <select
+                    value={formBookingSource}
+                    onChange={e => setFormBookingSource(e.target.value as BookingSource)}
+                    className="w-full p-2 rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 font-bold"
+                  >
+                    {BOOKING_SOURCES.map(src => (
+                      <option key={src} value={src}>{src}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-600 dark:text-zinc-400 mb-1">Priority</label>
+                  <select
+                    value={formPriority}
+                    onChange={e => setFormPriority(e.target.value as BookingPriority)}
+                    className="w-full p-2 rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 font-bold"
+                  >
+                    <option value="Normal">Normal</option>
+                    <option value="High">High Priority</option>
+                    <option value="Emergency">Emergency Priority</option>
+                  </select>
+                </div>
               </div>
 
               {/* Pickup Address & Schedule */}
@@ -1658,10 +1904,10 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
                   <label className="flex items-center gap-1.5 cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={formIsEmergency}
+                      checked={formIsEmergency || formPriority === 'Emergency'}
                       onChange={e => setFormIsEmergency(e.target.checked)}
                     />
-                    <span className="text-[11px] font-bold">Emergency Priority</span>
+                    <span className="text-[11px] font-bold text-red-600">Emergency Priority</span>
                   </label>
                 </div>
 
@@ -1738,6 +1984,85 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ---------------------------------------------------- */}
+      {/* MODAL: ESTIMATE QUOTATION VIEW */}
+      {/* ---------------------------------------------------- */}
+      {showEstimateModal && activeEstimate && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-xs flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-zinc-900 text-slate-900 dark:text-white rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-zinc-800 pb-3">
+              <div>
+                <h3 className="text-base font-black flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-purple-600" />
+                  Pick & Drop Transit Estimate
+                </h3>
+                <span className="font-mono text-[10px] text-slate-400">{activeEstimate.estimateId}</span>
+              </div>
+              <button 
+                onClick={() => setShowEstimateModal(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="bg-slate-50 dark:bg-zinc-800/40 p-3 rounded-xl space-y-1">
+                <p><strong>Customer:</strong> {activeEstimate.customerName} ({activeEstimate.customerPhone})</p>
+                <p><strong>Pet:</strong> {activeEstimate.petName}</p>
+                <p><strong>Service:</strong> {activeEstimate.serviceType}</p>
+                <p><strong>Pickup:</strong> {activeEstimate.pickupAddress} on {activeEstimate.pickupDate} ({activeEstimate.preferredPickupTime})</p>
+                <p><strong>Drop:</strong> {activeEstimate.dropAddress}</p>
+              </div>
+
+              <div className="bg-purple-50 dark:bg-purple-950/40 p-3 rounded-xl space-y-1 text-slate-800 dark:text-zinc-200">
+                <div className="flex justify-between">
+                  <span>Base Charge:</span>
+                  <span>{formatINR(activeEstimate.baseCharge)}</span>
+                </div>
+                {activeEstimate.additionalCharges > 0 && (
+                  <div className="flex justify-between">
+                    <span>Additional / Distance Surcharges:</span>
+                    <span>{formatINR(activeEstimate.additionalCharges)}</span>
+                  </div>
+                )}
+                {activeEstimate.waitingCharges > 0 && (
+                  <div className="flex justify-between">
+                    <span>Waiting Charges:</span>
+                    <span>{formatINR(activeEstimate.waitingCharges)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-bold pt-1 border-t border-purple-200 dark:border-purple-800">
+                  <span>Subtotal:</span>
+                  <span>{formatINR(activeEstimate.subtotal)}</span>
+                </div>
+                <div className="flex justify-between text-slate-500">
+                  <span>Estimated GST (18%):</span>
+                  <span>{formatINR(activeEstimate.gstAmount)}</span>
+                </div>
+                <div className="flex justify-between font-black text-sm text-[#D62828] pt-1">
+                  <span>Estimated Total:</span>
+                  <span>{formatINR(activeEstimate.grandTotal)}</span>
+                </div>
+              </div>
+
+              <p className="text-[10px] text-slate-400 italic">
+                * Note: This is an estimated quotation valid until {activeEstimate.validUntil}. Final billing will be generated upon trip completion via official GST Invoice.
+              </p>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  onClick={() => setShowEstimateModal(false)}
+                  className="px-4 py-2 bg-slate-100 dark:bg-zinc-800 rounded-xl font-bold"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -1881,8 +2206,9 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
                 <div className="flex items-center gap-2">
                   <h3 className="text-base font-black">{selectedBooking.bookingId}</h3>
                   {getStatusBadge(selectedBooking.status)}
+                  {getDelayIndicator(selectedBooking)}
                 </div>
-                <p className="text-xs text-slate-500">{selectedBooking.serviceType}</p>
+                <p className="text-xs text-slate-500">{selectedBooking.serviceType} • Booked via {selectedBooking.bookingSource || 'Phone'}</p>
               </div>
               <button 
                 onClick={() => setSelectedBooking(null)}
@@ -2102,6 +2428,7 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
               <div className="space-y-1 bg-slate-50 dark:bg-zinc-800/40 p-3 rounded-xl">
                 <span className="font-bold text-slate-400 uppercase text-[10px] block">Customer & Pet</span>
                 <p><strong>Customer:</strong> {selectedBooking.customerName} ({selectedBooking.customerPhone})</p>
+                <p><strong>Emergency Contact:</strong> {selectedBooking.emergencyContact || 'N/A'}</p>
                 <p><strong>Pet:</strong> {selectedBooking.petName} ({selectedBooking.petSpecies || 'Dog'})</p>
                 <p><strong>Pickup Date:</strong> {selectedBooking.pickupDate} at {selectedBooking.preferredPickupTime}</p>
                 <p><strong>Pickup Addr:</strong> {selectedBooking.pickupAddress}</p>

@@ -395,6 +395,58 @@ export interface PickDropStatusHistory {
   notes?: string;
 }
 
+export type BookingSource = 
+  | 'Phone' 
+  | 'WhatsApp' 
+  | 'Website' 
+  | 'Walk-in' 
+  | 'Existing Customer' 
+  | 'Staff' 
+  | 'Admin' 
+  | 'Other';
+
+export type BookingPriority = 'Normal' | 'High' | 'Emergency';
+
+export type DelayStatus = 'ON_TIME' | 'DELAYED' | 'MAJOR_DELAY' | 'COMPLETED';
+
+export interface PickDropCommunicationRecord {
+  id: string;
+  communicationType: 'BOOKING_CONFIRMED' | 'DRIVER_ASSIGNED' | 'PICKUP_NOTIFIED' | 'DELIVERY_NOTIFIED' | 'INVOICE_NOTIFIED';
+  bookingId: string;
+  customerId: string;
+  customerName?: string;
+  customerPhone?: string;
+  sentAt: string;
+  sentBy: string;
+  status: 'SENT' | 'FAILED' | 'PENDING';
+  notes?: string;
+}
+
+export interface PickDropEstimate {
+  estimateId: string;
+  bookingId?: string;
+  customerId: string;
+  customerName: string;
+  customerPhone: string;
+  petId: string;
+  petName: string;
+  serviceType: PickDropServiceType;
+  pickupAddress: string;
+  dropAddress: string;
+  pickupDate: string;
+  preferredPickupTime: string;
+  distanceKm: number;
+  baseCharge: number;
+  additionalCharges: number;
+  waitingCharges: number;
+  subtotal: number;
+  gstAmount: number;
+  grandTotal: number;
+  validUntil: string;
+  createdAt: string;
+  createdBy: string;
+}
+
 export interface PickDropBooking {
   id: string;
   bookingId: string; // e.g. PND-2627-0001
@@ -408,6 +460,11 @@ export interface PickDropBooking {
   petBreed?: string;
   petWeight?: string;
   petHandlingNotes?: string;
+  emergencyContact?: string;
+  bookingSource?: BookingSource;
+  priority?: BookingPriority;
+  preferredVehicleType?: string;
+  preferredDriverId?: string;
   serviceType: PickDropServiceType;
   
   // Pickup Details
@@ -435,6 +492,16 @@ export interface PickDropBooking {
 
   // Status & Tracking Lifecycle
   status: PickDropStatus;
+  statusChangedBy?: string;
+  statusChangedAt?: string;
+  operationalNote?: string;
+  delayReason?: string;
+  cancellationReason?: string;
+  failureReason?: string;
+
+  // ETA & Delay Tracking (Phase 3)
+  estimatedPickupTime?: string;
+  estimatedDeliveryTime?: string;
   actualPickupTime?: string;
   pickupConfirmedBy?: string;
   pickupNote?: string;
@@ -444,6 +511,8 @@ export interface PickDropBooking {
   receiverRelationship?: string;
   deliveryNote?: string;
   deliveredBy?: string;
+  delayMinutes?: number;
+  delayStatus?: DelayStatus;
 
   // Financials & Pricing Calculation
   distanceKm?: number;
