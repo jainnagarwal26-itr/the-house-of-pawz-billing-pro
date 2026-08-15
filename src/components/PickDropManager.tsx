@@ -65,7 +65,9 @@ interface PickDropManagerProps {
   onUpdateBooking: (booking: PickDropBooking) => Promise<void>;
   onDeleteBooking: (bookingId: string) => Promise<void>;
   onSaveDriver: (driver: PickDropDriver) => Promise<void>;
+  onDeleteDriver?: (driverId: string) => Promise<void>;
   onSaveVehicle: (vehicle: PickDropVehicle) => Promise<void>;
+  onDeleteVehicle?: (vehicleId: string) => Promise<void>;
   onSavePricingRule: (rule: PickDropPricingRule) => Promise<void>;
   onSaveRecurringSchedule?: (schedule: PickDropRecurringSchedule) => Promise<void>;
   onDeleteRecurringSchedule?: (scheduleId: string) => Promise<void>;
@@ -108,7 +110,9 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
   onUpdateBooking,
   onDeleteBooking,
   onSaveDriver,
+  onDeleteDriver,
   onSaveVehicle,
+  onDeleteVehicle,
   onSavePricingRule,
   onSaveRecurringSchedule,
   onDeleteRecurringSchedule,
@@ -1444,10 +1448,54 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
                     <strong className="text-emerald-600">{formatINR(perf.totalRevenue)}</strong>
                   </div>
 
-                  {d.notes && <p className="text-[11px] text-slate-500 italic">{d.notes}</p>}
+                  {/* Actions Footer */}
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-zinc-800">
+                    {hasPermission(currentUser, 'pick_drop_edit') && (
+                      <button
+                        onClick={() => {
+                          setEditingDriver(d);
+                          setDrvName(d.name);
+                          setDrvMobile(d.mobile);
+                          setDrvAltMobile(d.alternateMobile || '');
+                          setDrvLic(d.licenseNumber || '');
+                          setDrvLicExp(d.licenseExpiry || '');
+                          setDrvEmerg(d.emergencyContact || '');
+                          setDrvActive(d.isActive);
+                          setDrvNotes(d.notes || '');
+                          setShowDriverModal(true);
+                        }}
+                        className="px-2.5 py-1 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 text-slate-800 dark:text-zinc-200 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                        <span>Edit Driver</span>
+                      </button>
+                    )}
+
+                    {onDeleteDriver && hasPermission(currentUser, 'pick_drop_delete') && (
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`Delete driver ${d.name} (${d.driverId})?`)) {
+                            onDeleteDriver(d.driverId);
+                          }
+                        }}
+                        className="p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/60 rounded-lg cursor-pointer"
+                        title="Delete Driver (Accountant Only)"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })}
+
+            {drivers.length === 0 && (
+              <div className="col-span-full py-12 text-center text-slate-400 dark:text-zinc-600 bg-white dark:bg-zinc-900 rounded-2xl border border-dashed border-slate-200 dark:border-zinc-800">
+                <UserIcon className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                <p className="text-sm font-bold text-slate-600 dark:text-zinc-400">No Drivers Registered</p>
+                <p className="text-xs text-slate-400 mt-1">Use the "+ Add Driver" button to register authorized pet transportation drivers.</p>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1535,9 +1583,56 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
                   </div>
 
                   {v.notes && <p className="text-[11px] text-slate-500 italic">{v.notes}</p>}
+
+                  {/* Actions Footer */}
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-zinc-800">
+                    {hasPermission(currentUser, 'pick_drop_edit') && (
+                      <button
+                        onClick={() => {
+                          setEditingVehicle(v);
+                          setVehNumber(v.vehicleNumber);
+                          setVehType(v.vehicleType);
+                          setVehCapacity(v.capacity);
+                          setVehAc(v.isAc);
+                          setVehPetFriendly(v.isPetFriendly);
+                          setVehActive(v.isActive);
+                          setVehInsExpiry(v.insuranceExpiry || '');
+                          setVehPucExpiry(v.pucExpiry || '');
+                          setVehNotes(v.notes || '');
+                          setShowVehicleModal(true);
+                        }}
+                        className="px-2.5 py-1 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 text-slate-800 dark:text-zinc-200 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                        <span>Edit Vehicle</span>
+                      </button>
+                    )}
+
+                    {onDeleteVehicle && hasPermission(currentUser, 'pick_drop_delete') && (
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`Delete vehicle ${v.vehicleNumber} (${v.vehicleId})?`)) {
+                            onDeleteVehicle(v.vehicleId);
+                          }
+                        }}
+                        className="p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/60 rounded-lg cursor-pointer"
+                        title="Delete Vehicle (Accountant Only)"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })}
+
+            {vehicles.length === 0 && (
+              <div className="col-span-full py-12 text-center text-slate-400 dark:text-zinc-600 bg-white dark:bg-zinc-900 rounded-2xl border border-dashed border-slate-200 dark:border-zinc-800">
+                <Truck className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                <p className="text-sm font-bold text-slate-600 dark:text-zinc-400">No Vehicles Registered</p>
+                <p className="text-xs text-slate-400 mt-1">Use the "+ Add Vehicle" button to register fleet vehicles.</p>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -2465,6 +2560,330 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
                 )}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ---------------------------------------------------- */}
+      {/* MODAL: ADD / EDIT DRIVER */}
+      {/* ---------------------------------------------------- */}
+      {showDriverModal && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-xs flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-zinc-900 text-slate-900 dark:text-white rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-zinc-800 pb-3">
+              <h3 className="text-base font-black flex items-center gap-2">
+                <UserIcon className="w-5 h-5 text-[#D62828]" />
+                {editingDriver ? `Edit Driver: ${editingDriver.name}` : 'Register Authorized Driver'}
+              </h3>
+              <button 
+                onClick={() => setShowDriverModal(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!drvName.trim() || !drvMobile.trim()) {
+                  alert('Driver Name and Mobile Number are required.');
+                  return;
+                }
+                const driverData: PickDropDriver = {
+                  id: editingDriver?.id || `drv-local-${Date.now()}`,
+                  driverId: editingDriver?.driverId || `DRV-${Date.now().toString().slice(-4)}`,
+                  name: drvName.trim(),
+                  mobile: drvMobile.trim(),
+                  alternateMobile: drvAltMobile.trim() || undefined,
+                  licenseNumber: drvLic.trim() || undefined,
+                  licenseExpiry: drvLicExp.trim() || undefined,
+                  emergencyContact: drvEmerg.trim() || undefined,
+                  isActive: drvActive,
+                  notes: drvNotes.trim() || undefined,
+                  createdAt: editingDriver?.createdAt || new Date().toISOString()
+                };
+
+                await onSaveDriver(driverData);
+                setShowDriverModal(false);
+                setEditingDriver(null);
+              }}
+              className="space-y-3 text-xs"
+            >
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-bold mb-1">Driver Full Name *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Ramesh Pawar"
+                    value={drvName}
+                    onChange={e => setDrvName(e.target.value)}
+                    className="w-full p-2 rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold mb-1">Primary Mobile *</label>
+                  <input
+                    type="tel"
+                    required
+                    placeholder="10-digit mobile"
+                    value={drvMobile}
+                    onChange={e => setDrvMobile(e.target.value)}
+                    className="w-full p-2 rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-bold mb-1">Alternate Phone</label>
+                  <input
+                    type="tel"
+                    placeholder="Optional"
+                    value={drvAltMobile}
+                    onChange={e => setDrvAltMobile(e.target.value)}
+                    className="w-full p-2 rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold mb-1">Emergency Contact</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 9819001122 (Wife)"
+                    value={drvEmerg}
+                    onChange={e => setDrvEmerg(e.target.value)}
+                    className="w-full p-2 rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-bold mb-1">Driving License Number</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. MH02-20210087654"
+                    value={drvLic}
+                    onChange={e => setDrvLic(e.target.value)}
+                    className="w-full p-2 rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold mb-1">License Expiry Date</label>
+                  <input
+                    type="date"
+                    value={drvLicExp}
+                    onChange={e => setDrvLicExp(e.target.value)}
+                    className="w-full p-2 rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold mb-1">Notes / Certifications</label>
+                <textarea
+                  rows={2}
+                  placeholder="Specialization, pet handling experience, etc."
+                  value={drvNotes}
+                  onChange={e => setDrvNotes(e.target.value)}
+                  className="w-full p-2 rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-xs"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <label className="flex items-center gap-2 font-bold cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={drvActive}
+                    onChange={e => setDrvActive(e.target.checked)}
+                    className="rounded text-[#D62828]"
+                  />
+                  <span>Active Driver (Eligible for assignment)</span>
+                </label>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-zinc-800">
+                <button
+                  type="button"
+                  onClick={() => setShowDriverModal(false)}
+                  className="px-4 py-2 bg-slate-100 dark:bg-zinc-800 rounded-xl font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-[#D62828] text-white rounded-xl font-bold cursor-pointer"
+                >
+                  {editingDriver ? 'Update Driver' : 'Save Driver'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ---------------------------------------------------- */}
+      {/* MODAL: ADD / EDIT VEHICLE */}
+      {/* ---------------------------------------------------- */}
+      {showVehicleModal && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-xs flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-zinc-900 text-slate-900 dark:text-white rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-zinc-800 pb-3">
+              <h3 className="text-base font-black flex items-center gap-2">
+                <Truck className="w-5 h-5 text-[#D62828]" />
+                {editingVehicle ? `Edit Vehicle: ${editingVehicle.vehicleNumber}` : 'Register Fleet Vehicle'}
+              </h3>
+              <button 
+                onClick={() => setShowVehicleModal(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!vehNumber.trim()) {
+                  alert('Vehicle Registration Number is required.');
+                  return;
+                }
+                const vehicleData: PickDropVehicle = {
+                  id: editingVehicle?.id || `veh-local-${Date.now()}`,
+                  vehicleId: editingVehicle?.vehicleId || `VEH-${Date.now().toString().slice(-4)}`,
+                  vehicleNumber: vehNumber.trim().toUpperCase(),
+                  vehicleType: vehType,
+                  capacity: Number(vehCapacity) || 1,
+                  isAc: vehAc,
+                  isPetFriendly: vehPetFriendly,
+                  isActive: vehActive,
+                  insuranceExpiry: vehInsExpiry.trim() || undefined,
+                  pucExpiry: vehPucExpiry.trim() || undefined,
+                  notes: vehNotes.trim() || undefined,
+                  createdAt: editingVehicle?.createdAt || new Date().toISOString()
+                };
+
+                await onSaveVehicle(vehicleData);
+                setShowVehicleModal(false);
+                setEditingVehicle(null);
+              }}
+              className="space-y-3 text-xs"
+            >
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-bold mb-1">Vehicle Plate Number *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. MH-02-DW-4589"
+                    value={vehNumber}
+                    onChange={e => setVehNumber(e.target.value)}
+                    className="w-full p-2 rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 font-mono uppercase font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold mb-1">Vehicle Model / Type</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Eeco AC Van / WagonR"
+                    value={vehType}
+                    onChange={e => setVehType(e.target.value)}
+                    className="w-full p-2 rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="block font-bold mb-1">Capacity (Pets)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    value={vehCapacity}
+                    onChange={e => setVehCapacity(Number(e.target.value))}
+                    className="w-full p-2 rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold mb-1">Insurance Expiry</label>
+                  <input
+                    type="date"
+                    value={vehInsExpiry}
+                    onChange={e => setVehInsExpiry(e.target.value)}
+                    className="w-full p-2 rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold mb-1">PUC Expiry</label>
+                  <input
+                    type="date"
+                    value={vehPucExpiry}
+                    onChange={e => setVehPucExpiry(e.target.value)}
+                    className="w-full p-2 rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 pt-1">
+                <label className="flex items-center gap-1.5 font-bold cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={vehAc}
+                    onChange={e => setVehAc(e.target.checked)}
+                    className="rounded text-blue-600"
+                  />
+                  <span>❄️ AC Equipped</span>
+                </label>
+                <label className="flex items-center gap-1.5 font-bold cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={vehPetFriendly}
+                    onChange={e => setVehPetFriendly(e.target.checked)}
+                    className="rounded text-purple-600"
+                  />
+                  <span>🐾 Safety Cages</span>
+                </label>
+                <label className="flex items-center gap-1.5 font-bold cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={vehActive}
+                    onChange={e => setVehActive(e.target.checked)}
+                    className="rounded text-emerald-600"
+                  />
+                  <span>Active Fleet</span>
+                </label>
+              </div>
+
+              <div>
+                <label className="block font-bold mb-1">Vehicle Notes / Features</label>
+                <textarea
+                  rows={2}
+                  placeholder="Interior specs, safety equipment, sanitization schedule..."
+                  value={vehNotes}
+                  onChange={e => setVehNotes(e.target.value)}
+                  className="w-full p-2 rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-xs"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-zinc-800">
+                <button
+                  type="button"
+                  onClick={() => setShowVehicleModal(false)}
+                  className="px-4 py-2 bg-slate-100 dark:bg-zinc-800 rounded-xl font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-[#D62828] text-white rounded-xl font-bold cursor-pointer"
+                >
+                  {editingVehicle ? 'Update Vehicle' : 'Save Vehicle'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

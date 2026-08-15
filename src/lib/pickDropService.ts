@@ -25,62 +25,9 @@ const STORAGE_KEYS = {
   RECURRING: 'hop_pick_drop_recurring_v2'
 };
 
-// Initial default drivers
-export const INITIAL_DRIVERS: PickDropDriver[] = [
-  {
-    id: 'drv-001',
-    driverId: 'DRV-001',
-    name: 'Ramesh Pawar',
-    mobile: '9820112233',
-    alternateMobile: '9820112244',
-    licenseNumber: 'MH02-20190012345',
-    licenseExpiry: '2029-05-15',
-    emergencyContact: '9819001122 (Wife)',
-    isActive: true,
-    notes: 'Experienced senior pet driver, specialized in large breeds'
-  },
-  {
-    id: 'drv-002',
-    driverId: 'DRV-002',
-    name: 'Santosh Shinde',
-    mobile: '9833445566',
-    licenseNumber: 'MH02-20210087654',
-    licenseExpiry: '2031-10-20',
-    emergencyContact: '9833445577 (Brother)',
-    isActive: true,
-    notes: 'Courteous and punctual, trained in cat transportation'
-  }
-];
-
-// Initial default vehicles
-export const INITIAL_VEHICLES: PickDropVehicle[] = [
-  {
-    id: 'veh-001',
-    vehicleId: 'VEH-001',
-    vehicleNumber: 'MH-02-DW-4589',
-    vehicleType: 'Eeco AC Van',
-    capacity: 3,
-    isAc: true,
-    isPetFriendly: true,
-    isActive: true,
-    insuranceExpiry: '2027-03-31',
-    pucExpiry: '2026-11-30',
-    notes: 'Fitted with safety partitions, hygienic non-slip rubber mats & AC'
-  },
-  {
-    id: 'veh-002',
-    vehicleId: 'VEH-002',
-    vehicleNumber: 'MH-02-FE-8921',
-    vehicleType: 'WagonR Pet Cab',
-    capacity: 2,
-    isAc: true,
-    isPetFriendly: true,
-    isActive: true,
-    insuranceExpiry: '2027-01-15',
-    pucExpiry: '2026-12-15',
-    notes: 'Clean climate-controlled compact cab for quick single pet drops'
-  }
-];
+// Initial collections are 100% empty — Supabase DB is the Single Source of Truth
+export const INITIAL_DRIVERS: PickDropDriver[] = [];
+export const INITIAL_VEHICLES: PickDropVehicle[] = [];
 
 // Initial default pricing rules
 export const INITIAL_PRICING_RULES: PickDropPricingRule[] = [
@@ -747,8 +694,11 @@ export async function fetchPickDropDrivers(): Promise<PickDropDriver[]> {
       setLocal(STORAGE_KEYS.DRIVERS, drivers);
       return drivers;
     }
-  } catch {}
-  return getLocal<PickDropDriver[]>(STORAGE_KEYS.DRIVERS, INITIAL_DRIVERS);
+    setLocal(STORAGE_KEYS.DRIVERS, []);
+    return [];
+  } catch {
+    return getLocal<PickDropDriver[]>(STORAGE_KEYS.DRIVERS, []);
+  }
 }
 
 export async function savePickDropDriver(driver: PickDropDriver): Promise<{ data?: PickDropDriver; error?: string }> {
@@ -766,18 +716,33 @@ export async function savePickDropDriver(driver: PickDropDriver): Promise<{ data
       updated_at: new Date().toISOString()
     };
 
-    if (driver.id && !driver.id.startsWith('drv-')) {
+    if (driver.id && !driver.id.startsWith('drv-local-')) {
       await supabase.from('pick_drop_drivers').update(payload).eq('id', driver.id);
     } else {
       const { data } = await supabase.from('pick_drop_drivers').insert([payload]).select().single();
       if (data) driver.id = data.id;
     }
-  } catch {}
+  } catch (err: any) {
+    console.warn('savePickDropDriver database notice:', err?.message);
+  }
 
-  const current = getLocal<PickDropDriver[]>(STORAGE_KEYS.DRIVERS, INITIAL_DRIVERS);
+  const current = getLocal<PickDropDriver[]>(STORAGE_KEYS.DRIVERS, []);
   const updated = [driver, ...current.filter(d => d.driverId !== driver.driverId)];
   setLocal(STORAGE_KEYS.DRIVERS, updated);
   return { data: driver };
+}
+
+export async function deletePickDropDriver(driverId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    await supabase.from('pick_drop_drivers').delete().eq('driver_id', driverId);
+  } catch (err: any) {
+    console.warn('deletePickDropDriver notice:', err?.message);
+  }
+
+  const current = getLocal<PickDropDriver[]>(STORAGE_KEYS.DRIVERS, []);
+  const updated = current.filter(d => d.driverId !== driverId);
+  setLocal(STORAGE_KEYS.DRIVERS, updated);
+  return { success: true };
 }
 
 // Vehicles Master
@@ -802,8 +767,11 @@ export async function fetchPickDropVehicles(): Promise<PickDropVehicle[]> {
       setLocal(STORAGE_KEYS.VEHICLES, vehicles);
       return vehicles;
     }
-  } catch {}
-  return getLocal<PickDropVehicle[]>(STORAGE_KEYS.VEHICLES, INITIAL_VEHICLES);
+    setLocal(STORAGE_KEYS.VEHICLES, []);
+    return [];
+  } catch {
+    return getLocal<PickDropVehicle[]>(STORAGE_KEYS.VEHICLES, []);
+  }
 }
 
 export async function savePickDropVehicle(vehicle: PickDropVehicle): Promise<{ data?: PickDropVehicle; error?: string }> {
@@ -822,18 +790,33 @@ export async function savePickDropVehicle(vehicle: PickDropVehicle): Promise<{ d
       updated_at: new Date().toISOString()
     };
 
-    if (vehicle.id && !vehicle.id.startsWith('veh-')) {
+    if (vehicle.id && !vehicle.id.startsWith('veh-local-')) {
       await supabase.from('pick_drop_vehicles').update(payload).eq('id', vehicle.id);
     } else {
       const { data } = await supabase.from('pick_drop_vehicles').insert([payload]).select().single();
       if (data) vehicle.id = data.id;
     }
-  } catch {}
+  } catch (err: any) {
+    console.warn('savePickDropVehicle database notice:', err?.message);
+  }
 
-  const current = getLocal<PickDropVehicle[]>(STORAGE_KEYS.VEHICLES, INITIAL_VEHICLES);
+  const current = getLocal<PickDropVehicle[]>(STORAGE_KEYS.VEHICLES, []);
   const updated = [vehicle, ...current.filter(v => v.vehicleId !== vehicle.vehicleId)];
   setLocal(STORAGE_KEYS.VEHICLES, updated);
   return { data: vehicle };
+}
+
+export async function deletePickDropVehicle(vehicleId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    await supabase.from('pick_drop_vehicles').delete().eq('vehicle_id', vehicleId);
+  } catch (err: any) {
+    console.warn('deletePickDropVehicle notice:', err?.message);
+  }
+
+  const current = getLocal<PickDropVehicle[]>(STORAGE_KEYS.VEHICLES, []);
+  const updated = current.filter(v => v.vehicleId !== vehicleId);
+  setLocal(STORAGE_KEYS.VEHICLES, updated);
+  return { success: true };
 }
 
 // Pricing Rules

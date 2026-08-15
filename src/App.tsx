@@ -56,8 +56,10 @@ import {
   deletePickDropBooking, 
   fetchPickDropDrivers, 
   savePickDropDriver, 
+  deletePickDropDriver,
   fetchPickDropVehicles, 
   savePickDropVehicle, 
+  deletePickDropVehicle,
   fetchPickDropPricingRules, 
   savePickDropPricingRule,
   fetchPickDropRecurringSchedules,
@@ -627,6 +629,16 @@ export default function App() {
     logAuditEventToSupabase('DRIVER_SAVED', `Saved driver ${driver.name} (${driver.driverId})`);
   };
 
+  const handleDeletePickDropDriver = async (driverId: string) => {
+    if (!hasPermission(currentUser, 'pick_drop_delete')) {
+      alert('Access Denied: Only Accountant can delete driver master records.');
+      return;
+    }
+    await deletePickDropDriver(driverId);
+    setPickDropDrivers(prev => prev.filter(d => d.driverId !== driverId));
+    logAuditEventToSupabase('DRIVER_DELETED', `Deleted driver #${driverId}`);
+  };
+
   const handleSavePickDropVehicle = async (vehicle: PickDropVehicle) => {
     if (!hasPermission(currentUser, 'pick_drop_edit') && !hasPermission(currentUser, 'settings_edit')) {
       alert('Access Denied: You do not have permission to manage vehicles.');
@@ -637,6 +649,16 @@ export default function App() {
       setPickDropVehicles(prev => [res.data!, ...prev.filter(v => v.vehicleId !== vehicle.vehicleId)]);
     }
     logAuditEventToSupabase('VEHICLE_SAVED', `Saved vehicle ${vehicle.vehicleNumber} (${vehicle.vehicleId})`);
+  };
+
+  const handleDeletePickDropVehicle = async (vehicleId: string) => {
+    if (!hasPermission(currentUser, 'pick_drop_delete')) {
+      alert('Access Denied: Only Accountant can delete vehicle master records.');
+      return;
+    }
+    await deletePickDropVehicle(vehicleId);
+    setPickDropVehicles(prev => prev.filter(v => v.vehicleId !== vehicleId));
+    logAuditEventToSupabase('VEHICLE_DELETED', `Deleted vehicle #${vehicleId}`);
   };
 
   const handleSavePickDropPricingRule = async (rule: PickDropPricingRule) => {
@@ -966,7 +988,9 @@ export default function App() {
               onUpdateBooking={handleUpdatePickDropBooking}
               onDeleteBooking={handleDeletePickDropBooking}
               onSaveDriver={handleSavePickDropDriver}
+              onDeleteDriver={handleDeletePickDropDriver}
               onSaveVehicle={handleSavePickDropVehicle}
+              onDeleteVehicle={handleDeletePickDropVehicle}
               onSavePricingRule={handleSavePickDropPricingRule}
               onSaveRecurringSchedule={handleSavePickDropRecurringSchedule}
               onDeleteRecurringSchedule={handleDeletePickDropRecurringSchedule}
