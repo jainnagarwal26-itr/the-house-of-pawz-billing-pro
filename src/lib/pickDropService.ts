@@ -28,90 +28,7 @@ const STORAGE_KEYS = {
 // Initial collections are 100% empty — Supabase DB is the Single Source of Truth
 export const INITIAL_DRIVERS: PickDropDriver[] = [];
 export const INITIAL_VEHICLES: PickDropVehicle[] = [];
-
-// Initial default pricing rules
-export const INITIAL_PRICING_RULES: PickDropPricingRule[] = [
-  {
-    id: 'rule-001',
-    ruleName: 'Base One-Way Pickup',
-    ruleType: 'FIXED',
-    rate: 250.00,
-    isActive: true,
-    notes: 'Standard one-way pet pickup base rate'
-  },
-  {
-    id: 'rule-002',
-    ruleName: 'Base One-Way Drop',
-    ruleType: 'FIXED',
-    rate: 250.00,
-    isActive: true,
-    notes: 'Standard one-way pet drop base rate'
-  },
-  {
-    id: 'rule-003',
-    ruleName: 'Round Trip (Pickup + Drop)',
-    ruleType: 'ROUND_TRIP',
-    rate: 450.00,
-    isActive: true,
-    notes: 'Discounted combined two-way transportation'
-  },
-  {
-    id: 'rule-004',
-    ruleName: 'Distance Surcharge (per KM)',
-    ruleType: 'PER_KM',
-    rate: 20.00,
-    isActive: true,
-    notes: 'Rate per kilometer beyond base zone'
-  },
-  {
-    id: 'rule-005',
-    ruleName: 'Driver Waiting Charge (per 30 min)',
-    ruleType: 'WAITING',
-    rate: 100.00,
-    isActive: true,
-    notes: 'Charge for customer waiting over 15 mins'
-  },
-  {
-    id: 'rule-006',
-    ruleName: 'Additional Pet Surcharge',
-    ruleType: 'PER_PET',
-    rate: 150.00,
-    isActive: true,
-    notes: 'Charge for second or multiple pets in same ride'
-  },
-  {
-    id: 'rule-007',
-    ruleName: 'Night Surcharge (After 8 PM)',
-    ruleType: 'NIGHT',
-    rate: 200.00,
-    isActive: true,
-    notes: 'After-hours late evening transportation'
-  },
-  {
-    id: 'rule-008',
-    ruleName: 'Emergency / Immediate Pickup',
-    ruleType: 'EMERGENCY',
-    rate: 300.00,
-    isActive: true,
-    notes: 'Priority emergency dispatch'
-  },
-  {
-    id: 'rule-009',
-    ruleName: 'Holiday Surcharge',
-    ruleType: 'HOLIDAY',
-    rate: 150.00,
-    isActive: true,
-    notes: 'Public and bank holiday transit surcharge'
-  },
-  {
-    id: 'rule-010',
-    ruleName: 'Additional Route Stop',
-    ruleType: 'ADDITIONAL_STOP',
-    rate: 100.00,
-    isActive: true,
-    notes: 'Per intermediate stop requested on route'
-  }
-];
+export const INITIAL_PRICING_RULES: PickDropPricingRule[] = [];
 
 // Helper: Local Storage Sync
 function getLocal<T>(key: string, defaultVal: T): T {
@@ -195,7 +112,7 @@ export function calculatePickDropPrice(
   const fixedDropRule = rules.find(r => r.ruleType === 'FIXED' && r.isActive && r.ruleName.toLowerCase().includes('drop'));
 
   if (isRound) {
-    baseCharge = roundRule ? roundRule.rate : 450;
+    baseCharge = roundRule ? roundRule.rate : 0;
   } else if (serviceType.toLowerCase().includes('drop') && fixedDropRule) {
     baseCharge = fixedDropRule.rate;
   } else if (fixedPickupRule) {
@@ -823,7 +740,7 @@ export async function deletePickDropVehicle(vehicleId: string): Promise<{ succes
 export async function fetchPickDropPricingRules(): Promise<PickDropPricingRule[]> {
   try {
     const { data } = await supabase.from('pick_drop_pricing_rules').select('*').order('rule_name');
-    if (data && data.length > 0) {
+    if (data) {
       const rules: PickDropPricingRule[] = data.map((r: any) => ({
         id: r.id,
         ruleName: r.rule_name,
@@ -838,7 +755,7 @@ export async function fetchPickDropPricingRules(): Promise<PickDropPricingRule[]
       return rules;
     }
   } catch {}
-  return getLocal<PickDropPricingRule[]>(STORAGE_KEYS.PRICING, INITIAL_PRICING_RULES);
+  return getLocal<PickDropPricingRule[]>(STORAGE_KEYS.PRICING, []);
 }
 
 export async function savePickDropPricingRule(rule: PickDropPricingRule): Promise<{ data?: PickDropPricingRule; error?: string }> {
@@ -853,18 +770,51 @@ export async function savePickDropPricingRule(rule: PickDropPricingRule): Promis
       updated_at: new Date().toISOString()
     };
 
-    if (rule.id && !rule.id.startsWith('rule-')) {
-      await supabase.from('pick_drop_pricing_rules').update(payload).eq('id', rule.id);
+    if (rule.id && !rule.id.startsWith('rule-local-') && !rule.id.startsWith('rule-00')) {
+      const { data, error } = await supabase.from('pick_drop_pricing_rules').update(payload).eq('id', rule.id).select().single();
+      if (data) {
+        rule.id = data.id;
+        rule.effectiveFrom = data.effective_from;
+      }
+      if (error) {
+        console.error('Error updating pricing rule:', error);
+      }
     } else {
-      const { data } = await supabase.from('pick_drop_pricing_rules').insert([payload]).select().single();
-      if (data) rule.id = data.id;
+      const { data, error } = await supabase.from('pick_drop_pricing_rules').insert([payload]).select().single();
+      if (data) {
+        rule.id = data.id;
+        rule.effectiveFrom = data.effective_from;
+      }
+      if (error) {
+        console.error('Error inserting pricing rule:', error);
+      }
     }
-  } catch {}
+  } catch (err) {
+    console.error('savePickDropPricingRule exception:', err);
+  }
 
-  const current = getLocal<PickDropPricingRule[]>(STORAGE_KEYS.PRICING, INITIAL_PRICING_RULES);
+  const current = getLocal<PickDropPricingRule[]>(STORAGE_KEYS.PRICING, []);
   const updated = [rule, ...current.filter(r => r.id !== rule.id && r.ruleName !== rule.ruleName)];
   setLocal(STORAGE_KEYS.PRICING, updated);
   return { data: rule };
+}
+
+export async function deletePickDropPricingRule(ruleId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (ruleId && !ruleId.startsWith('rule-local-')) {
+      const { error } = await supabase.from('pick_drop_pricing_rules').delete().eq('id', ruleId);
+      if (error) {
+        console.error('Error deleting pricing rule from DB:', error);
+      }
+    }
+  } catch (err) {
+    console.error('deletePickDropPricingRule exception:', err);
+  }
+
+  const current = getLocal<PickDropPricingRule[]>(STORAGE_KEYS.PRICING, []);
+  const updated = current.filter(r => r.id !== ruleId);
+  setLocal(STORAGE_KEYS.PRICING, updated);
+  return { success: true };
 }
 
 // ==========================================

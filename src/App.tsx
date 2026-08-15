@@ -62,6 +62,7 @@ import {
   deletePickDropVehicle,
   fetchPickDropPricingRules, 
   savePickDropPricingRule,
+  deletePickDropPricingRule,
   fetchPickDropRecurringSchedules,
   savePickDropRecurringSchedule,
   deletePickDropRecurringSchedule
@@ -673,6 +674,16 @@ export default function App() {
     logAuditEventToSupabase('PRICING_RULE_SAVED', `Saved pricing rule ${rule.ruleName} (Rate: ₹${rule.rate})`);
   };
 
+  const handleDeletePickDropPricingRule = async (ruleId: string) => {
+    if (!hasPermission(currentUser, 'pick_drop_delete')) {
+      alert('Access Denied: Only Accountant can delete pricing rules.');
+      return;
+    }
+    await deletePickDropPricingRule(ruleId);
+    setPickDropPricingRules(prev => prev.filter(r => r.id !== ruleId));
+    logAuditEventToSupabase('PRICING_RULE_DELETED', `Deleted pricing rule #${ruleId}`);
+  };
+
   const handleSavePickDropRecurringSchedule = async (schedule: PickDropRecurringSchedule) => {
     if (!hasPermission(currentUser, 'pick_drop_recurring_edit')) {
       alert('Access Denied: You do not have permission to manage recurring transit schedules.');
@@ -992,6 +1003,7 @@ export default function App() {
               onSaveVehicle={handleSavePickDropVehicle}
               onDeleteVehicle={handleDeletePickDropVehicle}
               onSavePricingRule={handleSavePickDropPricingRule}
+              onDeletePricingRule={handleDeletePickDropPricingRule}
               onSaveRecurringSchedule={handleSavePickDropRecurringSchedule}
               onDeleteRecurringSchedule={handleDeletePickDropRecurringSchedule}
               onGenerateInvoiceForBooking={handleGenerateInvoiceForPickDropBooking}

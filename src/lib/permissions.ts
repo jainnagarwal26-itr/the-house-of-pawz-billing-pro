@@ -311,7 +311,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
     pick_drop_assign: true,
     pick_drop_status_update: true,
     pick_drop_pricing_view: true,
-    pick_drop_pricing_edit: false,
+    pick_drop_pricing_edit: true,
     pick_drop_reports_view: true,
     pick_drop_recurring_view: true,
     pick_drop_recurring_edit: true,
@@ -424,13 +424,13 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
     settings_factory_reset: false,
     reports_view: false,
     reports_export: false,
-    pick_drop_view: false,
-    pick_drop_create: false,
+    pick_drop_view: true,
+    pick_drop_create: true,
     pick_drop_edit: false,
     pick_drop_delete: false,
     pick_drop_assign: false,
-    pick_drop_status_update: false,
-    pick_drop_pricing_view: false,
+    pick_drop_status_update: true,
+    pick_drop_pricing_view: true,
     pick_drop_pricing_edit: false,
     pick_drop_reports_view: false,
     pick_drop_recurring_view: false,
@@ -485,7 +485,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
     reports_view: false,
     reports_export: false,
     pick_drop_view: true,
-    pick_drop_create: false,
+    pick_drop_create: true,
     pick_drop_edit: false,
     pick_drop_delete: false,
     pick_drop_assign: false,
@@ -543,7 +543,19 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
     settings_edit: false,
     settings_factory_reset: false,
     reports_view: true,
-    reports_export: false
+    reports_export: false,
+    pick_drop_view: true,
+    pick_drop_create: true,
+    pick_drop_edit: true,
+    pick_drop_delete: false,
+    pick_drop_assign: true,
+    pick_drop_status_update: true,
+    pick_drop_pricing_view: true,
+    pick_drop_pricing_edit: false,
+    pick_drop_reports_view: true,
+    pick_drop_recurring_view: true,
+    pick_drop_recurring_edit: true,
+    pick_drop_reports_export: false
   },
 
   RECEPTION: {
@@ -591,7 +603,19 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
     settings_edit: false,
     settings_factory_reset: false,
     reports_view: false,
-    reports_export: false
+    reports_export: false,
+    pick_drop_view: true,
+    pick_drop_create: true,
+    pick_drop_edit: false,
+    pick_drop_delete: false,
+    pick_drop_assign: false,
+    pick_drop_status_update: true,
+    pick_drop_pricing_view: true,
+    pick_drop_pricing_edit: false,
+    pick_drop_reports_view: false,
+    pick_drop_recurring_view: false,
+    pick_drop_recurring_edit: false,
+    pick_drop_reports_export: false
   },
 
   BILLING_USER: {
@@ -639,7 +663,19 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
     settings_edit: false,
     settings_factory_reset: false,
     reports_view: false,
-    reports_export: false
+    reports_export: false,
+    pick_drop_view: true,
+    pick_drop_create: true,
+    pick_drop_edit: false,
+    pick_drop_delete: false,
+    pick_drop_assign: false,
+    pick_drop_status_update: true,
+    pick_drop_pricing_view: true,
+    pick_drop_pricing_edit: false,
+    pick_drop_reports_view: false,
+    pick_drop_recurring_view: false,
+    pick_drop_recurring_edit: false,
+    pick_drop_reports_export: false
   }
 };
 
