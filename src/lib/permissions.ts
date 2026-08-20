@@ -193,6 +193,23 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
       { key: 'pick_drop_recurring_edit', label: 'Manage Recurring Transit', description: 'Create and generate recurring Pick & Drop trips' },
       { key: 'pick_drop_reports_export', label: 'Export Transit Reports', description: 'Download CSV reports for trips, fleet and revenue' }
     ]
+  },
+  {
+    id: 'services',
+    title: 'P. Service & Package Masters',
+    description: 'Care catalog, manual amounts, species tariffs, package tiers & monthly subscriptions',
+    iconName: 'Package',
+    permissions: [
+      { key: 'service_catalog_view', label: 'View Service Catalog', description: 'Inspect care services, tariffs and GST rates' },
+      { key: 'service_catalog_edit', label: 'Add / Edit Services', description: 'Create and update service master records' },
+      { key: 'service_catalog_delete', label: 'Delete Services', description: 'Permanently remove service master records' },
+      { key: 'package_master_view', label: 'View Package Master', description: 'Inspect bundled care package tiers' },
+      { key: 'package_master_edit', label: 'Add / Edit Packages', description: 'Create and update package master records' },
+      { key: 'package_master_delete', label: 'Delete Packages', description: 'Permanently remove package master records' },
+      { key: 'monthly_package_view', label: 'View Monthly Subscriptions', description: 'Inspect recurring client monthly packages' },
+      { key: 'monthly_package_manage', label: 'Manage Monthly Packages', description: 'Create, renew and bill monthly client packages' },
+      { key: 'monthly_package_delete', label: 'Delete Monthly Package', description: 'Permanently remove client monthly package subscriptions' }
+    ]
   }
 ];
 
@@ -255,7 +272,16 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
     pick_drop_reports_view: true,
     pick_drop_recurring_view: true,
     pick_drop_recurring_edit: true,
-    pick_drop_reports_export: true
+    pick_drop_reports_export: true,
+    service_catalog_view: true,
+    service_catalog_edit: true,
+    service_catalog_delete: true,
+    package_master_view: true,
+    package_master_edit: true,
+    package_master_delete: true,
+    monthly_package_view: true,
+    monthly_package_manage: true,
+    monthly_package_delete: true
   },
 
   ADMIN: {
@@ -315,7 +341,16 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
     pick_drop_reports_view: true,
     pick_drop_recurring_view: true,
     pick_drop_recurring_edit: true,
-    pick_drop_reports_export: true
+    pick_drop_reports_export: true,
+    service_catalog_view: true,
+    service_catalog_edit: true,
+    service_catalog_delete: false,
+    package_master_view: true,
+    package_master_edit: true,
+    package_master_delete: false,
+    monthly_package_view: true,
+    monthly_package_manage: true,
+    monthly_package_delete: false
   },
 
   SUPER_ADMIN: {
@@ -440,7 +475,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
 
   BILLING_STAFF: {
     dashboard_view: false,
-    invoices_view: false,
+    invoices_view: true,
     invoices_create: true,
     invoices_edit: false,
     invoices_delete: false,
@@ -495,7 +530,16 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
     pick_drop_reports_view: false,
     pick_drop_recurring_view: false,
     pick_drop_recurring_edit: false,
-    pick_drop_reports_export: false
+    pick_drop_reports_export: false,
+    service_catalog_view: true,
+    service_catalog_edit: false,
+    service_catalog_delete: false,
+    package_master_view: true,
+    package_master_edit: false,
+    package_master_delete: false,
+    monthly_package_view: true,
+    monthly_package_manage: false,
+    monthly_package_delete: false
   },
 
   MANAGER: {

@@ -62,7 +62,7 @@ export interface Pet {
   roomNo?: string;
 }
 
-export type ItemType = 'SERVICE' | 'PRODUCT';
+export type ItemType = 'SERVICE' | 'PRODUCT' | 'PACKAGE' | 'CUSTOM';
 
 export interface CatalogItem {
   id: string;
@@ -539,3 +539,104 @@ export interface PickDropBooking {
   // Linked History
   timeline?: PickDropStatusHistory[];
 }
+
+// ============================================================
+// PHASE 4: SERVICE CATALOG, PACKAGE & SUBSCRIPTION TYPES
+// ============================================================
+
+export type ServiceApplicableSpecies = 'Dog' | 'Cat' | 'Other' | 'All';
+
+export type ServiceMasterCategory = 
+  | 'WITHOUT_PACKAGE'
+  | 'DOG_SERVICE'
+  | 'CAT_SERVICE'
+  | 'MANUAL_AMOUNT'
+  | 'PICK_DROP'
+  | 'OTHER_SERVICE';
+
+export type PackageMasterCategory =
+  | 'DOG_DAY_CARE'
+  | 'CAT_DAY_CARE'
+  | 'DOG_NIGHT_CARE'
+  | 'CAT_NIGHT_CARE'
+  | 'BOARDING_PACKAGE'
+  | 'GROOMING_PACKAGE'
+  | 'TRAINING_PACKAGE'
+  | 'PICK_DROP_PACKAGE'
+  | 'CUSTOM_PACKAGE';
+
+export interface ServiceCatalogItem {
+  id: string;
+  serviceName: string;
+  category: ServiceMasterCategory;
+  speciesApplicable: ServiceApplicableSpecies;
+  description?: string;
+  baseRate: number;
+  isGstApplicable: boolean;
+  gstRate: number;
+  hsnSac: string;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ServicePackageMaster {
+  id: string;
+  packageName: string;
+  category: PackageMasterCategory;
+  petSpecies: ServiceApplicableSpecies;
+  description?: string;
+  includedServices?: string[];
+  validityDays: number;
+  packagePrice: number;
+  isGstApplicable: boolean;
+  gstRate: number;
+  hsnSac: string;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type MonthlyPackageStatus = 'ACTIVE' | 'EXPIRED' | 'CANCELLED' | 'COMPLETED';
+
+export interface MonthlyServicePackage {
+  id: string;
+  subscriptionCode: string; // e.g. SUB-2627-0001
+  customerId: string;
+  customerName: string;
+  customerPhone?: string;
+  petId: string;
+  petName: string;
+  petSpecies: string;
+  packageId: string;
+  packageName: string;
+  startDate: string;
+  endDate: string;
+  monthlyAmount: number;
+  gstRate: number;
+  gstAmount: number;
+  totalMonthlyAmount: number;
+  paidAmount: number;
+  balanceDue: number;
+  status: MonthlyPackageStatus;
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface MonthlyPackageBillingRecord {
+  id: string;
+  monthlyPackageId: string;
+  customerId: string;
+  petId: string;
+  packageId: string;
+  billingMonth: string; // YYYY-MM
+  invoiceId?: string;
+  invoiceNumber?: string;
+  taxableAmount: number;
+  gstAmount: number;
+  grandTotal: number;
+  generatedAt: string;
+  generatedBy: string;
+}
+

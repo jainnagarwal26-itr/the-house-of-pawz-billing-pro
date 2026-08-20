@@ -5,7 +5,8 @@ import {
 } from 'lucide-react';
 import { 
   Invoice, InvoiceItem, Customer, Pet, CatalogItem, 
-  CompanySettings, UserRole, formatINR, PaymentStatus, PaymentMode, User 
+  CompanySettings, UserRole, formatINR, PaymentStatus, PaymentMode, User,
+  ServiceCatalogItem, ServicePackageMaster, PickDropBooking
 } from '../types';
 import { CATALOG_ITEMS } from '../lib/storage';
 import { hasPermission } from '../lib/permissions';
@@ -16,6 +17,9 @@ interface InvoiceModalProps {
   allInvoices?: Invoice[];
   customers: Customer[];
   pets: Pet[];
+  services?: ServiceCatalogItem[];
+  packages?: ServicePackageMaster[];
+  pickDropBookings?: PickDropBooking[];
   settings: CompanySettings;
   userRole: UserRole;
   userName: string;
@@ -31,6 +35,9 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
   allInvoices,
   customers,
   pets,
+  services = [],
+  packages = [],
+  pickDropBookings = [],
   settings,
   userRole,
   userName,
@@ -186,21 +193,21 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
     {
       id: 'ITEM-1',
       type: 'SERVICE',
-      name: 'Deluxe Canine Boarding (Per Night)',
+      name: '',
       hsnSac: '999799',
-      price: 1500,
-      qty: 2,
+      price: 0,
+      qty: 1,
       discount: 0,
       discountAmount: 0,
-      taxableValue: 3000,
+      taxableValue: 0,
       gstRate: 18,
       cgstRate: 9,
-      cgstAmount: 270,
+      cgstAmount: 0,
       sgstRate: 9,
-      sgstAmount: 270,
+      sgstAmount: 0,
       igstRate: 0,
       igstAmount: 0,
-      total: 3540
+      total: 0
     }
   ]);
 
@@ -716,34 +723,150 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
             </div>
           </div>
 
-          {/* Section 2: Catalog Quick Picker */}
-          <div className="bg-slate-50 dark:bg-zinc-800/40 p-3 rounded-xl border border-slate-200 dark:border-zinc-800">
-            <div className="flex items-center justify-between mb-2">
+          {/* Section 2: Phase 4 Unified Service, Package & Catalog Picker */}
+          <div className="bg-slate-50 dark:bg-zinc-800/40 p-3 rounded-xl border border-slate-200 dark:border-zinc-800 space-y-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <span className="font-bold text-slate-800 dark:text-zinc-200 text-[11px] flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-[#C9A227]" />
-                Add Item from Services & Retail Catalog:
+                Select Care Service, Package, or Custom Entry:
               </span>
-              <input
-                type="text"
-                placeholder="Filter services or products..."
-                value={catalogSearch}
-                onChange={e => setCatalogSearch(e.target.value)}
-                className="p-1 px-2.5 rounded-md bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-700 text-xs w-56"
-              />
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder="Search services / packages..."
+                  value={catalogSearch}
+                  onChange={e => setCatalogSearch(e.target.value)}
+                  className="p-1 px-2.5 rounded-md bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-700 text-xs w-48 sm:w-56"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newItem: InvoiceItem = {
+                      id: `ITEM-CUSTOM-${Date.now().toString().slice(-4)}`,
+                      type: 'SERVICE',
+                      name: 'Manual Amount Care Service',
+                      hsnSac: '999799',
+                      price: 550,
+                      qty: 1,
+                      discount: 0,
+                      discountAmount: 0,
+                      taxableValue: 550,
+                      gstRate: 18,
+                      cgstRate: 9,
+                      cgstAmount: 49.5,
+                      sgstRate: 9,
+                      sgstAmount: 49.5,
+                      igstRate: 0,
+                      igstAmount: 0,
+                      total: 649
+                    };
+                    setItems([...items, newItem]);
+                  }}
+                  className="px-2.5 py-1 bg-slate-900 text-white dark:bg-zinc-100 dark:text-zinc-900 rounded-lg text-[11px] font-bold shrink-0 hover:bg-slate-800"
+                >
+                  + Add Custom Line
+                </button>
+              </div>
             </div>
 
+            {/* Quick Service Badges */}
             <div className="flex items-center space-x-2 overflow-x-auto pb-1">
+              {/* Configured Care Services */}
+              {services
+                .filter(s => s.isActive && (s.serviceName.toLowerCase().includes(catalogSearch.toLowerCase()) || s.category.toLowerCase().includes(catalogSearch.toLowerCase())))
+                .map(srv => (
+                  <button
+                    key={srv.id}
+                    type="button"
+                    onClick={() => {
+                      const calc = calculateItem(srv.baseRate, 1, 0, srv.isGstApplicable ? srv.gstRate : 0, isInterState);
+                      const newItem: InvoiceItem = {
+                        id: `ITEM-SRV-${Date.now().toString().slice(-4)}`,
+                        catalogItemId: srv.id,
+                        type: 'SERVICE',
+                        name: srv.serviceName,
+                        hsnSac: srv.hsnSac || '999799',
+                        price: srv.baseRate,
+                        qty: 1,
+                        discount: 0,
+                        discountAmount: calc.discountAmount,
+                        taxableValue: calc.taxableValue,
+                        gstRate: srv.isGstApplicable ? srv.gstRate : 0,
+                        cgstRate: calc.cgstRate,
+                        cgstAmount: calc.cgstAmount,
+                        sgstRate: calc.sgstRate,
+                        sgstAmount: calc.sgstAmount,
+                        igstRate: calc.igstRate,
+                        igstAmount: calc.igstAmount,
+                        total: calc.total
+                      };
+                      setItems([...items, newItem]);
+                    }}
+                    className="shrink-0 px-2.5 py-1.5 bg-white dark:bg-zinc-900 hover:bg-red-50 dark:hover:bg-red-950/40 border border-slate-200 dark:border-zinc-700 rounded-lg text-[11px] text-left transition-colors cursor-pointer"
+                  >
+                    <span className="font-bold text-slate-800 dark:text-zinc-200 block truncate max-w-[160px]">
+                      + {srv.serviceName}
+                    </span>
+                    <span className="text-[10px] text-[#D62828] font-mono font-semibold">
+                      ₹{srv.baseRate} {srv.isGstApplicable ? `(${srv.gstRate}% GST)` : '(0% GST)'}
+                    </span>
+                  </button>
+                ))}
+
+              {/* Configured Packages */}
+              {packages
+                .filter(p => p.isActive && (p.packageName.toLowerCase().includes(catalogSearch.toLowerCase()) || p.category.toLowerCase().includes(catalogSearch.toLowerCase())))
+                .map(pkg => (
+                  <button
+                    key={pkg.id}
+                    type="button"
+                    onClick={() => {
+                      const calc = calculateItem(pkg.packagePrice, 1, 0, pkg.isGstApplicable ? pkg.gstRate : 0, isInterState);
+                      const newItem: InvoiceItem = {
+                        id: `ITEM-PKG-${Date.now().toString().slice(-4)}`,
+                        catalogItemId: pkg.id,
+                        type: 'PACKAGE',
+                        name: `${pkg.packageName} (${pkg.validityDays} Days Package)`,
+                        hsnSac: pkg.hsnSac || '999799',
+                        price: pkg.packagePrice,
+                        qty: 1,
+                        discount: 0,
+                        discountAmount: calc.discountAmount,
+                        taxableValue: calc.taxableValue,
+                        gstRate: pkg.isGstApplicable ? pkg.gstRate : 0,
+                        cgstRate: calc.cgstRate,
+                        cgstAmount: calc.cgstAmount,
+                        sgstRate: calc.sgstRate,
+                        sgstAmount: calc.sgstAmount,
+                        igstRate: calc.igstRate,
+                        igstAmount: calc.igstAmount,
+                        total: calc.total
+                      };
+                      setItems([...items, newItem]);
+                    }}
+                    className="shrink-0 px-2.5 py-1.5 bg-white dark:bg-zinc-900 hover:bg-amber-50 dark:hover:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 rounded-lg text-[11px] text-left transition-colors cursor-pointer"
+                  >
+                    <span className="font-bold text-amber-900 dark:text-amber-300 block truncate max-w-[160px]">
+                      📦 {pkg.packageName}
+                    </span>
+                    <span className="text-[10px] text-amber-700 dark:text-amber-400 font-mono font-semibold">
+                      ₹{pkg.packagePrice} / {pkg.validityDays}d
+                    </span>
+                  </button>
+                ))}
+
+              {/* Fallback Retail Products from Catalog */}
               {filteredCatalog.map(cat => (
                 <button
                   key={cat.id}
                   type="button"
                   onClick={() => addCatalogItem(cat)}
-                  className="shrink-0 px-2.5 py-1.5 bg-white dark:bg-zinc-900 hover:bg-red-50 dark:hover:bg-red-950/40 border border-slate-200 dark:border-zinc-700 rounded-lg text-[11px] text-left transition-colors"
+                  className="shrink-0 px-2.5 py-1.5 bg-white dark:bg-zinc-900 hover:bg-slate-100 dark:hover:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-lg text-[11px] text-left transition-colors cursor-pointer"
                 >
-                  <span className="font-bold text-slate-800 dark:text-zinc-200 block truncate max-w-[160px]">
+                  <span className="font-bold text-slate-700 dark:text-zinc-300 block truncate max-w-[160px]">
                     + {cat.name}
                   </span>
-                  <span className="text-[10px] text-[#D62828] font-mono font-semibold">
+                  <span className="text-[10px] text-slate-500 font-mono">
                     ₹{cat.price} / {cat.unit}
                   </span>
                 </button>

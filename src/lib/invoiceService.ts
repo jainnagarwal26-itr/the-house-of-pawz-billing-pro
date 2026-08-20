@@ -180,20 +180,13 @@ export async function createInvoiceInSupabase(inv: Omit<Invoice, 'id' | 'created
       is_cancelled: inv.isCancelled || false
     };
 
-    const { data: createdInv, error: invErr } = await supabase
-      .from('invoices')
-      .insert(invoicePayload as any)
-      .select()
-      .single();
-
-    if (invErr || !createdInv) {
-      return { invoice: null, error: invErr?.message || 'Failed to create invoice' };
-    }
-
-    const cInv = createdInv as any;
-
-    if (inv.items && inv.items.length > 0) {
-      const itemsPayload = inv.items.map((item, idx) => ({
+    // Execute atomic transactional RPC create_invoice_with_items
+    // STRICT PRODUCTION RULE: No silent fallback to multi-step insert.
+    // Atomic RPC success = invoice created with all line items.
+    // RPC failure = entire transaction rolled back safely, zero orphan records.
+    const { data: rpcResult, error: rpcError } = await (supabase.rpc as any)('create_invoice_with_items', {
+      p_invoice: invoicePayload,
+      p_items: (inv.items || []).map((item, idx) => ({
         line_item_id: item.id || `ITEM-${internalId}-${idx + 1}`,
         internal_invoice_id: internalId,
         invoice_number: inv.invoiceNumber,
@@ -211,21 +204,21 @@ export async function createInvoiceInSupabase(inv: Omit<Invoice, 'id' | 'created
         sgst_amount: item.sgstAmount || 0,
         igst_amount: item.igstAmount || 0,
         item_total: item.total
-      }));
+      }))
+    });
 
-      const { error: itemsErr } = await supabase
-        .from('invoice_items')
-        .insert(itemsPayload as any);
-
-      if (itemsErr) {
-        console.error('Error inserting line items:', itemsErr);
-      }
+    if (rpcError || !rpcResult) {
+      console.error('[createInvoiceInSupabase] Atomic RPC create_invoice_with_items failed:', rpcError);
+      return { 
+        invoice: null, 
+        error: rpcError?.message || 'Atomic invoice creation failed on database. Transaction rolled back.' 
+      };
     }
 
     const created: Invoice = {
       ...inv,
-      id: cInv.internal_invoice_id,
-      createdAt: cInv.created_at
+      id: rpcResult.internal_invoice_id || internalId,
+      createdAt: rpcResult.created_at || new Date().toISOString()
     };
 
     return { invoice: created };

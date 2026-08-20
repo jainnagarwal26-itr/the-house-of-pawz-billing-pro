@@ -33,9 +33,11 @@ import { LoginModal } from './components/LoginModal';
 import { ForgotPasswordModal } from './components/ForgotPasswordModal';
 import { Footer } from './components/Footer';
 import { PickDropManager } from './components/PickDropManager';
+import { ServiceCatalogManager } from './components/ServiceCatalogManager';
 
 import { 
-  PickDropBooking, PickDropDriver, PickDropVehicle, PickDropPricingRule, PickDropStatus, PickDropRecurringSchedule 
+  PickDropBooking, PickDropDriver, PickDropVehicle, PickDropPricingRule, PickDropStatus, PickDropRecurringSchedule,
+  ServiceCatalogItem, ServicePackageMaster, MonthlyServicePackage 
 } from './types';
 
 // Supabase Production Services
@@ -48,6 +50,17 @@ import { fetchPaymentsFromSupabase, recordPaymentInSupabase } from './lib/paymen
 import { fetchCompanySettingsFromSupabase, updateCompanySettingsInSupabase } from './lib/settingsService';
 import { fetchUsersFromSupabase, updateUserPermissionInSupabase, updateUserRoleInSupabase } from './lib/userService';
 import { fetchAuditLogsFromSupabase, logAuditEventToSupabase } from './lib/auditService';
+import {
+  fetchServiceCatalogFromSupabase,
+  saveServiceCatalogItemInSupabase,
+  deleteServiceCatalogItemFromSupabase,
+  fetchPackageMasterFromSupabase,
+  savePackageMasterInSupabase,
+  deletePackageMasterFromSupabase,
+  fetchMonthlyPackagesFromSupabase,
+  saveMonthlyPackageInSupabase,
+  deleteMonthlyPackageFromSupabase
+} from './lib/serviceCatalogService';
 import { 
   fetchPickDropBookingsFromSupabase, 
   createPickDropBookingInSupabase, 
@@ -120,6 +133,11 @@ export default function App() {
   const [pickDropPricingRules, setPickDropPricingRules] = useState<PickDropPricingRule[]>([]);
   const [pickDropRecurringSchedules, setPickDropRecurringSchedules] = useState<PickDropRecurringSchedule[]>([]);
 
+  // Phase 4: Service Catalog & Package Collections
+  const [serviceCatalog, setServiceCatalog] = useState<ServiceCatalogItem[]>([]);
+  const [packageMaster, setPackageMaster] = useState<ServicePackageMaster[]>([]);
+  const [monthlyPackages, setMonthlyPackages] = useState<MonthlyServicePackage[]>([]);
+
   // UI State
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
@@ -150,26 +168,32 @@ export default function App() {
         dbInvoices,
         dbPayments,
         dbSettings,
-        dbUsers,
         dbAuditLogs,
-        dbPickDropBookings,
+        dbUsers,
+        dbBookings,
         dbDrivers,
         dbVehicles,
-        dbPricingRules,
-        dbRecurringSchedules
+        dbPricing,
+        dbRecurringTransit,
+        dbServices,
+        dbPackages,
+        dbMonthlySubs
       ] = await Promise.all([
         fetchCustomersFromSupabase(),
         fetchPetsFromSupabase(),
         fetchInvoicesFromSupabase(),
         fetchPaymentsFromSupabase(),
         fetchCompanySettingsFromSupabase(),
-        fetchUsersFromSupabase(),
         fetchAuditLogsFromSupabase(),
+        fetchUsersFromSupabase(),
         fetchPickDropBookingsFromSupabase(),
         fetchPickDropDrivers(),
         fetchPickDropVehicles(),
         fetchPickDropPricingRules(),
-        fetchPickDropRecurringSchedules()
+        fetchPickDropRecurringSchedules(),
+        fetchServiceCatalogFromSupabase(),
+        fetchPackageMasterFromSupabase(),
+        fetchMonthlyPackagesFromSupabase()
       ]);
 
       if (dbCustomers.length > 0) setCustomers(dbCustomers);
@@ -177,13 +201,16 @@ export default function App() {
       if (dbInvoices.length > 0) setInvoices(dbInvoices);
       if (dbPayments.length > 0) setPayments(dbPayments);
       if (dbSettings) setSettings(dbSettings);
-      if (dbUsers.length > 0) setUsers(dbUsers);
       if (dbAuditLogs.length > 0) setAuditLogs(dbAuditLogs);
-      if (dbPickDropBookings) setPickDropBookings(dbPickDropBookings);
-      if (dbDrivers) setPickDropDrivers(dbDrivers);
-      if (dbVehicles) setPickDropVehicles(dbVehicles);
-      if (dbPricingRules) setPickDropPricingRules(dbPricingRules);
-      if (dbRecurringSchedules) setPickDropRecurringSchedules(dbRecurringSchedules);
+      if (dbUsers.length > 0) setUsers(dbUsers);
+      setPickDropBookings(dbBookings || []);
+      setPickDropDrivers(dbDrivers || []);
+      setPickDropVehicles(dbVehicles || []);
+      setPickDropPricingRules(dbPricing || []);
+      setPickDropRecurringSchedules(dbRecurringTransit || []);
+      setServiceCatalog(dbServices || []);
+      setPackageMaster(dbPackages || []);
+      setMonthlyPackages(dbMonthlySubs || []);
 
       // NOTE: Historical migration (Invoices 000001–000067) is complete.
       // The auto-trigger has been intentionally removed. Do NOT re-add it.
@@ -826,6 +853,133 @@ export default function App() {
     setShowInvoiceModal(true);
   };
 
+  // ─── PHASE 4: SERVICE CATALOG & PACKAGE ACTION HANDLERS ───
+  const handleSaveServiceItem = async (service: ServiceCatalogItem) => {
+    const res = await saveServiceCatalogItemInSupabase(service, currentUser);
+    if (res.error) {
+      alert(`Error saving service: ${res.error}`);
+      return;
+    }
+    const fresh = await fetchServiceCatalogFromSupabase();
+    setServiceCatalog(fresh);
+    logAuditEventToSupabase('SERVICE_CATALOG_SAVED', `Saved service "${service.serviceName}" (Rate: ₹${service.baseRate})`);
+  };
+
+  const handleDeleteServiceItem = async (serviceId: string) => {
+    const res = await deleteServiceCatalogItemFromSupabase(serviceId, currentUser);
+    if (res.error) {
+      alert(`Error deleting service: ${res.error}`);
+      return;
+    }
+    setServiceCatalog(prev => prev.filter(s => s.id !== serviceId));
+    logAuditEventToSupabase('SERVICE_CATALOG_DELETED', `Deleted service ID #${serviceId}`);
+  };
+
+  const handleSavePackageMasterItem = async (pkg: ServicePackageMaster) => {
+    const res = await savePackageMasterInSupabase(pkg, currentUser);
+    if (res.error) {
+      alert(`Error saving package: ${res.error}`);
+      return;
+    }
+    const fresh = await fetchPackageMasterFromSupabase();
+    setPackageMaster(fresh);
+    logAuditEventToSupabase('PACKAGE_MASTER_SAVED', `Saved package "${pkg.packageName}" (Price: ₹${pkg.packagePrice})`);
+  };
+
+  const handleDeletePackageMasterItem = async (packageId: string) => {
+    const res = await deletePackageMasterFromSupabase(packageId, currentUser);
+    if (res.error) {
+      alert(`Error deleting package: ${res.error}`);
+      return;
+    }
+    setPackageMaster(prev => prev.filter(p => p.id !== packageId));
+    logAuditEventToSupabase('PACKAGE_MASTER_DELETED', `Deleted package ID #${packageId}`);
+  };
+
+  const handleSaveMonthlyPackageSubscription = async (sub: MonthlyServicePackage) => {
+    const res = await saveMonthlyPackageInSupabase(sub, currentUser);
+    if (res.error) {
+      alert(`Error saving monthly package: ${res.error}`);
+      return;
+    }
+    const fresh = await fetchMonthlyPackagesFromSupabase();
+    setMonthlyPackages(fresh);
+    logAuditEventToSupabase('MONTHLY_PACKAGE_SAVED', `Saved monthly package ${sub.subscriptionCode} for ${sub.customerName}`);
+  };
+
+  const handleDeleteMonthlyPackageSubscription = async (subId: string) => {
+    const res = await deleteMonthlyPackageFromSupabase(subId, currentUser);
+    if (res.error) {
+      alert(`Error deleting monthly package: ${res.error}`);
+      return;
+    }
+    setMonthlyPackages(prev => prev.filter(m => m.id !== subId));
+    logAuditEventToSupabase('MONTHLY_PACKAGE_DELETED', `Deleted monthly package ID #${subId}`);
+  };
+
+  const handleGenerateMonthlyInvoice = async (sub: MonthlyServicePackage) => {
+    const todayStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const nextInvNumber = await fetchNextInvoiceNumberFromDB('26-27');
+
+    const draftInv: Invoice = {
+      id: `INV-MON-${Date.now().toString().slice(-8)}`,
+      invoiceNumber: nextInvNumber,
+      invoiceDate: todayStr,
+      dueDate: todayStr,
+      customerId: sub.customerId,
+      customerName: sub.customerName,
+      customerPhone: sub.customerPhone || '+91 98000 00000',
+      customerEmail: '',
+      customerAddress: 'Mumbai, MH',
+      customerGSTIN: '',
+      petId: sub.petId,
+      petName: sub.petName,
+      placeOfSupply: settings.stateCode,
+      isInterState: false,
+      items: [
+        {
+          id: `ITEM-MON-${Date.now().toString().slice(-6)}`,
+          type: 'PACKAGE',
+          name: `${sub.packageName} (Monthly Billing: ${sub.startDate} to ${sub.endDate})`,
+          hsnSac: '999799',
+          price: sub.monthlyAmount,
+          qty: 1,
+          discount: 0,
+          discountAmount: 0,
+          taxableValue: sub.monthlyAmount,
+          gstRate: sub.gstRate,
+          cgstRate: sub.gstRate / 2,
+          cgstAmount: Math.round(sub.monthlyAmount * (sub.gstRate / 200) * 100) / 100,
+          sgstRate: sub.gstRate / 2,
+          sgstAmount: Math.round(sub.monthlyAmount * (sub.gstRate / 200) * 100) / 100,
+          igstRate: 0,
+          igstAmount: 0,
+          total: sub.totalMonthlyAmount
+        }
+      ],
+      subTotal: sub.monthlyAmount,
+      totalDiscount: 0,
+      taxableAmount: sub.monthlyAmount,
+      cgstTotal: Math.round(sub.monthlyAmount * (sub.gstRate / 200) * 100) / 100,
+      sgstTotal: Math.round(sub.monthlyAmount * (sub.gstRate / 200) * 100) / 100,
+      igstTotal: 0,
+      totalGst: sub.gstAmount,
+      roundOff: 0,
+      grandTotal: sub.totalMonthlyAmount,
+      paidAmount: sub.paidAmount,
+      balanceDue: sub.balanceDue,
+      paymentStatus: sub.balanceDue <= 0 ? 'PAID' : (sub.paidAmount > 0 ? 'PARTIAL' : 'UNPAID'),
+      paymentMode: 'UPI',
+      notes: `Monthly package billing for subscription #${sub.subscriptionCode}`,
+      createdByRole: currentUser.role,
+      createdByName: currentUser.name,
+      createdAt: new Date().toISOString()
+    };
+
+    setEditingInvoice(draftInv);
+    setShowInvoiceModal(true);
+  };
+
   // Excel Full Export
   const handleExportFullExcel = () => {
     exportFullDatabaseToExcel({
@@ -902,6 +1056,7 @@ export default function App() {
           isMobileDrawerOpen={showMobileDrawer}
           onCloseMobileDrawer={() => setShowMobileDrawer(false)}
           onOpenMobileDrawer={() => setShowMobileDrawer(true)}
+          onLogout={handleLogout}
         />
 
         {/* Dynamic Main Workspace Container */}
@@ -945,6 +1100,23 @@ export default function App() {
               onCancelInvoice={handleCancelInvoice}
               onDeleteInvoice={handleDeleteInvoice}
               onExportExcel={handleExportFullExcel}
+            />
+          )}
+
+          {activeTab === 'services' && (
+            <ServiceCatalogManager
+              services={serviceCatalog}
+              packages={packageMaster}
+              monthlyPackages={monthlyPackages}
+              currentUser={currentUser}
+              userRole={currentUser.role}
+              onSaveService={handleSaveServiceItem}
+              onDeleteService={handleDeleteServiceItem}
+              onSavePackage={handleSavePackageMasterItem}
+              onDeletePackage={handleDeletePackageMasterItem}
+              onSaveMonthlyPackage={handleSaveMonthlyPackageSubscription}
+              onDeleteMonthlyPackage={handleDeleteMonthlyPackageSubscription}
+              onGenerateMonthlyInvoice={handleGenerateMonthlyInvoice}
             />
           )}
 
@@ -1160,9 +1332,13 @@ export default function App() {
           allInvoices={invoices}
           customers={customers}
           pets={pets}
+          services={serviceCatalog}
+          packages={packageMaster}
+          pickDropBookings={pickDropBookings}
           settings={settings}
           userRole={currentUser.role}
           userName={currentUser.name}
+          currentUser={currentUser}
           onSaveInvoice={handleSaveInvoice}
           onAddCustomer={handleAddCustomer}
           onAddPet={handleAddPet}

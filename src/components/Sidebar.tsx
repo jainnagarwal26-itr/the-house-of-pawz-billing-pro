@@ -4,7 +4,7 @@ import {
   FileSpreadsheet, HardDrive, UserCog, History, Settings, 
   Repeat, PlusCircle, Lock, ShieldCheck, UserCheck, ChevronRight,
   ChevronLeft, PanelLeftClose, PanelLeftOpen, HelpCircle, Download,
-  Menu, X, Sparkles, Shield, Camera, Image as ImageIcon, Zap, Car
+  Menu, X, Sparkles, Shield, Camera, Image as ImageIcon, Zap, Car, LogOut
 } from 'lucide-react';
 import { UserRole, User } from '../types';
 import { hasPermission } from '../lib/permissions';
@@ -12,6 +12,7 @@ import { hasPermission } from '../lib/permissions';
 export type ActiveTab = 
   | 'dashboard' 
   | 'invoices' 
+  | 'services'
   | 'recurring'
   | 'customers' 
   | 'pets' 
@@ -36,6 +37,7 @@ interface SidebarProps {
   isMobileDrawerOpen?: boolean;
   onCloseMobileDrawer?: () => void;
   onOpenMobileDrawer?: () => void;
+  onLogout?: () => void;
 }
 
 export function isTabAllowedForUser(tab: ActiveTab, user?: User | null, userRole?: UserRole): boolean {
@@ -45,6 +47,7 @@ export function isTabAllowedForUser(tab: ActiveTab, user?: User | null, userRole
     const tabPermissionMap: Record<ActiveTab, string> = {
       dashboard: 'dashboard_view',
       invoices: 'invoices_view',
+      services: 'service_catalog_view',
       recurring: 'boarding_view',
       customers: 'customers_view',
       pets: 'pets_view',
@@ -67,10 +70,10 @@ export function isTabAllowedForUser(tab: ActiveTab, user?: User | null, userRole
     return ['dashboard', 'customers', 'pets', 'pick_drop', 'communication', 'payments'].includes(tab);
   }
   if (role === 'BILLING_STAFF') {
-    return ['pets', 'pick_drop'].includes(tab);
+    return ['invoices', 'customers', 'pets', 'pick_drop'].includes(tab);
   }
 
-  return ['pets', 'pick_drop'].includes(tab);
+  return ['invoices', 'pets', 'pick_drop'].includes(tab);
 }
 
 // Backwards compatibility alias
@@ -86,7 +89,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   activeBoardingCount,
   isMobileDrawerOpen = false,
   onCloseMobileDrawer,
-  onOpenMobileDrawer
+  onOpenMobileDrawer,
+  onLogout
 }) => {
   const [collapsed, setCollapsed] = useState(false);
   const isAdmin = userRole === 'ADMIN' || userRole === 'SUPER_ADMIN';
@@ -105,6 +109,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       adminOnly: false,
       badge: pendingPaymentCount > 0 ? `${pendingPaymentCount}` : null,
       badgeColor: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200'
+    },
+    {
+      id: 'services' as ActiveTab,
+      label: 'Services & Packages',
+      icon: Sparkles,
+      adminOnly: false,
+      badge: 'NEW',
+      badgeColor: 'bg-emerald-600 text-white font-mono'
     },
     {
       id: 'recurring' as ActiveTab,
@@ -467,7 +479,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </nav>
             </div>
 
-            {/* Footer Role Banner */}
+            {/* Footer Role Banner & Logout */}
             <div className="pt-3 border-t border-slate-800 text-xs text-slate-400 space-y-2">
               <div className="flex items-center space-x-2 p-2 bg-slate-950 rounded-xl border border-slate-800">
                 <Shield className="w-4 h-4 text-amber-400 shrink-0" />
@@ -476,6 +488,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <p className="text-[9px] text-slate-400 font-mono">Role: {userRole}</p>
                 </div>
               </div>
+
+              {onLogout && (
+                <button
+                  onClick={() => {
+                    if (onCloseMobileDrawer) onCloseMobileDrawer();
+                    onLogout();
+                  }}
+                  className="w-full py-2.5 px-3 bg-red-950/60 hover:bg-red-900/80 text-red-300 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-2 border border-red-900/80 cursor-pointer shadow-sm active:scale-95"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Logout Current Session</span>
+                </button>
+              )}
+
               <p className="text-[9px] text-center font-mono text-slate-500">
                 House of Pawz Billing v2.6 • Offline Ready
               </p>
