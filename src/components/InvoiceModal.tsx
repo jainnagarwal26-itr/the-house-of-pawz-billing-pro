@@ -873,7 +873,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
                       + {srv.serviceName}
                     </span>
                     <span className="text-[10px] text-[#D62828] font-mono font-semibold">
-                      ₹{srv.baseRate} {srv.isGstApplicable ? `(${srv.gstRate}% GST)` : '(0% GST)'}
+                      ₹{srv.baseRate} / {srv.billingUnit || 'Unit'} {srv.isGstApplicable ? `(${srv.gstRate}% GST)` : '(0% GST)'}
                     </span>
                   </button>
                 ))}

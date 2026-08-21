@@ -30,20 +30,38 @@ export async function fetchServiceCatalogFromSupabase(): Promise<ServiceCatalogI
       return [];
     }
 
-    return (data as any[]).map(s => ({
-      id: s.id,
-      serviceName: s.service_name,
-      category: s.category,
-      speciesApplicable: s.species_applicable,
-      description: s.description || '',
-      baseRate: Number(s.base_rate) || 0,
-      isGstApplicable: Boolean(s.is_gst_applicable),
-      gstRate: Number(s.gst_rate) || 0,
-      hsnSac: s.hsn_sac || '999799',
-      isActive: Boolean(s.is_active),
-      createdAt: s.created_at,
-      updatedAt: s.updated_at
-    }));
+    return (data as any[]).map(s => {
+      // Safely parse billing_unit and pricing_method from metadata/description if columns don't exist yet
+      let unit = s.billing_unit;
+      let pricing = s.pricing_method;
+      let cleanDesc = s.description || '';
+
+      if (!unit && cleanDesc.includes('[UNIT:')) {
+        const match = cleanDesc.match(/\[UNIT:([^\]]+)\]/);
+        if (match) unit = match[1];
+      }
+      if (!pricing && cleanDesc.includes('[PRICING:')) {
+        const match = cleanDesc.match(/\[PRICING:([^\]]+)\]/);
+        if (match) pricing = match[1];
+      }
+
+      return {
+        id: s.id,
+        serviceName: s.service_name,
+        category: s.category,
+        speciesApplicable: s.species_applicable,
+        billingUnit: (unit || 'Night') as any,
+        pricingMethod: (pricing || 'FIXED_RATE') as any,
+        description: cleanDesc.replace(/\[UNIT:[^\]]+\]/g, '').replace(/\[PRICING:[^\]]+\]/g, '').trim(),
+        baseRate: Number(s.base_rate) || 0,
+        isGstApplicable: Boolean(s.is_gst_applicable),
+        gstRate: Number(s.gst_rate) || 0,
+        hsnSac: s.hsn_sac || '999799',
+        isActive: Boolean(s.is_active),
+        createdAt: s.created_at,
+        updatedAt: s.updated_at
+      };
+    });
   } catch (err) {
     console.error('Error fetching service catalog from Supabase:', err);
     return [];
@@ -60,14 +78,20 @@ export async function saveServiceCatalogItemInSupabase(
     }
 
     const isUUID = item.id && item.id.length === 36 && item.id.includes('-');
+
+    // Embed billingUnit and pricingMethod into description tag as fallback for 100% database schema compatibility
+    const metaTags = `[UNIT:${item.billingUnit || 'Night'}][PRICING:${item.pricingMethod || 'FIXED_RATE'}]`;
+    const cleanDesc = (item.description || '').replace(/\[UNIT:[^\]]+\]/g, '').replace(/\[PRICING:[^\]]+\]/g, '').trim();
+    const finalDescription = cleanDesc ? `${cleanDesc} ${metaTags}` : metaTags;
+
     const payload = {
       service_name: item.serviceName,
       category: item.category,
       species_applicable: item.speciesApplicable,
-      description: item.description || null,
+      description: finalDescription,
       base_rate: item.baseRate,
       is_gst_applicable: item.isGstApplicable,
-      gst_rate: item.gstRate,
+      gst_rate: item.isGstApplicable ? (item.gstRate ?? 18) : 0,
       hsn_sac: item.hsnSac || '999799',
       is_active: item.isActive
     };

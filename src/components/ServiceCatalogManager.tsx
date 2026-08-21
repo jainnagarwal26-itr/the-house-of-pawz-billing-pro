@@ -14,6 +14,8 @@ import {
   ServiceMasterCategory,
   PackageMasterCategory,
   ServiceApplicableSpecies,
+  ServiceBillingUnit,
+  ServicePricingMethod,
   formatINR
 } from '../types';
 import { hasPermission } from '../lib/permissions';
@@ -63,6 +65,8 @@ export const ServiceCatalogManager: React.FC<ServiceCatalogManagerProps> = ({
   const [serviceName, setServiceName] = useState('');
   const [serviceCategory, setServiceCategory] = useState<ServiceMasterCategory>('WITHOUT_PACKAGE');
   const [serviceSpecies, setServiceSpecies] = useState<ServiceApplicableSpecies>('All');
+  const [serviceBillingUnit, setServiceBillingUnit] = useState<ServiceBillingUnit>('Night');
+  const [servicePricingMethod, setServicePricingMethod] = useState<ServicePricingMethod>('FIXED_RATE');
   const [serviceRate, setServiceRate] = useState<number>(0);
   const [serviceGstApplicable, setServiceGstApplicable] = useState(true);
   const [serviceGstRate, setServiceGstRate] = useState<number>(18);
@@ -202,6 +206,8 @@ export const ServiceCatalogManager: React.FC<ServiceCatalogManagerProps> = ({
       setServiceName(item.serviceName);
       setServiceCategory(item.category);
       setServiceSpecies(item.speciesApplicable);
+      setServiceBillingUnit(item.billingUnit || 'Night');
+      setServicePricingMethod(item.pricingMethod || 'FIXED_RATE');
       setServiceRate(item.baseRate);
       setServiceGstApplicable(item.isGstApplicable);
       setServiceGstRate(item.gstRate);
@@ -213,6 +219,8 @@ export const ServiceCatalogManager: React.FC<ServiceCatalogManagerProps> = ({
       setServiceName('');
       setServiceCategory('WITHOUT_PACKAGE');
       setServiceSpecies('All');
+      setServiceBillingUnit('Night');
+      setServicePricingMethod('FIXED_RATE');
       setServiceRate(0);
       setServiceGstApplicable(true);
       setServiceGstRate(18);
@@ -234,6 +242,8 @@ export const ServiceCatalogManager: React.FC<ServiceCatalogManagerProps> = ({
       serviceName: serviceName.trim(),
       category: serviceCategory,
       speciesApplicable: serviceSpecies,
+      billingUnit: serviceBillingUnit,
+      pricingMethod: servicePricingMethod,
       baseRate: Number(serviceRate) || 0,
       isGstApplicable: serviceGstApplicable,
       gstRate: serviceGstApplicable ? (Number(serviceGstRate) || 18) : 0,
@@ -478,13 +488,13 @@ export const ServiceCatalogManager: React.FC<ServiceCatalogManagerProps> = ({
                   <div>
                     <span className="text-slate-400 block text-[10px]">Base Rate:</span>
                     <span className="text-sm font-black text-slate-900 dark:text-white font-mono">
-                      {formatINR(s.baseRate)}
+                      {formatINR(s.baseRate)} <span className="text-xs font-normal text-slate-500">/ {s.billingUnit || 'Night'}</span>
                     </span>
                   </div>
                   <div className="text-right">
-                    <span className="text-slate-400 block text-[10px]">GST Tax:</span>
+                    <span className="text-slate-400 block text-[10px]">HSN: {s.hsnSac || '999799'}</span>
                     <span className="text-xs font-bold text-slate-700 dark:text-zinc-300 font-mono">
-                      {s.isGstApplicable ? `${s.gstRate}% GST` : 'Zero GST / Exempt'}
+                      {s.isGstApplicable ? `${s.gstRate}% GST` : 'Zero GST'}
                     </span>
                   </div>
                 </div>
@@ -900,7 +910,7 @@ export const ServiceCatalogManager: React.FC<ServiceCatalogManagerProps> = ({
                   <select
                     value={serviceCategory}
                     onChange={e => setServiceCategory(e.target.value as any)}
-                    className="w-full p-2 rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700"
+                    className="w-full p-2 rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 font-medium"
                   >
                     <option value="WITHOUT_PACKAGE">Without Package / Individual</option>
                     <option value="DOG_SERVICE">Dog Care Service</option>
@@ -916,7 +926,7 @@ export const ServiceCatalogManager: React.FC<ServiceCatalogManagerProps> = ({
                   <select
                     value={serviceSpecies}
                     onChange={e => setServiceSpecies(e.target.value as any)}
-                    className="w-full p-2 rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700"
+                    className="w-full p-2 rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 font-medium"
                   >
                     <option value="All">All Species (Universal)</option>
                     <option value="Dog">Dog Only</option>
@@ -926,9 +936,43 @@ export const ServiceCatalogManager: React.FC<ServiceCatalogManagerProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block font-bold text-slate-700 dark:text-zinc-300 mb-1">Base Rate (₹)</label>
+                  <label className="block font-bold text-slate-700 dark:text-zinc-300 mb-1">Billing Unit *</label>
+                  <select
+                    value={serviceBillingUnit}
+                    onChange={e => setServiceBillingUnit(e.target.value as any)}
+                    className="w-full p-2 rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 font-medium"
+                  >
+                    <option value="Night">Night (Boarding)</option>
+                    <option value="Day">Day (Day Care)</option>
+                    <option value="Session">Session (Grooming / Spa / Training)</option>
+                    <option value="Trip">Trip (Pick & Drop)</option>
+                    <option value="Visit">Visit (Consultation)</option>
+                    <option value="Hour">Hour</option>
+                    <option value="Month">Month</option>
+                    <option value="Piece">Piece / Item</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 dark:text-zinc-300 mb-1">Pricing Method *</label>
+                  <select
+                    value={servicePricingMethod}
+                    onChange={e => setServicePricingMethod(e.target.value as any)}
+                    className="w-full p-2 rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 font-medium"
+                  >
+                    <option value="FIXED_RATE">FIXED_RATE (Standard Unit Tariff)</option>
+                    <option value="MANUAL_AMOUNT">MANUAL_AMOUNT (Custom Charge)</option>
+                    <option value="PERCENTAGE">PERCENTAGE (% Surcharge / Fee)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                <div>
+                  <label className="block font-bold text-slate-700 dark:text-zinc-300 mb-1">Base Rate (₹) *</label>
                   <input
                     type="number"
                     min="0"
@@ -937,6 +981,18 @@ export const ServiceCatalogManager: React.FC<ServiceCatalogManagerProps> = ({
                     value={serviceRate}
                     onChange={e => setServiceRate(Number(e.target.value))}
                     className="w-full p-2 rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 dark:text-zinc-300 mb-1">HSN/SAC Code</label>
+                  <input
+                    type="text"
+                    required
+                    value={serviceHsnSac}
+                    onChange={e => setServiceHsnSac(e.target.value)}
+                    placeholder="999799"
+                    className="w-full p-2 rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 font-mono font-bold"
                   />
                 </div>
 

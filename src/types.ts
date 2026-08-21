@@ -582,11 +582,16 @@ export type PackageMasterCategory =
   | 'PICK_DROP_PACKAGE'
   | 'CUSTOM_PACKAGE';
 
+export type ServiceBillingUnit = 'Night' | 'Day' | 'Session' | 'Trip' | 'Visit' | 'Hour' | 'Month' | 'Piece' | 'Other';
+export type ServicePricingMethod = 'FIXED_RATE' | 'MANUAL_AMOUNT' | 'PERCENTAGE';
+
 export interface ServiceCatalogItem {
   id: string;
   serviceName: string;
   category: ServiceMasterCategory;
   speciesApplicable: ServiceApplicableSpecies;
+  billingUnit?: ServiceBillingUnit;
+  pricingMethod?: ServicePricingMethod;
   description?: string;
   baseRate: number;
   isGstApplicable: boolean;
