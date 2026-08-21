@@ -16,7 +16,6 @@ import {
   ServiceApplicableSpecies,
   formatINR
 } from '../types';
-import { CATALOG_ITEMS } from '../lib/storage';
 import { hasPermission } from '../lib/permissions';
 
 interface ServiceCatalogManagerProps {
@@ -296,27 +295,7 @@ export const ServiceCatalogManager: React.FC<ServiceCatalogManagerProps> = ({
     setShowPackageModal(false);
   };
 
-  // Build unified services array combining database-managed services and retail catalog items without duplicates
-  const unifiedServices: ServiceCatalogItem[] = [
-    ...services,
-    ...CATALOG_ITEMS
-      .filter(cat => !services.some(s => s.serviceName.toLowerCase() === cat.name.toLowerCase() || s.id === cat.id))
-      .map(cat => ({
-        id: cat.id,
-        serviceName: cat.name,
-        category: (cat.type === 'SERVICE' ? (cat.category?.toUpperCase() || 'WITHOUT_PACKAGE') : 'RETAIL_PRODUCT') as any,
-        speciesApplicable: (cat.name.toLowerCase().includes('canine') || cat.name.toLowerCase().includes('dog') ? 'Dog' :
-                            cat.name.toLowerCase().includes('feline') || cat.name.toLowerCase().includes('cat') ? 'Cat' : 'All') as any,
-        description: `${cat.type === 'SERVICE' ? 'Care Service' : 'Retail Product'} • Unit: ${cat.unit}`,
-        baseRate: cat.price,
-        isGstApplicable: true,
-        gstRate: cat.gstRate || 18,
-        hsnSac: cat.hsnSac || '999799',
-        isActive: true
-      }))
-  ];
-
-  const filteredServices = unifiedServices.filter(s => {
+  const filteredServices = services.filter(s => {
     if (speciesFilter !== 'All' && s.speciesApplicable !== 'All' && s.speciesApplicable !== speciesFilter) {
       return false;
     }

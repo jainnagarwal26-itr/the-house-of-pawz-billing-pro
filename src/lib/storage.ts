@@ -79,61 +79,6 @@ export const SYSTEM_USERS: User[] = [
 
 export const CATALOG_ITEMS: CatalogItem[] = [
   {
-    id: 'CAT-001',
-    type: 'SERVICE',
-    name: 'Deluxe Canine Boarding (Per Night)',
-    category: 'Boarding',
-    hsnSac: '999799',
-    price: 1500,
-    gstRate: 18,
-    unit: 'Night',
-    barcode: 'SERVICE-BRD-01'
-  },
-  {
-    id: 'CAT-002',
-    type: 'SERVICE',
-    name: 'Executive Feline Boarding (Per Night)',
-    category: 'Boarding',
-    hsnSac: '999799',
-    price: 1200,
-    gstRate: 18,
-    unit: 'Night',
-    barcode: 'SERVICE-BRD-02'
-  },
-  {
-    id: 'CAT-003',
-    type: 'SERVICE',
-    name: 'Full-Day Social Daycare (8 Hours)',
-    category: 'Daycare',
-    hsnSac: '999799',
-    price: 800,
-    gstRate: 18,
-    unit: 'Day',
-    barcode: 'SERVICE-DAY-01'
-  },
-  {
-    id: 'CAT-004',
-    type: 'SERVICE',
-    name: 'Royal Paw Spa & Grooming Package',
-    category: 'Grooming',
-    hsnSac: '999799',
-    price: 2500,
-    gstRate: 18,
-    unit: 'Session',
-    barcode: 'SERVICE-GRM-01'
-  },
-  {
-    id: 'CAT-005',
-    type: 'SERVICE',
-    name: 'Obedience & Behavioral Training Session',
-    category: 'Training',
-    hsnSac: '999799',
-    price: 1800,
-    gstRate: 18,
-    unit: 'Session',
-    barcode: 'SERVICE-TRN-01'
-  },
-  {
     id: 'CAT-006',
     type: 'PRODUCT',
     name: 'Royal Canin Adult Maxi Dog Food (15kg)',
