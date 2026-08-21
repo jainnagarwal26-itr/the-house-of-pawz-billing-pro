@@ -338,15 +338,61 @@ export default function App() {
 
     logAuditEventToSupabase('INVOICE_CREATED', `Created Tax Invoice ${savedInv.invoiceNumber} for ${savedInv.customerName} (₹ ${savedInv.grandTotal.toFixed(2)})`);
 
-    // Refresh Invoices, Customers, Payments from Supabase
-    const [freshInvs, freshCusts, freshPays] = await Promise.all([
+    // If invoice includes a Long-Term Package item, ensure customer-specific active contract assignment is recorded
+    const ltpItems = savedInv.items.filter(item => item.type === 'PACKAGE' && item.catalogItemId);
+    for (const ltpItem of ltpItems) {
+      const template = longTermContracts.find(c => c.id === ltpItem.catalogItemId);
+      if (template) {
+        // Create an active contract assignment for this specific customer & pet
+        const assignedContract: LongTermContract = {
+          id: `ltp-assign-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          contractCode: `${template.contractCode}-${savedInv.invoiceNumber.replace(/[^a-zA-Z0-9]/g, '')}`,
+          contractName: `${template.contractName} (${savedInv.customerName})`,
+          packageCategory: template.packageCategory || 'LONG_TERM_BOARDING',
+          applicableSpecies: template.applicableSpecies || 'All',
+          description: `Assigned via Invoice ${savedInv.invoiceNumber} on ${savedInv.invoiceDate}`,
+          customerId: savedInv.customerId,
+          customerName: savedInv.customerName,
+          customerPhone: savedInv.customerPhone,
+          customerEmail: savedInv.customerEmail,
+          customerGstin: savedInv.customerGSTIN,
+          customerType: customers.find(c => c.id === savedInv.customerId)?.customerType || 'INDIVIDUAL',
+          contractType: template.contractType || 'MONTHLY',
+          startDate: new Date().toISOString().slice(0, 10),
+          endDate: new Date(Date.now() + (template.validityDays || 365) * 86400000).toISOString().slice(0, 10),
+          billingFrequency: template.billingFrequency || 'Monthly',
+          paymentTerms: template.paymentTerms || 'Net 30',
+          creditDays: template.creditDays || 30,
+          currency: 'INR',
+          isGstApplicable: savedInv.isInterState ? false : true,
+          gstRate: ltpItem.gstRate || 18,
+          totalContractValue: ltpItem.total,
+          totalBilledAmount: ltpItem.total,
+          balanceDue: 0,
+          status: 'ACTIVE',
+          notes: `Customer Contract auto-assigned from Invoice ${savedInv.invoiceNumber}`,
+          components: template.components?.map((comp, idx) => ({
+            ...comp,
+            id: `comp-assign-${Date.now()}-${idx + 1}`,
+            contractId: '',
+            usedQuantity: 0
+          })) || []
+        };
+        await saveLongTermContractToSupabase(assignedContract);
+      }
+    }
+
+    // Refresh Invoices, Customers, Payments, and Contracts from Supabase
+    const [freshInvs, freshCusts, freshPays, freshContracts] = await Promise.all([
       fetchInvoicesFromSupabase(),
       fetchCustomersFromSupabase(),
-      fetchPaymentsFromSupabase()
+      fetchPaymentsFromSupabase(),
+      fetchLongTermContractsFromSupabase()
     ]);
     if (freshInvs.length > 0) setInvoices(freshInvs);
     if (freshCusts.length > 0) setCustomers(freshCusts);
     if (freshPays.length > 0) setPayments(freshPays);
+    setLongTermContracts(freshContracts);
 
     setShowInvoiceModal(false);
   };
