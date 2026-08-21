@@ -77,56 +77,7 @@ export const SYSTEM_USERS: User[] = [
   }
 ];
 
-export const CATALOG_ITEMS: CatalogItem[] = [
-  {
-    id: 'CAT-006',
-    type: 'PRODUCT',
-    name: 'Royal Canin Adult Maxi Dog Food (15kg)',
-    category: 'Food',
-    hsnSac: '2309',
-    price: 6800,
-    gstRate: 18,
-    unit: 'Bag',
-    barcode: '8901234560012',
-    stockQty: 24
-  },
-  {
-    id: 'CAT-007',
-    type: 'PRODUCT',
-    name: 'Organic Herbal Flea & Tick Shampoo (500ml)',
-    category: 'Medical/Spa',
-    hsnSac: '3305',
-    price: 950,
-    gstRate: 18,
-    unit: 'Bottle',
-    barcode: '8901234560029',
-    stockQty: 45
-  },
-  {
-    id: 'CAT-008',
-    type: 'PRODUCT',
-    name: 'Heavy-Duty Nylon Harness & Leash Set',
-    category: 'Accessories',
-    hsnSac: '4201',
-    price: 1250,
-    gstRate: 18,
-    unit: 'Set',
-    barcode: '8901234560036',
-    stockQty: 18
-  },
-  {
-    id: 'CAT-009',
-    type: 'PRODUCT',
-    name: 'Interactive Dental Chew Toy Pack',
-    category: 'Accessories',
-    hsnSac: '9503',
-    price: 650,
-    gstRate: 18,
-    unit: 'Pack',
-    barcode: '8901234560043',
-    stockQty: 60
-  }
-];
+export const CATALOG_ITEMS: CatalogItem[] = [];
 
 // LocalStorage Persistence Keys
 const STORAGE_KEYS = {
