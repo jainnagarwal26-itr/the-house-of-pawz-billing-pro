@@ -879,19 +879,19 @@ export const ServiceCatalogManager: React.FC<ServiceCatalogManagerProps> = ({
 
       {/* SERVICE MODAL */}
       {showServiceModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3">
-          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in-95">
-            <div className="p-4 bg-slate-900 text-white flex items-center justify-between">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-0 sm:p-3 overflow-y-auto">
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-none sm:rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 h-[100dvh] sm:h-auto sm:max-h-[92vh] flex flex-col">
+            <div className="p-4 bg-slate-900 text-white flex items-center justify-between shrink-0">
               <h3 className="text-sm font-bold flex items-center gap-2">
                 <Package className="w-4 h-4 text-[#D62828]" />
                 {editingService ? 'Edit Service Master Record' : 'Add New Service Master Record'}
               </h3>
-              <button onClick={() => setShowServiceModal(false)} className="text-slate-400 hover:text-white">
+              <button onClick={() => setShowServiceModal(false)} className="p-1.5 text-slate-400 hover:text-white rounded-lg">
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleSaveServiceForm} className="p-4 space-y-3 text-xs">
+            <form onSubmit={handleSaveServiceForm} className="p-4 space-y-3 text-xs overflow-y-auto flex-1 pb-20 sm:pb-4">
               <div>
                 <label className="block font-bold text-slate-700 dark:text-zinc-300 mb-1">Service Name *</label>
                 <input
@@ -1070,19 +1070,19 @@ export const ServiceCatalogManager: React.FC<ServiceCatalogManagerProps> = ({
 
       {/* PACKAGE MODAL */}
       {showPackageModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3">
-          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in-95">
-            <div className="p-4 bg-slate-900 text-white flex items-center justify-between">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-0 sm:p-3 overflow-y-auto">
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-none sm:rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 h-[100dvh] sm:h-auto sm:max-h-[92vh] flex flex-col">
+            <div className="p-4 bg-slate-900 text-white flex items-center justify-between shrink-0">
               <h3 className="text-sm font-bold flex items-center gap-2">
                 <Package className="w-4 h-4 text-[#D62828]" />
                 {editingPackage ? 'Edit Package Master Record' : 'Add New Package Master Record'}
               </h3>
-              <button onClick={() => setShowPackageModal(false)} className="text-slate-400 hover:text-white">
+              <button onClick={() => setShowPackageModal(false)} className="p-1.5 text-slate-400 hover:text-white rounded-lg">
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleSavePackageForm} className="p-4 space-y-3 text-xs">
+            <form onSubmit={handleSavePackageForm} className="p-4 space-y-3 text-xs overflow-y-auto flex-1 pb-20 sm:pb-4">
               <div>
                 <label className="block font-bold text-slate-700 dark:text-zinc-300 mb-1">Package Name *</label>
                 <input
@@ -1217,22 +1217,23 @@ export const ServiceCatalogManager: React.FC<ServiceCatalogManagerProps> = ({
 
       {/* LONG-TERM PACKAGE MASTER MODAL (Customer-Agnostic Reusable Master) */}
       {showLtpModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 z-50 overflow-y-auto">
-          <div className="bg-white dark:bg-zinc-900 w-full max-w-2xl rounded-3xl p-5 sm:p-6 space-y-4 border border-slate-200 dark:border-zinc-800 shadow-2xl my-8 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-zinc-800 pb-3">
-              <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
-                <span>🏢</span>
-                <span>{editingLtp ? 'Edit Long-Term Package Master' : 'Create Long-Term Package Master'}</span>
-              </h2>
-              <button
-                onClick={() => setShowLtpModal(false)}
-                className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 rounded-lg cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-0 sm:p-3 z-50 overflow-y-auto">
+          <div className="bg-white dark:bg-zinc-900 w-full max-w-2xl rounded-none sm:rounded-3xl p-4 sm:p-6 space-y-4 border border-slate-200 dark:border-zinc-800 shadow-2xl my-0 sm:my-8 h-[100dvh] sm:h-auto sm:max-h-[90vh] overflow-y-auto flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-zinc-800 pb-3">
+                <h2 className="text-sm sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
+                  <span>🏢</span>
+                  <span>{editingLtp ? 'Edit Long-Term Package Master' : 'Create Long-Term Package Master'}</span>
+                </h2>
+                <button
+                  onClick={() => setShowLtpModal(false)}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 rounded-lg cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
 
-            <form onSubmit={handleSaveLtpForm} className="space-y-4 text-xs">
+              <form onSubmit={handleSaveLtpForm} className="space-y-4 text-xs pt-3 pb-16 sm:pb-0">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block font-bold text-slate-700 dark:text-zinc-300 mb-1">Package Code *</label>
@@ -1490,6 +1491,7 @@ export const ServiceCatalogManager: React.FC<ServiceCatalogManagerProps> = ({
                 </button>
               </div>
             </form>
+            </div>
           </div>
         </div>
       )}

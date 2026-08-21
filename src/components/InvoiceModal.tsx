@@ -467,29 +467,29 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
   );
 
   return (
-    <div className="fixed inset-0 bg-black/75 backdrop-blur-xs flex items-center justify-center z-50 p-4 overflow-y-auto">
-      <div className="bg-white dark:bg-zinc-900 text-slate-900 dark:text-white rounded-2xl w-full max-w-5xl shadow-2xl overflow-hidden my-4 flex flex-col max-h-[92vh]">
+    <div className="fixed inset-0 bg-black/75 backdrop-blur-xs flex items-center justify-center z-50 p-0 sm:p-4 overflow-y-auto">
+      <div className="bg-white dark:bg-zinc-900 text-slate-900 dark:text-white rounded-none sm:rounded-2xl w-full max-w-5xl shadow-2xl overflow-hidden my-0 sm:my-4 flex flex-col h-[100dvh] sm:h-auto sm:max-h-[92vh]">
         {/* Top Title Bar */}
-        <div className="bg-slate-900 text-white p-4 flex items-center justify-between border-b border-slate-800">
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 rounded-lg bg-[#D62828] font-mono text-white font-bold flex items-center justify-center text-xs">
+        <div className="bg-slate-900 text-white p-3.5 sm:p-4 flex items-center justify-between border-b border-slate-800 shrink-0">
+          <div className="flex items-center space-x-2.5 sm:space-x-3 min-w-0">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-[#D62828] font-mono text-white font-bold flex items-center justify-center text-xs shrink-0">
               GST
             </div>
-            <div>
-              <h2 className="text-base font-extrabold flex items-center gap-2">
-                {isEditing ? 'Edit GST Tax Invoice' : 'Create New GST Tax Invoice'}
+            <div className="min-w-0">
+              <h2 className="text-sm sm:text-base font-extrabold flex items-center gap-1.5 sm:gap-2 truncate">
+                {isEditing ? 'Edit GST Invoice' : 'Create GST Invoice'}
                 {!isAdmin && (
-                  <span className="text-[10px] bg-amber-500 text-slate-950 font-bold px-1.5 py-0.5 rounded">
-                    Staff Billing Mode
+                  <span className="text-[9px] sm:text-[10px] bg-amber-500 text-slate-950 font-bold px-1.5 py-0.5 rounded shrink-0">
+                    Staff
                   </span>
                 )}
               </h2>
-              <p className="text-[11px] text-slate-400 font-mono flex items-center gap-1">
+              <p className="text-[10px] sm:text-[11px] text-slate-400 font-mono flex items-center gap-1 truncate">
                 Invoice No:{' '}
                 {invoiceNumberLoading ? (
                   <span className="flex items-center gap-1 text-amber-400">
                     <Loader2 className="w-3 h-3 animate-spin" />
-                    <span>Fetching from DB…</span>
+                    <span>Fetching…</span>
                   </span>
                 ) : (
                   <strong>{invoiceNumber || 'Awaiting DB…'}</strong>
@@ -500,14 +500,15 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
 
           <button
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+            className="p-1.5 sm:p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors shrink-0"
+            title="Close Invoice Modal"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Modal Form Content */}
-        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-6 text-xs">
+        <form onSubmit={handleSubmit} className="p-3 sm:p-6 overflow-y-auto space-y-4 sm:space-y-6 text-xs flex-1">
           {/* Validation Error Banner */}
           {validationError && (
             <div className="p-3 bg-red-50 dark:bg-red-950/80 border border-red-200 dark:border-red-800 rounded-xl text-red-700 dark:text-red-300 flex items-center space-x-2 animate-in fade-in">
@@ -1197,13 +1198,13 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
             </div>
           </div>
 
-          {/* Modal Footer Controls */}
-          <div className="flex items-center justify-end space-x-3 pt-4 border-t border-slate-200 dark:border-zinc-800">
+          {/* Modal Footer Controls (Sticky on mobile) */}
+          <div className="sticky bottom-0 bg-white dark:bg-zinc-900 -mx-3 sm:-mx-6 -mb-3 sm:-mb-6 p-3 sm:p-4 border-t border-slate-200 dark:border-zinc-800 flex items-center justify-end space-x-2 sm:space-x-3 shadow-lg z-20">
             <button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="px-4 py-2 bg-slate-200 dark:bg-zinc-800 hover:bg-slate-300 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 rounded-xl text-xs font-bold disabled:opacity-50"
+              className="px-4 py-2.5 min-h-[44px] bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 rounded-xl text-xs font-bold disabled:opacity-50 transition-colors"
             >
               Cancel
             </button>
@@ -1211,7 +1212,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
             <button
               type="submit"
               disabled={isSubmitting || invoiceNumberLoading}
-              className={`px-6 py-2.5 font-extrabold rounded-xl text-xs flex items-center space-x-2 shadow-lg transition-all ${
+              className={`px-5 sm:px-6 py-2.5 min-h-[44px] font-extrabold rounded-xl text-xs flex items-center justify-center space-x-2 shadow-lg transition-all ${
                 isSubmitting || invoiceNumberLoading
                   ? 'bg-slate-400 cursor-not-allowed text-white opacity-70'
                   : 'bg-[#D62828] hover:bg-red-700 text-white shadow-red-900/40 active:scale-95'
@@ -1230,7 +1231,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
               ) : (
                 <>
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>{isEditing ? 'Update & Save GST Invoice' : 'Save & Issue GST Invoice'}</span>
+                  <span>{isEditing ? 'Update GST Invoice' : 'Save & Issue GST Invoice'}</span>
                 </>
               )}
             </button>

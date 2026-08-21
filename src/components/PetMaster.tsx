@@ -382,13 +382,23 @@ export const PetMaster: React.FC<PetMasterProps> = ({
 
       {/* Add/Edit Pet Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-zinc-900 text-slate-900 dark:text-white rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-4">
-            <h3 className="text-base font-bold">
-              {editingPet ? 'Edit Pet Profile' : 'Add New Pet Profile'}
-            </h3>
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-xs flex items-center justify-center z-50 p-0 sm:p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-zinc-900 text-slate-900 dark:text-white rounded-none sm:rounded-2xl w-full max-w-lg p-4 sm:p-6 shadow-2xl space-y-4 h-[100dvh] sm:h-auto sm:max-h-[90vh] overflow-y-auto flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between border-b pb-3 border-slate-100 dark:border-zinc-800">
+                <h3 className="text-base font-bold">
+                  {editingPet ? 'Edit Pet Profile' : 'Add New Pet Profile'}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 rounded-lg cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
 
-            <form onSubmit={handleSubmit} className="space-y-3 text-xs">
+              <form onSubmit={handleSubmit} className="space-y-3 text-xs pt-3 pb-16 sm:pb-0">
               <div>
                 <label className="font-bold text-slate-700 dark:text-zinc-300 block mb-1">Pet Owner Customer *</label>
                 <select
@@ -511,6 +521,7 @@ export const PetMaster: React.FC<PetMasterProps> = ({
                 </button>
               </div>
             </form>
+            </div>
           </div>
         </div>
       )}

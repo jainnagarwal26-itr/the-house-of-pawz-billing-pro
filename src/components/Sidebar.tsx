@@ -352,11 +352,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </aside>
 
-      {/* MOBILE BOTTOM NAVIGATION BAR (Fixed at bottom on phones) */}
-      <div className="no-print md:hidden fixed bottom-0 inset-x-0 z-40 bg-slate-950/95 border-t border-slate-800/80 backdrop-blur-lg px-2 py-1.5 flex items-center justify-around shadow-2xl">
+      {/* MOBILE BOTTOM NAVIGATION BAR (Fixed at bottom on phones with safe area inset) */}
+      <div className="no-print md:hidden fixed bottom-0 inset-x-0 z-40 bg-slate-950/95 border-t border-slate-800/80 backdrop-blur-lg px-2 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] flex items-center justify-around shadow-2xl">
         <button
           onClick={() => handleTabClick('dashboard')}
-          className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl text-[10px] font-bold transition-all ${
+          className={`flex flex-col items-center justify-center py-1 px-3 min-h-[44px] rounded-xl text-[10px] font-bold transition-all cursor-pointer ${
             activeTab === 'dashboard' ? 'text-[#D62828]' : 'text-slate-400 hover:text-white'
           }`}
         >
@@ -366,21 +366,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         <button
           onClick={() => handleTabClick('invoices')}
-          className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl text-[10px] font-bold transition-all relative ${
+          className={`flex flex-col items-center justify-center py-1 px-3 min-h-[44px] rounded-xl text-[10px] font-bold transition-all relative cursor-pointer ${
             activeTab === 'invoices' ? 'text-[#D62828]' : 'text-slate-400 hover:text-white'
           }`}
         >
           <Receipt className="w-5 h-5 mb-0.5" />
           <span>Invoices</span>
           {pendingPaymentCount > 0 && (
-            <span className="absolute top-0.5 right-1 w-2 h-2 rounded-full bg-amber-400" />
+            <span className="absolute top-1 right-2 w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
           )}
         </button>
 
         {/* Center Primary Action Button (+ New Invoice) */}
         <button
           onClick={onNewInvoice}
-          className="w-12 h-12 rounded-full bg-gradient-to-tr from-[#D62828] to-red-500 text-white flex items-center justify-center shadow-lg shadow-red-900/60 -mt-5 border-2 border-slate-950 active:scale-90 transition-transform"
+          className="w-12 h-12 rounded-full bg-gradient-to-tr from-[#D62828] to-red-500 text-white flex items-center justify-center shadow-lg shadow-red-900/60 -mt-6 border-2 border-slate-950 active:scale-90 transition-transform cursor-pointer"
           title="Create New Invoice"
         >
           <PlusCircle className="w-6 h-6 text-white" />
@@ -388,14 +388,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         <button
           onClick={() => handleTabClick('pets')}
-          className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl text-[10px] font-bold transition-all relative ${
+          className={`flex flex-col items-center justify-center py-1 px-3 min-h-[44px] rounded-xl text-[10px] font-bold transition-all relative cursor-pointer ${
             activeTab === 'pets' ? 'text-[#D62828]' : 'text-slate-400 hover:text-white'
           }`}
         >
           <Dog className="w-5 h-5 mb-0.5" />
           <span>Pets</span>
           {activeBoardingCount > 0 && (
-            <span className="absolute top-0.5 right-1 w-2 h-2 rounded-full bg-emerald-400" />
+            <span className="absolute top-1 right-2 w-2 h-2 rounded-full bg-emerald-400" />
           )}
         </button>
 
@@ -403,7 +403,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onClick={() => {
             if (onOpenMobileDrawer) onOpenMobileDrawer();
           }}
-          className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl text-[10px] font-bold transition-all ${
+          className={`flex flex-col items-center justify-center py-1 px-3 min-h-[44px] rounded-xl text-[10px] font-bold transition-all cursor-pointer ${
             isMobileDrawerOpen ? 'text-[#D62828]' : 'text-slate-400 hover:text-white'
           }`}
         >

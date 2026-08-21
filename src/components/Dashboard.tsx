@@ -339,40 +339,40 @@ export const Dashboard: React.FC<DashboardProps> = ({
   };
 
   return (
-    <div className="p-3 sm:p-6 space-y-5 max-w-7xl mx-auto">
+    <div className="p-2.5 sm:p-6 space-y-3.5 sm:space-y-5 max-w-7xl mx-auto pb-24 md:pb-8">
       
       {/* 1. EXECUTIVE HEADER BANNER */}
-      <div className="bg-gradient-to-r from-slate-900 via-zinc-900 to-[#1e1e1e] text-white p-5 rounded-2xl border border-zinc-800 shadow-2xl relative overflow-hidden">
+      <div className="bg-gradient-to-r from-slate-900 via-zinc-900 to-[#1e1e1e] text-white p-3.5 sm:p-5 rounded-2xl border border-zinc-800 shadow-2xl relative overflow-hidden">
         <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-gradient-to-l from-[#D62828]/25 via-[#C9A227]/10 to-transparent pointer-events-none" />
 
-        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="space-y-1.5">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded text-[10px] font-mono font-extrabold uppercase tracking-wider bg-[#C9A227] text-slate-950">
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-4">
+          <div className="space-y-1 sm:space-y-1.5">
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+              <span className="px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-mono font-extrabold uppercase tracking-wider bg-[#C9A227] text-slate-950">
                 Enterprise BI v2.6
               </span>
-              <span className="text-xs text-slate-400 font-mono">FY 2026-27 • CA & Owner Command</span>
+              <span className="hidden sm:inline-block text-xs text-slate-400 font-mono">FY 2026-27 • CA & Owner Command</span>
               
               {/* Health Indicator Badge */}
-              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold flex items-center gap-1.5 border ${businessStatus.bgColor}`}>
-                <span className={`w-2 h-2 rounded-full ${businessStatus.badge} animate-pulse`} />
+              <span className={`px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-extrabold flex items-center gap-1 border ${businessStatus.bgColor}`}>
+                <span className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${businessStatus.badge} animate-pulse`} />
                 {businessStatus.label}
               </span>
             </div>
 
-            <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2">
+            <h2 className="text-base sm:text-2xl font-black text-white tracking-tight flex items-center gap-1.5 sm:gap-2">
               The House of Pawz <span className="text-[#D62828] font-light">| Executive Dashboard</span>
             </h2>
-            <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
+            <p className="text-[11px] sm:text-xs text-slate-300 max-w-2xl leading-relaxed line-clamp-2 sm:line-clamp-none">
               360° Business Intelligence, Real-time GST Filing Readiness, Boarding Suite Analytics, Customer Experience Center & Financial KPIs.
             </p>
           </div>
 
           {/* Header Action Buttons */}
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 shrink-0 pt-1 sm:pt-0">
             <button
               onClick={onNewInvoice}
-              className="px-3.5 py-2 bg-[#D62828] hover:bg-red-700 text-white font-bold rounded-xl text-xs flex items-center space-x-1.5 shadow-lg shadow-red-900/50 active:scale-95 transition-all"
+              className="px-3.5 py-2.5 min-h-[44px] bg-[#D62828] hover:bg-red-700 text-white font-bold rounded-xl text-xs flex items-center justify-center space-x-1.5 shadow-lg shadow-red-900/50 active:scale-95 transition-all cursor-pointer"
             >
               <PlusCircle className="w-4 h-4" />
               <span>+ Create Invoice</span>
@@ -380,7 +380,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
             <button
               onClick={() => setShowZReportModal(true)}
-              className="px-3 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-bold rounded-xl text-xs flex items-center space-x-1.5 border border-amber-500/40"
+              className="px-3 py-2.5 min-h-[44px] bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-bold rounded-xl text-xs flex items-center justify-center space-x-1.5 border border-amber-500/40 cursor-pointer"
               title="View Daily Business Closing (Z-Report)"
             >
               <FileText className="w-4 h-4 text-amber-400" />
@@ -389,21 +389,21 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
             <button
               onClick={handlePrintDashboard}
-              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold rounded-xl text-xs flex items-center space-x-1 border border-slate-700"
+              className="hidden sm:flex px-3 py-2.5 min-h-[44px] bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold rounded-xl text-xs items-center justify-center space-x-1 border border-slate-700 cursor-pointer"
               title="Print Dashboard Summary"
             >
               <Printer className="w-4 h-4 text-slate-400" />
-              <span className="hidden sm:inline">Print</span>
+              <span>Print</span>
             </button>
 
             {isAdmin && (
               <button
                 onClick={onExportExcel}
-                className="px-3 py-2 bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 font-bold rounded-xl text-xs flex items-center space-x-1.5 border border-emerald-800"
+                className="hidden sm:flex px-3 py-2.5 min-h-[44px] bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 font-bold rounded-xl text-xs items-center justify-center space-x-1.5 border border-emerald-800 cursor-pointer"
                 title="Export Excel Database"
               >
                 <HardDrive className="w-4 h-4 text-emerald-400" />
-                <span className="hidden sm:inline">Excel Export</span>
+                <span>Excel Export</span>
               </button>
             )}
           </div>
@@ -411,8 +411,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
       </div>
 
       {/* 2. UNIVERSAL SMART SEARCH & QUICK ACTIONS BAR */}
-      <div className="bg-white dark:bg-zinc-900 p-3 sm:p-4 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-xs space-y-3">
-        <div className="flex flex-col sm:flex-row items-center gap-3">
+      <div className="bg-white dark:bg-zinc-900 p-3 sm:p-4 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-xs space-y-2.5 sm:space-y-3">
+        <div className="flex flex-col sm:flex-row items-center gap-2.5 sm:gap-3">
           {/* Search Box */}
           <div className="relative flex-1 w-full">
             <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
@@ -420,7 +420,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               type="text"
               value={smartSearchQuery}
               onChange={e => setSmartSearchQuery(e.target.value)}
-              placeholder="Smart Search: Type Customer name, Pet, Invoice #, Payment, Room No..."
+              placeholder="Search customers, pets, invoices..."
               className="w-full h-10 pl-9 pr-8 bg-slate-50 dark:bg-zinc-800 text-xs text-slate-900 dark:text-white rounded-xl border border-slate-200 dark:border-zinc-700 focus:outline-none focus:ring-2 focus:ring-[#D62828]/40"
             />
             {smartSearchQuery && (
@@ -433,8 +433,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
             )}
           </div>
 
-          {/* Quick Action Buttons */}
-          <div className="flex items-center space-x-1.5 shrink-0 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0">
+          {/* Quick Action Buttons Grid */}
+          <div className="grid grid-cols-3 sm:flex items-center gap-1.5 sm:space-x-1.5 shrink-0 w-full sm:w-auto">
             <button
               onClick={() => {
                 if (pendingInvoices.length > 0) {
@@ -445,26 +445,26 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   alert('No pending invoices available.');
                 }
               }}
-              className="px-2.5 py-2 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 rounded-xl text-xs font-bold flex items-center space-x-1 shrink-0 border border-emerald-200 dark:border-emerald-800"
+              className="px-2 sm:px-2.5 py-2.5 min-h-[44px] bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 rounded-xl text-[11px] sm:text-xs font-bold flex items-center justify-center space-x-1 border border-emerald-200 dark:border-emerald-800 cursor-pointer"
             >
               <Wallet className="w-3.5 h-3.5" />
-              <span>Receive Payment</span>
+              <span className="truncate">Receive Payment</span>
             </button>
 
             <button
               onClick={() => setShowQuickCustomerModal(true)}
-              className="px-2.5 py-2 bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 hover:bg-blue-100 rounded-xl text-xs font-bold flex items-center space-x-1 shrink-0 border border-blue-200 dark:border-blue-800"
+              className="px-2 sm:px-2.5 py-2.5 min-h-[44px] bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 hover:bg-blue-100 rounded-xl text-[11px] sm:text-xs font-bold flex items-center justify-center space-x-1 border border-blue-200 dark:border-blue-800 cursor-pointer"
             >
               <UserPlus className="w-3.5 h-3.5" />
-              <span>Add Customer</span>
+              <span className="truncate">Add Customer</span>
             </button>
 
             <button
               onClick={() => setShowQuickBoardingModal(true)}
-              className="px-2.5 py-2 bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 hover:bg-purple-100 rounded-xl text-xs font-bold flex items-center space-x-1 shrink-0 border border-purple-200 dark:border-purple-800"
+              className="px-2 sm:px-2.5 py-2.5 min-h-[44px] bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 hover:bg-purple-100 rounded-xl text-[11px] sm:text-xs font-bold flex items-center justify-center space-x-1 border border-purple-200 dark:border-purple-800 cursor-pointer"
             >
               <Dog className="w-3.5 h-3.5" />
-              <span>Book Suite</span>
+              <span className="truncate">Book Suite</span>
             </button>
           </div>
         </div>

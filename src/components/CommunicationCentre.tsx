@@ -603,14 +603,96 @@ https://www.wisdomcentre.co.in/`;
       {/* TAB 1: INVOICE COMMUNICATION */}
       {activeTab === 'invoices' && (
         <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-xs overflow-hidden">
-          <div className="p-4 border-b border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-800/40 flex items-center justify-between">
-            <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
-              <Receipt className="w-4 h-4 text-blue-600" />
-              Direct Invoice PDF, WhatsApp & Email Action Center ({filteredInvoices.length})
+          <div className="p-3.5 sm:p-4 border-b border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-800/40 flex items-center justify-between">
+            <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5 truncate">
+              <Receipt className="w-4 h-4 text-blue-600 shrink-0" />
+              <span>Direct Invoice Action Center ({filteredInvoices.length})</span>
             </h3>
           </div>
 
-          <div className="overflow-x-auto">
+          {/* Mobile Cards View */}
+          <div className="block md:hidden divide-y divide-slate-100 dark:divide-zinc-800">
+            {filteredInvoices.map(inv => (
+              <div key={inv.id} className="p-3.5 space-y-2.5">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <span className="font-mono font-bold text-slate-900 dark:text-white text-xs block">
+                      {inv.invoiceNumber}
+                    </span>
+                    <p className="text-[11px] font-bold text-slate-800 dark:text-zinc-200">
+                      {inv.customerName}
+                    </p>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      {inv.invoiceDate} • 📞 {inv.customerPhone || 'No Phone'}
+                    </span>
+                  </div>
+
+                  <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-extrabold font-mono shrink-0 ${
+                    inv.paymentStatus === 'PAID'
+                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                      : inv.paymentStatus === 'CANCELLED'
+                      ? 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300'
+                      : inv.paymentStatus === 'PARTIAL'
+                      ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                      : 'bg-red-50 text-red-700 border border-red-200'
+                  }`}>
+                    {inv.paymentStatus}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-zinc-800 text-xs">
+                  <div>
+                    <span className="text-[10px] text-slate-400 block">Total:</span>
+                    <span className="font-mono font-black text-slate-900 dark:text-white text-sm">
+                      {formatINR(inv.grandTotal)}
+                    </span>
+                  </div>
+
+                  {inv.balanceDue > 0 && (
+                    <div className="text-right">
+                      <span className="text-[10px] text-slate-400 block">Balance Due:</span>
+                      <span className="font-mono font-bold text-red-600 dark:text-red-400 text-xs">
+                        {formatINR(inv.balanceDue)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Mobile Communication Buttons */}
+                <div className="grid grid-cols-3 gap-1.5 pt-1">
+                  <button
+                    onClick={() => {
+                      setIsAutoDownloadPDF(false);
+                      setSelectedInvoiceForPreview(inv);
+                    }}
+                    className="p-2 min-h-[40px] bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 rounded-xl text-xs font-bold flex items-center justify-center gap-1 cursor-pointer"
+                  >
+                    <Eye className="w-3.5 h-3.5 text-slate-500" />
+                    <span>View</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleSendInvoiceWhatsApp(inv)}
+                    className="p-2 min-h-[40px] bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 rounded-xl text-xs font-bold flex items-center justify-center gap-1 cursor-pointer"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>WhatsApp</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleSendInvoiceEmail(inv)}
+                    className="p-2 min-h-[40px] bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 rounded-xl text-xs font-bold flex items-center justify-center gap-1 cursor-pointer"
+                  >
+                    <Mail className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Email</span>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left border-collapse table-fixed min-w-[900px]">
               <thead>
                 <tr className="bg-slate-100 dark:bg-zinc-800/80 text-slate-700 dark:text-zinc-300 text-[10px] uppercase tracking-wider font-extrabold border-b border-slate-200 dark:border-zinc-800">

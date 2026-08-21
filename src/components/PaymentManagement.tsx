@@ -125,76 +125,126 @@ export const PaymentManagement: React.FC<PaymentManagementProps> = ({
         </div>
       </div>
 
-      {/* Payments Table */}
+      {/* Payments List: Mobile Cards + Desktop Table */}
       <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-xs overflow-hidden">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-slate-100 dark:bg-zinc-800/80 text-slate-700 dark:text-zinc-300 text-[10px] uppercase font-bold border-b border-slate-200 dark:border-zinc-800">
-              <th className="p-3">Payment ID</th>
-              <th className="p-3">Invoice & Client</th>
-              <th className="p-3 font-mono text-right">Amount (₹)</th>
-              <th className="p-3">Mode & Ref</th>
-              <th className="p-3">Date</th>
-              <th className="p-3">Collected By</th>
-              <th className="p-3 text-center">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-zinc-800/80 text-xs">
-            {filtered.map(p => (
-              <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-zinc-800/40 transition-colors">
-                <td className="p-3 font-mono font-bold text-slate-900 dark:text-white">
-                  {p.id}
-                </td>
-                <td className="p-3">
-                  <span className="font-mono font-bold text-[#D62828] block">{p.invoiceNumber}</span>
-                  <span className="text-slate-700 dark:text-zinc-300 font-medium">{p.customerName}</span>
-                </td>
-                <td className="p-3 text-right font-mono font-extrabold text-emerald-600 dark:text-emerald-400 text-sm">
-                  {formatINR(p.amount)}
-                </td>
-                <td className="p-3">
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-zinc-800 text-slate-800 dark:text-zinc-200">
+        
+        {/* Mobile View: Cards */}
+        <div className="block md:hidden divide-y divide-slate-100 dark:divide-zinc-800">
+          {filtered.map(p => (
+            <div key={p.id} className="p-3.5 space-y-2">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <span className="font-mono font-bold text-[#D62828] text-xs block">
+                    {p.invoiceNumber}
+                  </span>
+                  <p className="text-xs font-bold text-slate-900 dark:text-white">
+                    {p.customerName}
+                  </p>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    ID: {p.id} • {p.paymentDate}
+                  </span>
+                </div>
+
+                <div className="text-right shrink-0">
+                  <span className="font-mono font-black text-emerald-600 dark:text-emerald-400 text-sm block">
+                    {formatINR(p.amount)}
+                  </span>
+                  <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-slate-100 dark:bg-zinc-800 text-slate-800 dark:text-zinc-200">
                     {p.paymentMode}
                   </span>
-                  {p.transactionRef && (
-                    <span className="block text-[10px] text-slate-400 font-mono truncate max-w-[140px]">
-                      Ref: {p.transactionRef}
-                    </span>
-                  )}
-                </td>
-                <td className="p-3 font-mono text-slate-500">{p.paymentDate}</td>
-                <td className="p-3 text-slate-600 dark:text-zinc-400 font-medium">{p.receivedBy}</td>
-                <td className="p-3 text-center">
-                  {onDeletePayment && hasPermission(currentUser, 'payments_delete') && (
-                    <button
-                      onClick={() => {
-                        if (confirm(`Are you sure you want to delete payment record ${p.id} for ₹${p.amount}?`)) {
-                          onDeletePayment(p.id);
-                        }
-                      }}
-                      className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors"
-                      title="Delete Payment Record"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
-                </td>
+                </div>
+              </div>
+
+              {p.transactionRef && (
+                <p className="text-[10px] text-slate-500 font-mono truncate">
+                  Ref: {p.transactionRef} • Collected by {p.receivedBy}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Desktop View: Table */}
+        <div className="hidden md:block overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-100 dark:bg-zinc-800/80 text-slate-700 dark:text-zinc-300 text-[10px] uppercase font-bold border-b border-slate-200 dark:border-zinc-800">
+                <th className="p-3">Payment ID</th>
+                <th className="p-3">Invoice & Client</th>
+                <th className="p-3 font-mono text-right">Amount (₹)</th>
+                <th className="p-3">Mode & Ref</th>
+                <th className="p-3">Date</th>
+                <th className="p-3">Collected By</th>
+                <th className="p-3 text-center">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-zinc-800/80 text-xs">
+              {filtered.map(p => (
+                <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-zinc-800/40 transition-colors">
+                  <td className="p-3 font-mono font-bold text-slate-900 dark:text-white">
+                    {p.id}
+                  </td>
+                  <td className="p-3">
+                    <span className="font-mono font-bold text-[#D62828] block">{p.invoiceNumber}</span>
+                    <span className="text-slate-700 dark:text-zinc-300 font-medium">{p.customerName}</span>
+                  </td>
+                  <td className="p-3 text-right font-mono font-extrabold text-emerald-600 dark:text-emerald-400 text-sm">
+                    {formatINR(p.amount)}
+                  </td>
+                  <td className="p-3">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-zinc-800 text-slate-800 dark:text-zinc-200">
+                      {p.paymentMode}
+                    </span>
+                    {p.transactionRef && (
+                      <span className="block text-[10px] text-slate-400 font-mono truncate max-w-[140px]">
+                        Ref: {p.transactionRef}
+                      </span>
+                    )}
+                  </td>
+                  <td className="p-3 font-mono text-slate-500">{p.paymentDate}</td>
+                  <td className="p-3 text-slate-600 dark:text-zinc-400 font-medium">{p.receivedBy}</td>
+                  <td className="p-3 text-center">
+                    {onDeletePayment && hasPermission(currentUser, 'payments_delete') && (
+                      <button
+                        onClick={() => {
+                          if (confirm(`Are you sure you want to delete payment record ${p.id} for ₹${p.amount}?`)) {
+                            onDeletePayment(p.id);
+                          }
+                        }}
+                        className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors"
+                        title="Delete Payment Record"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Record Payment Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-zinc-900 text-slate-900 dark:text-white rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
-            <h3 className="text-base font-bold">Record Customer Payment</h3>
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-xs flex items-center justify-center z-50 p-0 sm:p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-zinc-900 text-slate-900 dark:text-white rounded-none sm:rounded-2xl w-full max-w-md p-4 sm:p-6 shadow-2xl space-y-4 h-[100dvh] sm:h-auto sm:max-h-[90vh] overflow-y-auto flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between border-b pb-3 border-slate-100 dark:border-zinc-800">
+                <h3 className="text-base font-bold">Record Customer Payment</h3>
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 rounded-lg cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
 
-            {pendingInvoices.length === 0 ? (
-              <p className="text-xs text-slate-500">No invoices currently have an outstanding balance.</p>
-            ) : (
-              <form onSubmit={handleSubmit} className="space-y-3 text-xs">
+              {pendingInvoices.length === 0 ? (
+                <p className="text-xs text-slate-500 pt-3">No invoices currently have an outstanding balance.</p>
+              ) : (
+                <form onSubmit={handleSubmit} className="space-y-3 text-xs pt-3 pb-16 sm:pb-0">
                 <div>
                   <label className="font-bold text-slate-700 dark:text-zinc-300 block mb-1">Select Outstanding Invoice *</label>
                   <select
@@ -265,6 +315,7 @@ export const PaymentManagement: React.FC<PaymentManagementProps> = ({
                 </div>
               </form>
             )}
+            </div>
           </div>
         </div>
       )}

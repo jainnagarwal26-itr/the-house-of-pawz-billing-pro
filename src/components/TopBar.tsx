@@ -162,7 +162,8 @@ export const TopBar: React.FC<TopBarProps> = ({
 
         <div className="hidden sm:block h-4 w-px bg-slate-200 dark:bg-zinc-700 mx-1" />
 
-        <div className="flex items-center space-x-2 px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-xs shrink-0">
+        {/* Desktop User Pill */}
+        <div className="hidden sm:flex items-center space-x-2 px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-xs shrink-0">
           <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
           <div className="flex items-center space-x-1.5">
             <span className="font-bold text-slate-900 dark:text-white truncate max-w-[110px]">
@@ -179,9 +180,27 @@ export const TopBar: React.FC<TopBarProps> = ({
           </div>
         </div>
 
+        {/* Mobile Compact User Avatar / Role Pill */}
+        <button
+          onClick={onOpenMobileDrawer}
+          className="sm:hidden flex items-center space-x-1 p-1 bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-lg text-xs"
+          title="View Account Profile & Menu"
+        >
+          <div className="w-5 h-5 rounded-full bg-[#D62828] text-white flex items-center justify-center font-bold text-[9px]">
+            {(currentUser.name || currentUser.username).slice(0, 1).toUpperCase()}
+          </div>
+          <span className={`text-[8px] font-extrabold px-1 py-0.2 rounded font-mono ${
+            currentUser.role === 'ACCOUNTANT' ? 'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300' :
+            currentUser.role === 'ADMIN' ? 'bg-red-100 text-[#D62828] dark:bg-red-950 dark:text-red-300' :
+            'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
+          }`}>
+            {currentUser.role === 'BILLING_STAFF' ? 'STAFF' : currentUser.role}
+          </span>
+        </button>
+
         <button
           onClick={onLogout}
-          className="p-1.5 sm:px-3 sm:py-1.5 bg-red-50 hover:bg-red-100 dark:bg-red-950/60 dark:hover:bg-red-900/80 text-[#D62828] dark:text-red-300 rounded-xl text-xs font-bold transition-all flex items-center space-x-1 border border-red-200 dark:border-red-900 shrink-0"
+          className="p-2 sm:px-3 sm:py-1.5 min-h-[36px] sm:min-h-[44px] bg-red-50 hover:bg-red-100 dark:bg-red-950/60 dark:hover:bg-red-900/80 text-[#D62828] dark:text-red-300 rounded-xl text-xs font-bold transition-all flex items-center space-x-1 border border-red-200 dark:border-red-900 shrink-0 cursor-pointer"
           title="Logout of current active session"
         >
           <LogOut className="w-3.5 h-3.5" />

@@ -1841,24 +1841,25 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
       {/* MODAL: NEW BOOKING (WITH PREMIUM PHASE 3 FIELDS) */}
       {/* ---------------------------------------------------- */}
       {showNewBookingModal && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-xs flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-zinc-900 text-slate-900 dark:text-white rounded-2xl w-full max-w-2xl p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-200 dark:border-zinc-800 pb-3">
-              <h3 className="text-base font-black flex items-center gap-2">
-                <Car className="w-5 h-5 text-[#D62828]" />
-                Register Pick & Drop Booking
-              </h3>
-              <button 
-                onClick={() => setShowNewBookingModal(false)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-xs flex items-center justify-center z-50 p-0 sm:p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-zinc-900 text-slate-900 dark:text-white rounded-none sm:rounded-2xl w-full max-w-2xl p-4 sm:p-6 shadow-2xl space-y-4 h-[100dvh] sm:h-auto sm:max-h-[90vh] overflow-y-auto flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between border-b border-slate-200 dark:border-zinc-800 pb-3">
+                <h3 className="text-base font-black flex items-center gap-2">
+                  <Car className="w-5 h-5 text-[#D62828]" />
+                  Register Pick & Drop Booking
+                </h3>
+                <button 
+                  onClick={() => setShowNewBookingModal(false)}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
 
-            <form onSubmit={handleCreateBookingSubmit} className="space-y-4 text-xs">
-              {/* Customer & Pet Selection */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <form onSubmit={handleCreateBookingSubmit} className="space-y-4 text-xs pt-3 pb-16 sm:pb-0">
+                {/* Customer & Pet Selection */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold text-slate-600 dark:text-zinc-400 mb-1">Customer *</label>
                   <select
@@ -2176,6 +2177,7 @@ export const PickDropManager: React.FC<PickDropManagerProps> = ({
                 </button>
               </div>
             </form>
+            </div>
           </div>
         </div>
       )}
