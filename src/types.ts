@@ -689,12 +689,16 @@ export interface LongTermContract {
   id: string;
   contractCode: string; // e.g. "LTP-2627-001"
   contractName: string; // e.g. "180-Night Dog Boarding & Transit"
-  customerId: string;
-  customerName: string;
+  packageCategory?: string; // e.g. "LONG_TERM_BOARDING", "MULTI_SERVICE_CARE", "TRANSIT_CARE", "CUSTOM"
+  applicableSpecies?: ServiceApplicableSpecies; // 'Dog' | 'Cat' | 'All' | 'Other'
+  description?: string;
+  validityDays?: number;
+  customerId?: string; // Optional: empty/null for Package Master, populated when assigned to a customer
+  customerName?: string;
   customerPhone?: string;
   customerEmail?: string;
   customerGstin?: string;
-  customerType: CustomerType;
+  customerType?: CustomerType;
   contractType: ContractPeriodType;
   startDate: string; // YYYY-MM-DD
   endDate: string; // YYYY-MM-DD

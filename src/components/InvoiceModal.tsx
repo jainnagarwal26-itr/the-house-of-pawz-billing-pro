@@ -6,7 +6,7 @@ import {
 import { 
   Invoice, InvoiceItem, Customer, Pet, CatalogItem, 
   CompanySettings, UserRole, formatINR, PaymentStatus, PaymentMode, User,
-  ServiceCatalogItem, ServicePackageMaster, PickDropBooking
+  ServiceCatalogItem, ServicePackageMaster, PickDropBooking, LongTermContract
 } from '../types';
 import { CATALOG_ITEMS } from '../lib/storage';
 import { hasPermission } from '../lib/permissions';
@@ -19,10 +19,11 @@ interface InvoiceModalProps {
   pets: Pet[];
   services?: ServiceCatalogItem[];
   packages?: ServicePackageMaster[];
+  longTermPackages?: LongTermContract[];
   pickDropBookings?: PickDropBooking[];
   settings: CompanySettings;
-  userRole: UserRole;
-  userName: string;
+  userRole?: UserRole;
+  userName?: string;
   currentUser?: User | null;
   onSaveInvoice: (invoice: Invoice) => void;
   onAddCustomer?: (customer: Customer) => void;
@@ -32,15 +33,16 @@ interface InvoiceModalProps {
 
 export const InvoiceModal: React.FC<InvoiceModalProps> = ({
   invoice,
-  allInvoices,
+  allInvoices = [],
   customers,
   pets,
   services = [],
   packages = [],
+  longTermPackages = [],
   pickDropBookings = [],
   settings,
-  userRole,
-  userName,
+  userRole = 'USER',
+  userName = 'Billing Staff',
   currentUser,
   onSaveInvoice,
   onAddCustomer,
@@ -48,32 +50,39 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
   onClose
 }) => {
   const isEditing = !!invoice;
-  const isAdmin = userRole === 'ADMIN' || currentUser?.role === 'ADMIN';
-  const canEditInvoiceNumber = isAdmin || hasPermission(currentUser, 'invoices_change_number');
+  const isAdmin = userRole === 'ADMIN' || currentUser?.role === 'ADMIN' || currentUser?.role === 'SUPER_ADMIN' || currentUser?.role === 'ACCOUNTANT';
+  const canEditInvoiceNumber = hasPermission(currentUser, 'invoices_change_number');
 
-  // Quick Add Customer State
-  const [showAddCustModal, setShowAddCustModal] = useState<boolean>(false);
-  const [newCustName, setNewCustName] = useState<string>('');
-  const [newCustPhone, setNewCustPhone] = useState<string>('');
-  const [newCustEmail, setNewCustEmail] = useState<string>('');
-  const [newCustAddress, setNewCustAddress] = useState<string>('');
-  const [newCustGSTIN, setNewCustGSTIN] = useState<string>('');
+  // Customer State
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>(
+    invoice?.customerId || (customers[0]?.id || '')
+  );
+  const [customerName, setCustomerName] = useState<string>(invoice?.customerName || '');
+  const [customerPhone, setCustomerPhone] = useState<string>(invoice?.customerPhone || '');
+  const [customerEmail, setCustomerEmail] = useState<string>(invoice?.customerEmail || '');
+  const [customerAddress, setCustomerAddress] = useState<string>(invoice?.customerAddress || '');
+  const [customerGSTIN, setCustomerGSTIN] = useState<string>(invoice?.customerGSTIN || '');
 
-  // Quick Add Pet State
-  const [showAddPetModal, setShowAddPetModal] = useState<boolean>(false);
-  const [newPetName, setNewPetName] = useState<string>('');
-  const [newPetSpecies, setNewPetSpecies] = useState<'Dog' | 'Cat' | 'Bird' | 'Rabbit' | 'Other'>('Dog');
-  const [newPetBreed, setNewPetBreed] = useState<string>('Standard');
-  const [newPetAge, setNewPetAge] = useState<string>('2 Years');
+  // Quick Customer Create State
+  const [showAddCustModal, setShowAddCustModal] = useState(false);
+  const [newCustName, setNewCustName] = useState('');
+  const [newCustPhone, setNewCustPhone] = useState('');
+  const [newCustEmail, setNewCustEmail] = useState('');
+  const [newCustAddress, setNewCustAddress] = useState('');
+  const [newCustGSTIN, setNewCustGSTIN] = useState('');
+
+  // Quick Pet Create State
+  const [showAddPetModal, setShowAddPetModal] = useState(false);
+  const [newPetName, setNewPetName] = useState('');
+  const [newPetSpecies, setNewPetSpecies] = useState<'Dog' | 'Cat' | 'Other'>('Dog');
+  const [newPetBreed, setNewPetBreed] = useState('');
+  const [newPetAge, setNewPetAge] = useState('');
   const [newPetGender, setNewPetGender] = useState<'Male' | 'Female'>('Male');
 
-  // Selected Customer State
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string>(invoice?.customerId || customers[0]?.id || '');
-  const [customerName, setCustomerName] = useState<string>(invoice?.customerName || customers[0]?.name || '');
-  const [customerPhone, setCustomerPhone] = useState<string>(invoice?.customerPhone || customers[0]?.phone || '');
-  const [customerEmail, setCustomerEmail] = useState<string>(invoice?.customerEmail || customers[0]?.email || '');
-  const [customerAddress, setCustomerAddress] = useState<string>(invoice?.customerAddress || customers[0]?.address || '');
-  const [customerGSTIN, setCustomerGSTIN] = useState<string>(invoice?.customerGSTIN || customers[0]?.gstin || '');
+  // Multi-Pet Selection State
+  const [selectedPetIds, setSelectedPetIds] = useState<string[]>(
+    invoice?.petId ? [invoice.petId] : []
+  );
 
   // Quick Create Customer Handler
   const handleQuickCreateCustomer = (e: React.FormEvent) => {
@@ -88,11 +97,12 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
       phone: newCustPhone.trim(),
       email: newCustEmail.trim() || `${newCustName.trim().toLowerCase().replace(/\s+/g, '.')}@example.com`,
       address: newCustAddress.trim() || 'Mumbai, Maharashtra',
-      gstin: newCustGSTIN.trim().toUpperCase(),
+      gstin: newCustGSTIN.trim() || undefined,
       stateCode: settings.stateCode || '27-Maharashtra',
       emergencyContact: newCustPhone.trim(),
       outstandingBalance: 0,
       advanceBalance: 0,
+      customerType: 'INDIVIDUAL',
       createdAt: new Date().toLocaleDateString('en-IN')
     };
 
@@ -102,7 +112,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
     setSelectedCustomerId(newCust.id);
     setCustomerName(newCust.name);
     setCustomerPhone(newCust.phone);
-    setCustomerEmail(newCust.email);
+    setCustomerEmail(newCust.email || '');
     setCustomerAddress(newCust.address);
     setCustomerGSTIN(newCust.gstin || '');
 
@@ -140,6 +150,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
     }
     setSelectedPetId(newPet.id);
     setPetName(newPet.name);
+    setSelectedPetIds(prev => Array.from(new Set([...prev, newPet.id])));
 
     setNewPetName('');
     setShowAddPetModal(false);
@@ -435,7 +446,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
         paymentStatus,
         paymentMode,
         notes,
-        createdByRole: userRole,
+        createdByRole: (currentUser?.role || userRole || 'USER') as UserRole,
         createdByName: userName,
         createdAt: invoice?.createdAt || new Date().toISOString()
       };
@@ -616,38 +627,92 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
 
             {/* Pet & Supply Place */}
             <div className="space-y-2">
-              <label className="font-bold text-slate-700 dark:text-zinc-200 uppercase tracking-wider text-[10px]">
-                Pet & Tax Region:
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="font-bold text-slate-700 dark:text-zinc-200 uppercase tracking-wider text-[10px]">
+                  Pet & Tax Region:
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowAddPetModal(true)}
+                  className="text-[10px] font-bold text-rose-600 dark:text-rose-400 hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>+ Add Pet</span>
+                </button>
+              </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <div className="flex items-center justify-between mb-0.5">
-                    <label className="text-[10px] text-slate-500 block">Pet Profile:</label>
-                    <button
-                      type="button"
-                      onClick={() => setShowAddPetModal(true)}
-                      className="text-[10px] font-bold text-rose-600 dark:text-rose-400 hover:underline"
-                    >
-                      + Add Pet
-                    </button>
+              {/* Multi-Pet Selection Row */}
+              {(() => {
+                const customerPets = pets.filter(p => p.customerId === selectedCustomerId);
+                if (customerPets.length === 0) {
+                  return (
+                    <div className="p-2.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 rounded-lg text-xs flex items-center justify-between">
+                      <span className="text-amber-800 dark:text-amber-300 font-medium">
+                        No pets registered for this customer.
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setShowAddPetModal(true)}
+                        className="px-2 py-0.5 bg-amber-600 hover:bg-amber-700 text-white rounded text-[10px] font-bold"
+                      >
+                        + Add Pet
+                      </button>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-1.5">
+                    <div className="flex flex-wrap gap-1.5 items-center">
+                      <span className="text-[10px] text-slate-400 font-bold">Select Pet(s):</span>
+                      {customerPets.map(p => {
+                        const isSelected = selectedPetIds.includes(p.id) || selectedPetId === p.id;
+                        return (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => {
+                              if (isSelected) {
+                                const remaining = selectedPetIds.filter(id => id !== p.id);
+                                setSelectedPetIds(remaining);
+                                if (selectedPetId === p.id) {
+                                  setSelectedPetId(remaining[0] || '');
+                                  const firstRemaining = customerPets.find(cp => cp.id === remaining[0]);
+                                  setPetName(firstRemaining?.name || '');
+                                }
+                              } else {
+                                const next = [...selectedPetIds, p.id];
+                                setSelectedPetIds(next);
+                                setSelectedPetId(p.id);
+                                setPetName(p.name);
+                              }
+                            }}
+                            className={`px-2 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                              isSelected
+                                ? 'bg-slate-900 text-white dark:bg-zinc-100 dark:text-zinc-900 ring-2 ring-red-500'
+                                : 'bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 hover:bg-slate-200'
+                            }`}
+                          >
+                            <span>🐾 {p.name}</span>
+                            <span className="text-[9px] opacity-75 font-mono">({p.species})</span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <select
-                    value={selectedPetId}
-                    onChange={e => {
-                      setSelectedPetId(e.target.value);
-                      const p = pets.find(pet => pet.id === e.target.value);
-                      setPetName(p ? p.name : '');
-                    }}
+                );
+              })()}
+
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <div>
+                  <label className="text-[10px] text-slate-500 block mb-0.5">Primary Pet Name:</label>
+                  <input
+                    type="text"
+                    placeholder="None / Retail Product"
+                    value={petName}
+                    onChange={e => setPetName(e.target.value)}
                     className="w-full p-2 rounded-lg bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-700 text-xs font-medium"
-                  >
-                    <option value="">-- None / Retail Product --</option>
-                    {pets.filter(p => p.customerId === selectedCustomerId).map(p => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} ({p.breed})
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </div>
 
                 <div>
@@ -851,6 +916,49 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
                     </span>
                     <span className="text-[10px] text-amber-700 dark:text-amber-400 font-mono font-semibold">
                       ₹{pkg.packagePrice} / {pkg.validityDays}d
+                    </span>
+                  </button>
+                ))}
+
+              {/* Long-Term Packages (Phase 4.5 Live Master) */}
+              {longTermPackages
+                .filter(ltp => ltp.status === 'ACTIVE' && (ltp.contractName.toLowerCase().includes(catalogSearch.toLowerCase()) || (ltp.contractCode && ltp.contractCode.toLowerCase().includes(catalogSearch.toLowerCase()))))
+                .map(ltp => (
+                  <button
+                    key={ltp.id}
+                    type="button"
+                    onClick={() => {
+                      const totalComponentsValue = ltp.totalContractValue || ltp.components?.reduce((sum, c) => sum + (c.fixedAmount || (c.rate * c.allocatedQuantity) || 0), 0) || 0;
+                      const calc = calculateItem(totalComponentsValue, 1, 0, ltp.isGstApplicable ? ltp.gstRate : 0, isInterState);
+                      const newItem: InvoiceItem = {
+                        id: `ITEM-LTP-${Date.now().toString().slice(-4)}`,
+                        catalogItemId: ltp.id,
+                        type: 'PACKAGE',
+                        name: `${ltp.contractName} [${ltp.contractCode}]`,
+                        hsnSac: '999799',
+                        price: totalComponentsValue,
+                        qty: 1,
+                        discount: 0,
+                        discountAmount: calc.discountAmount,
+                        taxableValue: calc.taxableValue,
+                        gstRate: ltp.isGstApplicable ? ltp.gstRate : 0,
+                        cgstRate: calc.cgstRate,
+                        cgstAmount: calc.cgstAmount,
+                        sgstRate: calc.sgstRate,
+                        sgstAmount: calc.sgstAmount,
+                        igstRate: calc.igstRate,
+                        igstAmount: calc.igstAmount,
+                        total: calc.total
+                      };
+                      setItems([...items, newItem]);
+                    }}
+                    className="shrink-0 px-2.5 py-1.5 bg-white dark:bg-zinc-900 hover:bg-purple-50 dark:hover:bg-purple-950/40 border border-purple-200 dark:border-purple-900/60 rounded-lg text-[11px] text-left transition-colors cursor-pointer"
+                  >
+                    <span className="font-bold text-purple-900 dark:text-purple-300 block truncate max-w-[160px]">
+                      🏢 {ltp.contractName}
+                    </span>
+                    <span className="text-[10px] text-purple-700 dark:text-purple-400 font-mono font-semibold">
+                      ₹{ltp.totalContractValue} / {ltp.billingFrequency || 'Term'}
                     </span>
                   </button>
                 ))}

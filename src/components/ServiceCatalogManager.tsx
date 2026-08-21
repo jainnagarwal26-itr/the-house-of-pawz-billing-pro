@@ -7,6 +7,8 @@ import {
   ServiceCatalogItem, 
   ServicePackageMaster, 
   MonthlyServicePackage, 
+  LongTermContract,
+  LongTermContractItem,
   UserRole, 
   User, 
   ServiceMasterCategory,
@@ -19,6 +21,7 @@ import { hasPermission } from '../lib/permissions';
 interface ServiceCatalogManagerProps {
   services: ServiceCatalogItem[];
   packages: ServicePackageMaster[];
+  longTermPackages?: LongTermContract[];
   monthlyPackages: MonthlyServicePackage[];
   currentUser?: User | null;
   userRole: UserRole;
@@ -26,6 +29,8 @@ interface ServiceCatalogManagerProps {
   onDeleteService: (serviceId: string) => Promise<void>;
   onSavePackage: (pkg: ServicePackageMaster) => Promise<void>;
   onDeletePackage: (packageId: string) => Promise<void>;
+  onSaveLongTermPackage?: (pkg: LongTermContract) => Promise<void>;
+  onDeleteLongTermPackage?: (pkgId: string) => Promise<void>;
   onSaveMonthlyPackage: (sub: MonthlyServicePackage) => Promise<void>;
   onDeleteMonthlyPackage: (subId: string) => Promise<void>;
   onGenerateMonthlyInvoice: (sub: MonthlyServicePackage) => Promise<void>;
@@ -34,6 +39,7 @@ interface ServiceCatalogManagerProps {
 export const ServiceCatalogManager: React.FC<ServiceCatalogManagerProps> = ({
   services,
   packages,
+  longTermPackages = [],
   monthlyPackages,
   currentUser,
   userRole,
@@ -41,11 +47,13 @@ export const ServiceCatalogManager: React.FC<ServiceCatalogManagerProps> = ({
   onDeleteService,
   onSavePackage,
   onDeletePackage,
+  onSaveLongTermPackage,
+  onDeleteLongTermPackage,
   onSaveMonthlyPackage,
   onDeleteMonthlyPackage,
   onGenerateMonthlyInvoice
 }) => {
-  const [activeTab, setActiveTab] = useState<'services' | 'packages' | 'monthly'>('services');
+  const [activeTab, setActiveTab] = useState<'services' | 'packages' | 'long_term' | 'monthly'>('services');
   const [searchQuery, setSearchQuery] = useState('');
   const [speciesFilter, setSpeciesFilter] = useState<'All' | 'Dog' | 'Cat' | 'Other'>('All');
 
@@ -75,12 +83,118 @@ export const ServiceCatalogManager: React.FC<ServiceCatalogManagerProps> = ({
   const [packageDescription, setPackageDescription] = useState('');
   const [packageActive, setPackageActive] = useState(true);
 
+  // Long-Term Package Master Modal State
+  const [showLtpModal, setShowLtpModal] = useState(false);
+  const [editingLtp, setEditingLtp] = useState<LongTermContract | null>(null);
+  const [ltpCode, setLtpCode] = useState('');
+  const [ltpName, setLtpName] = useState('');
+  const [ltpCategory, setLtpCategory] = useState('LONG_TERM_BOARDING');
+  const [ltpSpecies, setLtpSpecies] = useState<ServiceApplicableSpecies>('All');
+  const [ltpValidityDays, setLtpValidityDays] = useState<number>(365);
+  const [ltpBillingFrequency, setLtpBillingFrequency] = useState('Monthly');
+  const [ltpPaymentTerms, setLtpPaymentTerms] = useState('Net 30');
+  const [ltpGstApplicable, setLtpGstApplicable] = useState(true);
+  const [ltpGstRate, setLtpGstRate] = useState(18);
+  const [ltpDescription, setLtpDescription] = useState('');
+  const [ltpActive, setLtpActive] = useState(true);
+  const [ltpComponents, setLtpComponents] = useState<LongTermContractItem[]>([]);
+
   const canEditService = hasPermission(currentUser, 'service_catalog_edit');
   const canDeleteService = hasPermission(currentUser, 'service_catalog_delete');
   const canEditPackage = hasPermission(currentUser, 'package_master_edit');
   const canDeletePackage = hasPermission(currentUser, 'package_master_delete');
+  const canEditLongTerm = hasPermission(currentUser, 'long_term_package_create') || hasPermission(currentUser, 'long_term_package_edit');
+  const canDeleteLongTerm = hasPermission(currentUser, 'long_term_package_delete');
   const canManageMonthly = hasPermission(currentUser, 'monthly_package_manage');
   const canDeleteMonthly = hasPermission(currentUser, 'monthly_package_delete');
+
+  const handleOpenLtpModal = (pkg?: LongTermContract) => {
+    if (pkg) {
+      setEditingLtp(pkg);
+      setLtpCode(pkg.contractCode);
+      setLtpName(pkg.contractName);
+      setLtpCategory(pkg.packageCategory || 'LONG_TERM_BOARDING');
+      setLtpSpecies(pkg.applicableSpecies || 'All');
+      setLtpValidityDays(pkg.validityDays || 365);
+      setLtpBillingFrequency(pkg.billingFrequency || 'Monthly');
+      setLtpPaymentTerms(pkg.paymentTerms || 'Net 30');
+      setLtpGstApplicable(pkg.isGstApplicable !== false);
+      setLtpGstRate(pkg.gstRate || 18);
+      setLtpDescription(pkg.description || pkg.notes || '');
+      setLtpActive(pkg.status === 'ACTIVE');
+      setLtpComponents(pkg.components || []);
+    } else {
+      setEditingLtp(null);
+      setLtpCode(`LTP-${new Date().getFullYear().toString().slice(-2)}${(new Date().getFullYear() + 1).toString().slice(-2)}-${Date.now().toString().slice(-4)}`);
+      setLtpName('');
+      setLtpCategory('LONG_TERM_BOARDING');
+      setLtpSpecies('All');
+      setLtpValidityDays(365);
+      setLtpBillingFrequency('Monthly');
+      setLtpPaymentTerms('Net 30');
+      setLtpGstApplicable(true);
+      setLtpGstRate(18);
+      setLtpDescription('');
+      setLtpActive(true);
+      setLtpComponents([
+        {
+          id: `comp-ltp-${Date.now()}-1`,
+          contractId: '',
+          serviceName: 'Night Boarding Component',
+          speciesApplicable: 'Dog',
+          pricingMethod: 'FIXED_RATE',
+          allocatedQuantity: 30,
+          unit: 'Nights',
+          rate: 600,
+          fixedAmount: 18000,
+          isGstApplicable: true,
+          gstRate: 18,
+          hsnSac: '999799',
+          usedQuantity: 0
+        }
+      ]);
+    }
+    setShowLtpModal(true);
+  };
+
+  const handleSaveLtpForm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!ltpName.trim()) {
+      alert('Please enter Long-Term Package Name');
+      return;
+    }
+    const totalVal = ltpComponents.reduce((sum, c) => sum + (c.fixedAmount || (c.rate * c.allocatedQuantity) || 0), 0);
+    const payload: LongTermContract = {
+      id: editingLtp?.id || `LTP-${Date.now().toString().slice(-4)}`,
+      contractCode: ltpCode.trim() || `LTP-${Date.now().toString().slice(-4)}`,
+      contractName: ltpName.trim(),
+      packageCategory: ltpCategory,
+      applicableSpecies: ltpSpecies,
+      description: ltpDescription.trim(),
+      validityDays: ltpValidityDays,
+      customerId: 'PACKAGE_MASTER',
+      customerName: 'Package Master Template',
+      contractType: 'YEARLY',
+      startDate: new Date().toISOString().slice(0, 10),
+      endDate: new Date(Date.now() + ltpValidityDays * 86400000).toISOString().slice(0, 10),
+      billingFrequency: ltpBillingFrequency,
+      paymentTerms: ltpPaymentTerms,
+      creditDays: 30,
+      currency: 'INR',
+      isGstApplicable: ltpGstApplicable,
+      gstRate: ltpGstRate,
+      totalContractValue: totalVal,
+      totalBilledAmount: 0,
+      balanceDue: totalVal,
+      status: ltpActive ? 'ACTIVE' : 'CANCELLED',
+      notes: ltpDescription.trim(),
+      components: ltpComponents
+    };
+    if (onSaveLongTermPackage) {
+      await onSaveLongTermPackage(payload);
+    }
+    setShowLtpModal(false);
+  };
 
   const handleOpenServiceModal = (item?: ServiceCatalogItem) => {
     if (item) {
@@ -234,7 +348,17 @@ export const ServiceCatalogManager: React.FC<ServiceCatalogManagerProps> = ({
               className="px-3.5 py-2 bg-[#D62828] hover:bg-red-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-transform active:scale-95 cursor-pointer"
             >
               <Plus className="w-4 h-4" />
-              <span>+ Add Package</span>
+              <span>+ Add Standard Package</span>
+            </button>
+          )}
+
+          {activeTab === 'long_term' && canEditLongTerm && (
+            <button
+              onClick={() => handleOpenLtpModal()}
+              className="px-3.5 py-2 bg-[#D62828] hover:bg-red-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-transform active:scale-95 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>+ Add Long-Term Package</span>
             </button>
           )}
         </div>
@@ -242,10 +366,10 @@ export const ServiceCatalogManager: React.FC<ServiceCatalogManagerProps> = ({
 
       {/* Tabs & Filters */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-zinc-800 pb-2">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1">
           <button
             onClick={() => setActiveTab('services')}
-            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-colors cursor-pointer ${
+            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-colors cursor-pointer shrink-0 ${
               activeTab === 'services'
                 ? 'bg-slate-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
                 : 'text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800'
@@ -256,18 +380,29 @@ export const ServiceCatalogManager: React.FC<ServiceCatalogManagerProps> = ({
 
           <button
             onClick={() => setActiveTab('packages')}
-            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-colors cursor-pointer ${
+            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-colors cursor-pointer shrink-0 ${
               activeTab === 'packages'
                 ? 'bg-slate-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
                 : 'text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800'
             }`}
           >
-            Package Master ({packages.length})
+            Standard Packages ({packages.length})
+          </button>
+
+          <button
+            onClick={() => setActiveTab('long_term')}
+            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-colors cursor-pointer shrink-0 ${
+              activeTab === 'long_term'
+                ? 'bg-slate-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
+                : 'text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800'
+            }`}
+          >
+            Long-Term Packages ({longTermPackages.length})
           </button>
 
           <button
             onClick={() => setActiveTab('monthly')}
-            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-colors cursor-pointer ${
+            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-colors cursor-pointer shrink-0 ${
               activeTab === 'monthly'
                 ? 'bg-slate-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
                 : 'text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800'
@@ -499,10 +634,10 @@ export const ServiceCatalogManager: React.FC<ServiceCatalogManagerProps> = ({
           {filteredPackages.length === 0 && (
             <div className="col-span-full py-12 text-center text-slate-400 dark:text-zinc-600 bg-white dark:bg-zinc-900 rounded-2xl border border-dashed border-slate-200 dark:border-zinc-800">
               <Package className="w-10 h-10 mx-auto mb-2 opacity-30" />
-              <p className="text-sm font-bold text-slate-600 dark:text-zinc-400">No Packages Configured</p>
+              <p className="text-sm font-bold text-slate-600 dark:text-zinc-400">No Standard Packages Configured</p>
               <p className="text-xs text-slate-400 mt-1">
                 {canEditPackage
-                  ? 'Use the "+ Add Package" button above to configure packages.'
+                  ? 'Use the "+ Add Standard Package" button above to configure packages.'
                   : 'Contact Administrator or Accountant to configure packages.'}
               </p>
             </div>
@@ -510,7 +645,142 @@ export const ServiceCatalogManager: React.FC<ServiceCatalogManagerProps> = ({
         </div>
       )}
 
-      {/* TAB 3: MONTHLY SUBSCRIPTIONS */}
+      {/* TAB 3: LONG-TERM PACKAGES (Phase 4.5 Package Master) */}
+      {activeTab === 'long_term' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+          {longTermPackages
+            .filter(ltp => {
+              if (speciesFilter !== 'All' && ltp.applicableSpecies && ltp.applicableSpecies !== 'All' && ltp.applicableSpecies !== speciesFilter) {
+                return false;
+              }
+              if (searchQuery.trim()) {
+                const q = searchQuery.toLowerCase();
+                return ltp.contractName.toLowerCase().includes(q) || (ltp.contractCode && ltp.contractCode.toLowerCase().includes(q));
+              }
+              return true;
+            })
+            .map(ltp => (
+              <div
+                key={ltp.id}
+                className={`bg-white dark:bg-zinc-900 p-4 rounded-2xl border transition-all flex flex-col justify-between ${
+                  ltp.status === 'ACTIVE'
+                    ? 'border-purple-200 dark:border-purple-900/60 shadow-2xs hover:border-purple-300'
+                    : 'border-slate-200 dark:border-zinc-800 opacity-60 bg-slate-50 dark:bg-zinc-900/50'
+                }`}
+              >
+                <div className="space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                        <span>🏢</span>
+                        <span>{ltp.contractName}</span>
+                      </h3>
+                      <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full font-bold bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300">
+                        {ltp.contractCode}
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full font-mono bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300">
+                      {ltp.billingFrequency || 'Monthly'}
+                    </span>
+                  </div>
+
+                  {ltp.description && (
+                    <p className="text-xs text-slate-500 dark:text-zinc-400 line-clamp-2">
+                      {ltp.description}
+                    </p>
+                  )}
+
+                  {/* Components Allocation Preview */}
+                  {ltp.components && ltp.components.length > 0 && (
+                    <div className="p-2.5 bg-slate-50 dark:bg-zinc-800/60 rounded-xl space-y-1 text-xs">
+                      <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">
+                        Included Components ({ltp.components.length}):
+                      </span>
+                      {ltp.components.map(c => (
+                        <div key={c.id} className="flex items-center justify-between text-[11px]">
+                          <span className="text-slate-700 dark:text-zinc-300 font-medium truncate max-w-[170px]">
+                            • {c.serviceName} ({c.allocatedQuantity} {c.unit})
+                          </span>
+                          <span className="font-mono font-bold text-slate-900 dark:text-white">
+                            {formatINR(c.fixedAmount || (c.rate * c.allocatedQuantity) || 0)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="pt-2 flex items-center justify-between border-t border-slate-100 dark:border-zinc-800 text-xs">
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">Package Value:</span>
+                      <span className="text-sm font-black text-purple-700 dark:text-purple-400 font-mono">
+                        {formatINR(ltp.totalContractValue || ltp.components?.reduce((sum, c) => sum + (c.fixedAmount || (c.rate * c.allocatedQuantity) || 0), 0) || 0)}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-slate-400 block text-[10px]">GST Rate:</span>
+                      <span className="text-xs font-bold text-slate-700 dark:text-zinc-300 font-mono">
+                        {ltp.isGstApplicable ? `${ltp.gstRate}% GST` : 'Zero GST'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="pt-3 mt-3 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-between">
+                  <span className={`text-[10px] font-bold flex items-center gap-1 ${
+                    ltp.status === 'ACTIVE' ? 'text-emerald-600' : 'text-slate-400'
+                  }`}>
+                    {ltp.status === 'ACTIVE' ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
+                    {ltp.status}
+                  </span>
+
+                  <div className="flex items-center gap-1">
+                    {canEditLongTerm && (
+                      <button
+                        onClick={() => handleOpenLtpModal(ltp)}
+                        className="p-1.5 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/60 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
+                        title="Edit Long-Term Package Master"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                        <span>Edit</span>
+                      </button>
+                    )}
+
+                    {canDeleteLongTerm && (
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`Permanently delete Long-Term Package "${ltp.contractName}"?`)) {
+                            if (onDeleteLongTermPackage) {
+                              onDeleteLongTermPackage(ltp.id);
+                            }
+                          }
+                        }}
+                        className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/60 rounded-lg cursor-pointer"
+                        title="Delete Long-Term Package Master"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+
+          {longTermPackages.length === 0 && (
+            <div className="col-span-full py-12 text-center text-slate-400 dark:text-zinc-600 bg-white dark:bg-zinc-900 rounded-2xl border border-dashed border-slate-200 dark:border-zinc-800">
+              <Package className="w-10 h-10 mx-auto mb-2 opacity-30" />
+              <p className="text-sm font-bold text-slate-600 dark:text-zinc-400">No Long-Term Packages Configured</p>
+              <p className="text-xs text-slate-400 mt-1">
+                {canEditLongTerm
+                  ? 'Use the "+ Add Long-Term Package" button above to configure packages.'
+                  : 'Contact Administrator or Accountant to configure long-term packages.'}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 4: MONTHLY SUBSCRIPTIONS */}
       {activeTab === 'monthly' && (
         <div className="space-y-3">
           <div className="overflow-x-auto border border-slate-200 dark:border-zinc-800 rounded-2xl bg-white dark:bg-zinc-900 shadow-2xs">
@@ -882,6 +1152,285 @@ export const ServiceCatalogManager: React.FC<ServiceCatalogManagerProps> = ({
                   className="px-4 py-2 bg-[#D62828] text-white rounded-xl font-bold shadow-md hover:bg-red-700"
                 >
                   {editingPackage ? 'Update Package' : 'Save Package'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* LONG-TERM PACKAGE MASTER MODAL (Customer-Agnostic Reusable Master) */}
+      {showLtpModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 z-50 overflow-y-auto">
+          <div className="bg-white dark:bg-zinc-900 w-full max-w-2xl rounded-3xl p-5 sm:p-6 space-y-4 border border-slate-200 dark:border-zinc-800 shadow-2xl my-8 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-zinc-800 pb-3">
+              <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
+                <span>🏢</span>
+                <span>{editingLtp ? 'Edit Long-Term Package Master' : 'Create Long-Term Package Master'}</span>
+              </h2>
+              <button
+                onClick={() => setShowLtpModal(false)}
+                className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 rounded-lg cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveLtpForm} className="space-y-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 dark:text-zinc-300 mb-1">Package Code *</label>
+                  <input
+                    type="text"
+                    required
+                    value={ltpCode}
+                    onChange={e => setLtpCode(e.target.value)}
+                    className="w-full p-2 rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 font-mono font-bold"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block font-bold text-slate-700 dark:text-zinc-300 mb-1">Package Name *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. 180-Night Canine Boarding & Transit Tier"
+                    value={ltpName}
+                    onChange={e => setLtpName(e.target.value)}
+                    className="w-full p-2 rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 font-medium"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 dark:text-zinc-300 mb-1">Applicable Species</label>
+                  <select
+                    value={ltpSpecies}
+                    onChange={e => setLtpSpecies(e.target.value as any)}
+                    className="w-full p-2 rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 font-medium"
+                  >
+                    <option value="All">All Species (Dog + Cat)</option>
+                    <option value="Dog">Dog Only</option>
+                    <option value="Cat">Cat Only</option>
+                    <option value="Other">Other Species</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 dark:text-zinc-300 mb-1">Billing Frequency</label>
+                  <select
+                    value={ltpBillingFrequency}
+                    onChange={e => setLtpBillingFrequency(e.target.value)}
+                    className="w-full p-2 rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 font-medium"
+                  >
+                    <option value="Monthly">Monthly</option>
+                    <option value="Quarterly">Quarterly</option>
+                    <option value="Half-Yearly">Half-Yearly</option>
+                    <option value="Yearly">Yearly</option>
+                    <option value="Custom Term">Custom Term</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 dark:text-zinc-300 mb-1">Validity (Days)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={ltpValidityDays}
+                    onChange={e => setLtpValidityDays(Number(e.target.value) || 30)}
+                    className="w-full p-2 rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* Components Allocation Section */}
+              <div className="space-y-2 border-t border-slate-100 dark:border-zinc-800 pt-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-800 dark:text-zinc-200">
+                    Package Components & Tariff Allocations
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newComp: LongTermContractItem = {
+                        id: `comp-ltp-${Date.now()}-${ltpComponents.length + 1}`,
+                        contractId: '',
+                        serviceName: 'Additional Service Component',
+                        speciesApplicable: ltpSpecies === 'Cat' ? 'Cat' : 'Dog',
+                        pricingMethod: 'FIXED_RATE',
+                        allocatedQuantity: 10,
+                        unit: 'Nights',
+                        rate: 600,
+                        fixedAmount: 6000,
+                        isGstApplicable: true,
+                        gstRate: 18,
+                        hsnSac: '999799',
+                        usedQuantity: 0
+                      };
+                      setLtpComponents([...ltpComponents, newComp]);
+                    }}
+                    className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 text-slate-800 dark:text-zinc-200 rounded-lg text-[10px] font-bold flex items-center gap-1 cursor-pointer"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>+ Add Component</span>
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  {ltpComponents.map((comp, idx) => (
+                    <div key={comp.id} className="p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-xl border border-slate-200 dark:border-zinc-700/60 space-y-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Service Name *</label>
+                          <input
+                            type="text"
+                            required
+                            value={comp.serviceName}
+                            onChange={e => {
+                              const updated = [...ltpComponents];
+                              updated[idx].serviceName = e.target.value;
+                              setLtpComponents(updated);
+                            }}
+                            className="w-full p-1.5 rounded-lg bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-700 text-xs"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Species</label>
+                          <select
+                            value={comp.speciesApplicable}
+                            onChange={e => {
+                              const updated = [...ltpComponents];
+                              updated[idx].speciesApplicable = e.target.value;
+                              setLtpComponents(updated);
+                            }}
+                            className="w-full p-1.5 rounded-lg bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-700 text-xs"
+                          >
+                            <option value="Dog">Dog</option>
+                            <option value="Cat">Cat</option>
+                            <option value="All">All Species</option>
+                            <option value="Other">Other</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Unit</label>
+                          <input
+                            type="text"
+                            value={comp.unit}
+                            onChange={e => {
+                              const updated = [...ltpComponents];
+                              updated[idx].unit = e.target.value;
+                              setLtpComponents(updated);
+                            }}
+                            className="w-full p-1.5 rounded-lg bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-700 text-xs"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 items-end">
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Allocated Qty</label>
+                          <input
+                            type="number"
+                            min={0}
+                            value={comp.allocatedQuantity}
+                            onChange={e => {
+                              const updated = [...ltpComponents];
+                              const qty = Number(e.target.value) || 0;
+                              updated[idx].allocatedQuantity = qty;
+                              updated[idx].fixedAmount = qty * updated[idx].rate;
+                              setLtpComponents(updated);
+                            }}
+                            className="w-full p-1.5 rounded-lg bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-700 text-xs font-mono"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Rate (₹)</label>
+                          <input
+                            type="number"
+                            min={0}
+                            value={comp.rate}
+                            onChange={e => {
+                              const updated = [...ltpComponents];
+                              const rate = Number(e.target.value) || 0;
+                              updated[idx].rate = rate;
+                              updated[idx].fixedAmount = updated[idx].allocatedQuantity * rate;
+                              setLtpComponents(updated);
+                            }}
+                            className="w-full p-1.5 rounded-lg bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-700 text-xs font-mono"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Total (₹)</label>
+                          <input
+                            type="number"
+                            disabled
+                            value={comp.fixedAmount}
+                            className="w-full p-1.5 rounded-lg bg-slate-100 dark:bg-zinc-800 border border-slate-300 dark:border-zinc-700 text-xs font-mono font-bold text-slate-900 dark:text-white"
+                          />
+                        </div>
+
+                        <div className="flex justify-end pb-0.5">
+                          {ltpComponents.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setLtpComponents(ltpComponents.filter((_, i) => i !== idx));
+                              }}
+                              className="p-1.5 text-red-500 hover:bg-red-100 dark:hover:bg-red-950/60 rounded-lg cursor-pointer"
+                              title="Remove Component"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 dark:text-zinc-300 mb-1">Description / Terms</label>
+                <textarea
+                  rows={2}
+                  value={ltpDescription}
+                  onChange={e => setLtpDescription(e.target.value)}
+                  placeholder="Terms of long-term boarding, inclusions, rollover policies..."
+                  className="w-full p-2 rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="ltpActiveCheck"
+                  checked={ltpActive}
+                  onChange={e => setLtpActive(e.target.checked)}
+                  className="rounded text-[#D62828]"
+                />
+                <label htmlFor="ltpActiveCheck" className="font-bold text-slate-700 dark:text-zinc-300">
+                  Active Package Master
+                </label>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-zinc-800">
+                <button
+                  type="button"
+                  onClick={() => setShowLtpModal(false)}
+                  className="px-4 py-2 bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 rounded-xl font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-[#D62828] text-white rounded-xl font-bold shadow-md hover:bg-red-700 cursor-pointer"
+                >
+                  {editingLtp ? 'Update Long-Term Package' : 'Save Long-Term Package'}
                 </button>
               </div>
             </form>

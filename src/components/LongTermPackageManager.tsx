@@ -893,7 +893,7 @@ export const LongTermPackageManager: React.FC<LongTermPackageManagerProps> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-bold text-slate-700 dark:text-zinc-300 block mb-1">Customer Client *</label>
+                  <label className="font-bold text-slate-700 dark:text-zinc-300 block mb-1">Select Customer / Client *</label>
                   <select
                     value={selectedCustomerId}
                     onChange={e => setSelectedCustomerId(e.target.value)}

@@ -1285,6 +1285,7 @@ export default function App() {
             <ServiceCatalogManager
               services={serviceCatalog}
               packages={packageMaster}
+              longTermPackages={longTermContracts}
               monthlyPackages={monthlyPackages}
               currentUser={currentUser}
               userRole={currentUser.role}
@@ -1292,6 +1293,8 @@ export default function App() {
               onDeleteService={handleDeleteServiceItem}
               onSavePackage={handleSavePackageMasterItem}
               onDeletePackage={handleDeletePackageMasterItem}
+              onSaveLongTermPackage={handleSaveLongTermContract}
+              onDeleteLongTermPackage={handleDeleteLongTermContract}
               onSaveMonthlyPackage={handleSaveMonthlyPackageSubscription}
               onDeleteMonthlyPackage={handleDeleteMonthlyPackageSubscription}
               onGenerateMonthlyInvoice={handleGenerateMonthlyInvoice}
@@ -1530,6 +1533,7 @@ export default function App() {
           pets={pets}
           services={serviceCatalog}
           packages={packageMaster}
+          longTermPackages={longTermContracts}
           pickDropBookings={pickDropBookings}
           settings={settings}
           userRole={currentUser.role}

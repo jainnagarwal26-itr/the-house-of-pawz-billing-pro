@@ -102,15 +102,15 @@ export async function saveLongTermContractToSupabase(contract: LongTermContract)
     const contractPayload = {
       contract_code: contract.contractCode,
       contract_name: contract.contractName,
-      customer_id: contract.customerId,
-      customer_name: contract.customerName,
+      customer_id: contract.customerId || 'PACKAGE_MASTER',
+      customer_name: contract.customerName || 'Package Master Template',
       customer_phone: contract.customerPhone || null,
       customer_email: contract.customerEmail || null,
       customer_gstin: contract.customerGstin || null,
       customer_type: contract.customerType || 'INDIVIDUAL',
       contract_type: contract.contractType || 'MONTHLY',
-      start_date: contract.startDate,
-      end_date: contract.endDate,
+      start_date: contract.startDate || new Date().toISOString().slice(0, 10),
+      end_date: contract.endDate || new Date(Date.now() + 365 * 86400000).toISOString().slice(0, 10),
       billing_frequency: contract.billingFrequency || 'Monthly',
       payment_terms: contract.paymentTerms || 'Net 30',
       credit_days: contract.creditDays || 30,
@@ -135,7 +135,7 @@ export async function saveLongTermContractToSupabase(contract: LongTermContract)
         .single();
 
       if (error || !data) {
-        return { success: false, error: error?.message || 'Failed to create long term contract' };
+        return { success: false, error: error?.message || 'Failed to create long term package master' };
       }
       targetContractId = data.id;
     } else {
