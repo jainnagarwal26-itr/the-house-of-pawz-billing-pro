@@ -210,6 +210,25 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
       { key: 'monthly_package_manage', label: 'Manage Monthly Packages', description: 'Create, renew and bill monthly client packages' },
       { key: 'monthly_package_delete', label: 'Delete Monthly Package', description: 'Permanently remove client monthly package subscriptions' }
     ]
+  },
+  {
+    id: 'long_term_packages',
+    title: 'Q. Long-Term Packages & Contracts',
+    description: 'Corporate contracts, institutional packages, multi-component allocations & periodic billing',
+    iconName: 'Building2',
+    permissions: [
+      { key: 'long_term_package_view', label: 'View Long-Term Packages', description: 'Inspect contracts, allocations and remaining balances' },
+      { key: 'long_term_package_create', label: 'Create Long-Term Packages', description: 'Establish new institutional/individual long-term packages' },
+      { key: 'long_term_package_edit', label: 'Edit Long-Term Packages', description: 'Update package components, tariffs and validity' },
+      { key: 'long_term_package_delete', label: 'Delete Long-Term Packages', description: 'Permanently remove long-term package contracts' },
+      { key: 'long_term_usage_view', label: 'View Service Usage', description: 'Inspect pet-wise check-in and transit usage history' },
+      { key: 'long_term_usage_create', label: 'Log Service Usage', description: 'Record care nights, day care and transit usage against packages' },
+      { key: 'long_term_usage_edit', label: 'Edit Service Usage', description: 'Update logged service usage records' },
+      { key: 'long_term_usage_delete', label: 'Delete Service Usage', description: 'Permanently remove service usage logs' },
+      { key: 'long_term_billing_view', label: 'View Billing History', description: 'Inspect billing periods and generated contract invoices' },
+      { key: 'long_term_billing_create', label: 'Generate Contract Invoices', description: 'Preview and generate GST invoices for service periods' },
+      { key: 'long_term_billing_delete', label: 'Delete Billing History', description: 'Permanently delete billing period logs' }
+    ]
   }
 ];
 
@@ -281,7 +300,18 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
     package_master_delete: true,
     monthly_package_view: true,
     monthly_package_manage: true,
-    monthly_package_delete: true
+    monthly_package_delete: true,
+    long_term_package_view: true,
+    long_term_package_create: true,
+    long_term_package_edit: true,
+    long_term_package_delete: true,
+    long_term_usage_view: true,
+    long_term_usage_create: true,
+    long_term_usage_edit: true,
+    long_term_usage_delete: true,
+    long_term_billing_view: true,
+    long_term_billing_create: true,
+    long_term_billing_delete: true
   },
 
   ADMIN: {
@@ -350,7 +380,18 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
     package_master_delete: false,
     monthly_package_view: true,
     monthly_package_manage: true,
-    monthly_package_delete: false
+    monthly_package_delete: false,
+    long_term_package_view: true,
+    long_term_package_create: true,
+    long_term_package_edit: true,
+    long_term_package_delete: false,
+    long_term_usage_view: true,
+    long_term_usage_create: true,
+    long_term_usage_edit: true,
+    long_term_usage_delete: false,
+    long_term_billing_view: true,
+    long_term_billing_create: true,
+    long_term_billing_delete: false
   },
 
   SUPER_ADMIN: {
@@ -410,7 +451,27 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
     pick_drop_reports_view: true,
     pick_drop_recurring_view: true,
     pick_drop_recurring_edit: true,
-    pick_drop_reports_export: true
+    pick_drop_reports_export: true,
+    service_catalog_view: true,
+    service_catalog_edit: true,
+    service_catalog_delete: true,
+    package_master_view: true,
+    package_master_edit: true,
+    package_master_delete: true,
+    monthly_package_view: true,
+    monthly_package_manage: true,
+    monthly_package_delete: true,
+    long_term_package_view: true,
+    long_term_package_create: true,
+    long_term_package_edit: true,
+    long_term_package_delete: true,
+    long_term_usage_view: true,
+    long_term_usage_create: true,
+    long_term_usage_edit: true,
+    long_term_usage_delete: true,
+    long_term_billing_view: true,
+    long_term_billing_create: true,
+    long_term_billing_delete: true
   },
 
   USER: {
@@ -539,7 +600,18 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
     package_master_delete: false,
     monthly_package_view: true,
     monthly_package_manage: false,
-    monthly_package_delete: false
+    monthly_package_delete: false,
+    long_term_package_view: true,
+    long_term_package_create: false,
+    long_term_package_edit: false,
+    long_term_package_delete: false,
+    long_term_usage_view: true,
+    long_term_usage_create: true,
+    long_term_usage_edit: false,
+    long_term_usage_delete: false,
+    long_term_billing_view: true,
+    long_term_billing_create: false,
+    long_term_billing_delete: false
   },
 
   MANAGER: {

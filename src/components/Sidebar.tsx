@@ -4,7 +4,7 @@ import {
   FileSpreadsheet, HardDrive, UserCog, History, Settings, 
   Repeat, PlusCircle, Lock, ShieldCheck, UserCheck, ChevronRight,
   ChevronLeft, PanelLeftClose, PanelLeftOpen, HelpCircle, Download,
-  Menu, X, Sparkles, Shield, Camera, Image as ImageIcon, Zap, Car, LogOut
+  Menu, X, Sparkles, Shield, Camera, Image as ImageIcon, Zap, Car, LogOut, Building2
 } from 'lucide-react';
 import { UserRole, User } from '../types';
 import { hasPermission } from '../lib/permissions';
@@ -13,6 +13,7 @@ export type ActiveTab =
   | 'dashboard' 
   | 'invoices' 
   | 'services'
+  | 'long_term_packages'
   | 'recurring'
   | 'customers' 
   | 'pets' 
@@ -48,6 +49,7 @@ export function isTabAllowedForUser(tab: ActiveTab, user?: User | null, userRole
       dashboard: 'dashboard_view',
       invoices: 'invoices_view',
       services: 'service_catalog_view',
+      long_term_packages: 'long_term_package_view',
       recurring: 'boarding_view',
       customers: 'customers_view',
       pets: 'pets_view',
@@ -117,6 +119,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       adminOnly: false,
       badge: 'NEW',
       badgeColor: 'bg-emerald-600 text-white font-mono'
+    },
+    {
+      id: 'long_term_packages' as ActiveTab,
+      label: 'Long-Term Packages',
+      icon: Building2,
+      adminOnly: false,
+      badge: 'B2B',
+      badgeColor: 'bg-purple-600 text-white font-mono'
     },
     {
       id: 'recurring' as ActiveTab,

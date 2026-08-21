@@ -34,10 +34,12 @@ import { ForgotPasswordModal } from './components/ForgotPasswordModal';
 import { Footer } from './components/Footer';
 import { PickDropManager } from './components/PickDropManager';
 import { ServiceCatalogManager } from './components/ServiceCatalogManager';
+import { LongTermPackageManager } from './components/LongTermPackageManager';
 
 import { 
   PickDropBooking, PickDropDriver, PickDropVehicle, PickDropPricingRule, PickDropStatus, PickDropRecurringSchedule,
-  ServiceCatalogItem, ServicePackageMaster, MonthlyServicePackage 
+  ServiceCatalogItem, ServicePackageMaster, MonthlyServicePackage,
+  LongTermContract, LongTermContractItem, LongTermServiceUsage, LongTermBillingPeriod
 } from './types';
 
 // Supabase Production Services
@@ -80,6 +82,15 @@ import {
   savePickDropRecurringSchedule,
   deletePickDropRecurringSchedule
 } from './lib/pickDropService';
+import {
+  fetchLongTermContractsFromSupabase,
+  saveLongTermContractToSupabase,
+  deleteLongTermContractFromSupabase,
+  fetchLongTermServiceUsagesFromSupabase,
+  logLongTermServiceUsageToSupabase,
+  fetchLongTermBillingPeriodsFromSupabase,
+  recordLongTermBillingPeriodToSupabase
+} from './lib/longTermPackageService';
 
 export default function App() {
   // Database Connection State
@@ -137,6 +148,9 @@ export default function App() {
   const [serviceCatalog, setServiceCatalog] = useState<ServiceCatalogItem[]>([]);
   const [packageMaster, setPackageMaster] = useState<ServicePackageMaster[]>([]);
   const [monthlyPackages, setMonthlyPackages] = useState<MonthlyServicePackage[]>([]);
+  const [longTermContracts, setLongTermContracts] = useState<LongTermContract[]>([]);
+  const [longTermUsages, setLongTermUsages] = useState<LongTermServiceUsage[]>([]);
+  const [longTermBillingPeriods, setLongTermBillingPeriods] = useState<LongTermBillingPeriod[]>([]);
 
   // UI State
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
@@ -177,7 +191,10 @@ export default function App() {
         dbRecurringTransit,
         dbServices,
         dbPackages,
-        dbMonthlySubs
+        dbMonthlySubs,
+        dbContracts,
+        dbUsages,
+        dbBillingPeriods
       ] = await Promise.all([
         fetchCustomersFromSupabase(),
         fetchPetsFromSupabase(),
@@ -193,7 +210,10 @@ export default function App() {
         fetchPickDropRecurringSchedules(),
         fetchServiceCatalogFromSupabase(),
         fetchPackageMasterFromSupabase(),
-        fetchMonthlyPackagesFromSupabase()
+        fetchMonthlyPackagesFromSupabase(),
+        fetchLongTermContractsFromSupabase(),
+        fetchLongTermServiceUsagesFromSupabase(),
+        fetchLongTermBillingPeriodsFromSupabase()
       ]);
 
       if (dbCustomers.length > 0) setCustomers(dbCustomers);
@@ -211,6 +231,9 @@ export default function App() {
       setServiceCatalog(dbServices || []);
       setPackageMaster(dbPackages || []);
       setMonthlyPackages(dbMonthlySubs || []);
+      setLongTermContracts(dbContracts || []);
+      setLongTermUsages(dbUsages || []);
+      setLongTermBillingPeriods(dbBillingPeriods || []);
 
       // NOTE: Historical migration (Invoices 000001–000067) is complete.
       // The auto-trigger has been intentionally removed. Do NOT re-add it.
@@ -925,12 +948,12 @@ export default function App() {
       id: `INV-MON-${Date.now().toString().slice(-8)}`,
       invoiceNumber: nextInvNumber,
       invoiceDate: todayStr,
-      dueDate: todayStr,
+      dueDate: sub.endDate || todayStr,
       customerId: sub.customerId,
       customerName: sub.customerName,
       customerPhone: sub.customerPhone || '+91 98000 00000',
       customerEmail: '',
-      customerAddress: 'Mumbai, MH',
+      customerAddress: 'Mumbai, Maharashtra',
       customerGSTIN: '',
       petId: sub.petId,
       petName: sub.petName,
@@ -938,9 +961,9 @@ export default function App() {
       isInterState: false,
       items: [
         {
-          id: `ITEM-MON-${Date.now().toString().slice(-6)}`,
+          id: `ITEM-MON-1`,
           type: 'PACKAGE',
-          name: `${sub.packageName} (Monthly Billing: ${sub.startDate} to ${sub.endDate})`,
+          name: `Monthly Subscription: ${sub.packageName} (${sub.petName})`,
           hsnSac: '999799',
           price: sub.monthlyAmount,
           qty: 1,
@@ -949,9 +972,9 @@ export default function App() {
           taxableValue: sub.monthlyAmount,
           gstRate: sub.gstRate,
           cgstRate: sub.gstRate / 2,
-          cgstAmount: Math.round(sub.monthlyAmount * (sub.gstRate / 200) * 100) / 100,
+          cgstAmount: sub.gstAmount / 2,
           sgstRate: sub.gstRate / 2,
-          sgstAmount: Math.round(sub.monthlyAmount * (sub.gstRate / 200) * 100) / 100,
+          sgstAmount: sub.gstAmount / 2,
           igstRate: 0,
           igstAmount: 0,
           total: sub.totalMonthlyAmount
@@ -960,17 +983,17 @@ export default function App() {
       subTotal: sub.monthlyAmount,
       totalDiscount: 0,
       taxableAmount: sub.monthlyAmount,
-      cgstTotal: Math.round(sub.monthlyAmount * (sub.gstRate / 200) * 100) / 100,
-      sgstTotal: Math.round(sub.monthlyAmount * (sub.gstRate / 200) * 100) / 100,
+      cgstTotal: sub.gstAmount / 2,
+      sgstTotal: sub.gstAmount / 2,
       igstTotal: 0,
       totalGst: sub.gstAmount,
       roundOff: 0,
       grandTotal: sub.totalMonthlyAmount,
-      paidAmount: sub.paidAmount,
-      balanceDue: sub.balanceDue,
-      paymentStatus: sub.balanceDue <= 0 ? 'PAID' : (sub.paidAmount > 0 ? 'PARTIAL' : 'UNPAID'),
+      paidAmount: 0,
+      balanceDue: sub.totalMonthlyAmount,
+      paymentStatus: 'UNPAID',
       paymentMode: 'UPI',
-      notes: `Monthly package billing for subscription #${sub.subscriptionCode}`,
+      notes: `Monthly recurring package subscription ${sub.subscriptionCode}.`,
       createdByRole: currentUser.role,
       createdByName: currentUser.name,
       createdAt: new Date().toISOString()
@@ -978,6 +1001,161 @@ export default function App() {
 
     setEditingInvoice(draftInv);
     setShowInvoiceModal(true);
+  };
+
+  // ─── LONG-TERM PACKAGE ACTION HANDLERS (PHASE 4.5) ─────
+  const handleSaveLongTermContract = async (contract: LongTermContract) => {
+    const res = await saveLongTermContractToSupabase(contract);
+    if (!res.success) {
+      alert(`Error saving long-term package: ${res.error}`);
+      return;
+    }
+    const fresh = await fetchLongTermContractsFromSupabase();
+    setLongTermContracts(fresh);
+    logAuditEventToSupabase('LONG_TERM_PACKAGE_SAVED', `Saved Long-Term Package "${contract.contractName}" (${contract.contractCode}) for ${contract.customerName}`);
+  };
+
+  const handleDeleteLongTermContract = async (contractId: string) => {
+    const res = await deleteLongTermContractFromSupabase(contractId);
+    if (!res.success) {
+      alert(`Error deleting contract: ${res.error}`);
+      return;
+    }
+    setLongTermContracts(prev => prev.filter(c => c.id !== contractId));
+    logAuditEventToSupabase('LONG_TERM_PACKAGE_DELETED', `Deleted contract ID #${contractId}`);
+  };
+
+  const handleLogLongTermUsage = async (usage: LongTermServiceUsage, component: LongTermContractItem) => {
+    const res = await logLongTermServiceUsageToSupabase(usage, component);
+    if (!res.success) {
+      alert(`Error logging usage: ${res.error}`);
+      return;
+    }
+    const [freshContracts, freshUsages] = await Promise.all([
+      fetchLongTermContractsFromSupabase(),
+      fetchLongTermServiceUsagesFromSupabase()
+    ]);
+    setLongTermContracts(freshContracts);
+    setLongTermUsages(freshUsages);
+    logAuditEventToSupabase('SERVICE_USAGE_LOGGED', `Logged ${usage.quantityUsed} ${usage.unit} of ${usage.serviceName} against ${usage.contractCode}`);
+  };
+
+  const handleGenerateContractInvoice = async (preview: {
+    contract: LongTermContract;
+    periodName: string;
+    startDate: string;
+    endDate: string;
+    serviceDescription: string;
+    subTotal: number;
+    taxableAmount: number;
+    cgst: number;
+    sgst: number;
+    igst: number;
+    grandTotal: number;
+    lineItems: any[];
+  }) => {
+    const todayStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const nextInvNumber = await fetchNextInvoiceNumberFromDB('26-27');
+    const cust = customers.find(c => c.id === preview.contract.customerId);
+
+    const contractInv: Invoice = {
+      id: `INV-LTP-${Date.now().toString().slice(-8)}`,
+      invoiceNumber: nextInvNumber,
+      invoiceDate: todayStr,
+      dueDate: preview.endDate || todayStr,
+      customerId: preview.contract.customerId,
+      customerName: preview.contract.customerName,
+      customerPhone: preview.contract.customerPhone || cust?.phone || '+91 98000 00000',
+      customerEmail: preview.contract.customerEmail || cust?.email || '',
+      customerAddress: cust?.address || 'Mumbai, Maharashtra',
+      customerGSTIN: preview.contract.customerGstin || cust?.gstin || '',
+      placeOfSupply: settings.stateCode,
+      isInterState: false,
+      items: preview.lineItems.map((item, idx) => ({
+        id: `ITEM-LTP-${idx + 1}`,
+        type: item.type || 'PACKAGE',
+        name: item.name,
+        hsnSac: item.hsnSac || '999799',
+        price: item.price,
+        qty: item.qty,
+        discount: 0,
+        discountAmount: 0,
+        taxableValue: item.taxableValue,
+        gstRate: item.gstRate,
+        cgstRate: item.cgstRate,
+        cgstAmount: item.cgstAmount,
+        sgstRate: item.sgstRate,
+        sgstAmount: item.sgstAmount,
+        igstRate: 0,
+        igstAmount: 0,
+        total: item.total
+      })),
+      subTotal: preview.subTotal,
+      totalDiscount: 0,
+      taxableAmount: preview.taxableAmount,
+      cgstTotal: preview.cgst,
+      sgstTotal: preview.sgst,
+      igstTotal: preview.igst,
+      totalGst: preview.cgst + preview.sgst + preview.igst,
+      roundOff: 0,
+      grandTotal: preview.grandTotal,
+      paidAmount: 0,
+      balanceDue: preview.grandTotal,
+      paymentStatus: 'UNPAID',
+      paymentMode: 'UPI',
+      notes: `Contract: ${preview.contract.contractCode} | Service Period: ${preview.serviceDescription}`,
+      createdByRole: currentUser.role,
+      createdByName: currentUser.name,
+      createdAt: new Date().toISOString()
+    };
+
+    // Save invoice to Supabase atomically
+    await handleSaveInvoice(contractInv);
+
+    // Record billing period
+    const bpId = `bp-local-${Date.now()}`;
+    await recordLongTermBillingPeriodToSupabase({
+      id: bpId,
+      contractId: preview.contract.id,
+      contractCode: preview.contract.contractCode,
+      customerId: preview.contract.customerId,
+      customerName: preview.contract.customerName,
+      periodName: preview.periodName,
+      periodStartDate: preview.startDate,
+      periodEndDate: preview.endDate,
+      servicePeriodDescription: preview.serviceDescription,
+      invoiceNumber: nextInvNumber,
+      subTotal: preview.subTotal,
+      taxableAmount: preview.taxableAmount,
+      cgstAmount: preview.cgst,
+      sgstAmount: preview.sgst,
+      igstAmount: preview.igst,
+      totalGst: preview.cgst + preview.sgst + preview.igst,
+      grandTotal: preview.grandTotal,
+      billingDate: new Date().toISOString().slice(0, 10),
+      status: 'INVOICED'
+    });
+
+    // Mark relevant usages for this contract within period as BILLED
+    const { supabase } = await import('./lib/supabase');
+    await supabase
+      .from('long_term_service_usage')
+      .update({
+        billing_status: 'BILLED',
+        invoice_number: nextInvNumber,
+        billing_period_id: bpId
+      })
+      .eq('contract_id', preview.contract.id)
+      .eq('billing_status', 'PENDING');
+
+    const [freshPeriods, freshUsages] = await Promise.all([
+      fetchLongTermBillingPeriodsFromSupabase(),
+      fetchLongTermServiceUsagesFromSupabase()
+    ]);
+    setLongTermBillingPeriods(freshPeriods);
+    setLongTermUsages(freshUsages);
+
+    setActiveTab('invoices');
   };
 
   // Excel Full Export
@@ -1117,6 +1295,24 @@ export default function App() {
               onSaveMonthlyPackage={handleSaveMonthlyPackageSubscription}
               onDeleteMonthlyPackage={handleDeleteMonthlyPackageSubscription}
               onGenerateMonthlyInvoice={handleGenerateMonthlyInvoice}
+            />
+          )}
+
+          {activeTab === 'long_term_packages' && (
+            <LongTermPackageManager
+              contracts={longTermContracts}
+              usages={longTermUsages}
+              billingPeriods={longTermBillingPeriods}
+              customers={customers}
+              pets={pets}
+              services={serviceCatalog}
+              packages={packageMaster}
+              currentUser={currentUser}
+              userRole={currentUser.role}
+              onSaveContract={handleSaveLongTermContract}
+              onDeleteContract={handleDeleteLongTermContract}
+              onLogUsage={handleLogLongTermUsage}
+              onGenerateContractInvoice={handleGenerateContractInvoice}
             />
           )}
 

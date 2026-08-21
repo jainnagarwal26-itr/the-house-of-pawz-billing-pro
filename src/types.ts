@@ -28,6 +28,8 @@ export interface User {
   permissionHistory?: PermissionChangeRecord[];
 }
 
+export type CustomerType = 'INDIVIDUAL' | 'B2B' | 'CORPORATE' | 'INSTITUTIONAL';
+
 export interface Customer {
   id: string;
   name: string;
@@ -40,6 +42,21 @@ export interface Customer {
   outstandingBalance: number;
   advanceBalance?: number; // Client advance deposit balance
   createdAt: string;
+  // B2B / Long-Term classification fields
+  customerType?: CustomerType; // Defaults to 'INDIVIDUAL'
+  companyName?: string;
+  contactPerson?: string;
+  pan?: string;
+  billingAddress?: string;
+  shippingAddress?: string;
+  paymentTerms?: string;
+  creditDays?: number;
+  billingCycle?: string;
+  contractRef?: string;
+  contractStartDate?: string;
+  contractEndDate?: string;
+  specialBillingNotes?: string;
+  isActive?: boolean;
 }
 
 export interface Pet {
@@ -640,3 +657,115 @@ export interface MonthlyPackageBillingRecord {
   generatedBy: string;
 }
 
+// ----------------------------------------------------
+// LONG-TERM PACKAGE & CONTRACT BILLING SYSTEM (PHASE 4.5)
+// ----------------------------------------------------
+
+export type ContractPeriodType = 'MONTHLY' | 'QUARTERLY' | 'HALF_YEARLY' | 'YEARLY' | 'CUSTOM_PERIOD';
+export type ContractStatus = 'ACTIVE' | 'EXPIRING_SOON' | 'EXPIRED' | 'CANCELLED' | 'TERMINATED';
+export type ComponentPricingMethod = 'FIXED_RATE' | 'FLAT_AMOUNT' | 'PERCENTAGE';
+
+export interface LongTermContractItem {
+  id: string;
+  contractId: string;
+  serviceId?: string;
+  serviceName: string;
+  speciesApplicable: string; // 'Dog' | 'Cat' | 'All' | 'Other'
+  pricingMethod: ComponentPricingMethod; // 'FIXED_RATE' | 'FLAT_AMOUNT' | 'PERCENTAGE'
+  allocatedQuantity: number; // e.g. 180 (nights) or 0 if pure % charge
+  unit: string; // 'Nights', 'Days', 'Sessions', 'Trips', '%'
+  rate: number; // unit rate or percentage value (e.g. 20 for 20%)
+  fixedAmount: number; // calculated or flat amount
+  isGstApplicable: boolean;
+  gstRate: number; // 18 by default
+  hsnSac: string; // '999799'
+  usedQuantity: number; // tracked dynamically from usage
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface LongTermContract {
+  id: string;
+  contractCode: string; // e.g. "LTP-2627-001"
+  contractName: string; // e.g. "180-Night Dog Boarding & Transit"
+  customerId: string;
+  customerName: string;
+  customerPhone?: string;
+  customerEmail?: string;
+  customerGstin?: string;
+  customerType: CustomerType;
+  contractType: ContractPeriodType;
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
+  billingFrequency: string; // 'Monthly', 'Quarterly', 'Custom'
+  paymentTerms: string; // 'Net 30', 'Net 15', 'Immediate'
+  creditDays: number;
+  currency: string; // 'INR'
+  isGstApplicable: boolean;
+  gstRate: number;
+  totalContractValue: number;
+  totalBilledAmount: number;
+  balanceDue: number;
+  status: ContractStatus;
+  notes?: string;
+  components: LongTermContractItem[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface LongTermServiceUsage {
+  id: string;
+  contractId: string;
+  contractCode: string;
+  contractItemId: string;
+  customerId: string;
+  customerName: string;
+  petId?: string;
+  petName?: string;
+  petSpecies?: string;
+  serviceName: string;
+  serviceDate: string; // YYYY-MM-DD
+  startDate?: string;
+  endDate?: string;
+  quantityUsed: number;
+  unit: string;
+  pickDropBookingId?: string;
+  pickupAddress?: string;
+  dropAddress?: string;
+  driverName?: string;
+  vehicleNumber?: string;
+  baseAmount: number;
+  gstAmount: number;
+  totalAmount: number;
+  billingStatus: 'PENDING' | 'BILLED' | 'EXEMPT';
+  invoiceNumber?: string;
+  notes?: string;
+  loggedBy: string;
+  createdAt?: string;
+}
+
+export interface LongTermBillingPeriod {
+  id: string;
+  contractId: string;
+  contractCode: string;
+  customerId: string;
+  customerName: string;
+  periodName: string; // e.g. "20 June 2026 to 20 July 2026, till 12 noon"
+  periodStartDate: string; // YYYY-MM-DD
+  periodEndDate: string; // YYYY-MM-DD
+  servicePeriodDescription: string;
+  invoiceId?: string;
+  invoiceNumber?: string;
+  subTotal: number;
+  taxableAmount: number;
+  cgstAmount: number;
+  sgstAmount: number;
+  igstAmount: number;
+  totalGst: number;
+  grandTotal: number;
+  billingDate: string;
+  status: 'PENDING' | 'INVOICED' | 'CANCELLED';
+  notes?: string;
+  createdAt?: string;
+}

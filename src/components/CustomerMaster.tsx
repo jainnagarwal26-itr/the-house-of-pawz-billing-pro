@@ -3,7 +3,7 @@ import {
   Users, Search, Plus, Phone, Mail, MapPin, 
   IndianRupee, Edit, Trash2, CheckCircle2, Car 
 } from 'lucide-react';
-import { Customer, Pet, formatINR, User, PickDropBooking } from '../types';
+import { Customer, Pet, formatINR, User, PickDropBooking, CustomerType } from '../types';
 import { hasPermission } from '../lib/permissions';
 
 interface CustomerMasterProps {
@@ -38,8 +38,18 @@ export const CustomerMaster: React.FC<CustomerMasterProps> = ({
   const [stateCode, setStateCode] = useState('27-Maharashtra');
   const [emergencyContact, setEmergencyContact] = useState('');
   const [advanceBalance, setAdvanceBalance] = useState<number>(0);
+  const [customerType, setCustomerType] = useState<CustomerType>('INDIVIDUAL');
+  const [companyName, setCompanyName] = useState('');
+  const [contactPerson, setContactPerson] = useState('');
+  const [pan, setPan] = useState('');
+  const [paymentTerms, setPaymentTerms] = useState('Net 30');
+  const [creditDays, setCreditDays] = useState(30);
 
   const openAddModal = () => {
+    if (!hasPermission(currentUser, 'customers_create')) {
+      alert('Access Denied: You do not have permission to create customer records.');
+      return;
+    }
     setEditingCustomer(null);
     setName('');
     setPhone('');
@@ -49,6 +59,12 @@ export const CustomerMaster: React.FC<CustomerMasterProps> = ({
     setStateCode('27-Maharashtra');
     setEmergencyContact('');
     setAdvanceBalance(0);
+    setCustomerType('INDIVIDUAL');
+    setCompanyName('');
+    setContactPerson('');
+    setPan('');
+    setPaymentTerms('Net 30');
+    setCreditDays(30);
     setShowModal(true);
   };
 
@@ -66,6 +82,12 @@ export const CustomerMaster: React.FC<CustomerMasterProps> = ({
     setStateCode(c.stateCode);
     setEmergencyContact(c.emergencyContact);
     setAdvanceBalance(c.advanceBalance || 0);
+    setCustomerType(c.customerType || 'INDIVIDUAL');
+    setCompanyName(c.companyName || '');
+    setContactPerson(c.contactPerson || '');
+    setPan(c.pan || '');
+    setPaymentTerms(c.paymentTerms || 'Net 30');
+    setCreditDays(c.creditDays || 30);
     setShowModal(true);
   };
 
@@ -82,7 +104,13 @@ export const CustomerMaster: React.FC<CustomerMasterProps> = ({
       emergencyContact,
       outstandingBalance: editingCustomer?.outstandingBalance || 0,
       advanceBalance: Number(advanceBalance) || 0,
-      createdAt: editingCustomer?.createdAt || new Date().toISOString().slice(0, 10)
+      createdAt: editingCustomer?.createdAt || new Date().toISOString().slice(0, 10),
+      customerType,
+      companyName: customerType !== 'INDIVIDUAL' ? companyName : undefined,
+      contactPerson: customerType !== 'INDIVIDUAL' ? contactPerson : undefined,
+      pan: customerType !== 'INDIVIDUAL' ? pan : undefined,
+      paymentTerms: customerType !== 'INDIVIDUAL' ? paymentTerms : undefined,
+      creditDays: customerType !== 'INDIVIDUAL' ? Number(creditDays) : undefined
     };
 
     if (editingCustomer) {
@@ -308,6 +336,80 @@ export const CustomerMaster: React.FC<CustomerMasterProps> = ({
                     className="w-full p-2 rounded-lg bg-slate-50 dark:bg-zinc-800 border border-slate-300 dark:border-zinc-700 font-mono"
                   />
                 </div>
+              </div>
+
+              {/* Customer Classification */}
+              <div className="p-2.5 bg-slate-100 dark:bg-zinc-800/80 rounded-xl space-y-2">
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-zinc-300 block mb-1">Customer Classification</label>
+                  <select
+                    value={customerType}
+                    onChange={e => setCustomerType(e.target.value as any)}
+                    className="w-full p-2 rounded-lg bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-700 font-bold"
+                  >
+                    <option value="INDIVIDUAL">Individual (Retail Parent)</option>
+                    <option value="B2B">B2B (Business Entity)</option>
+                    <option value="CORPORATE">Corporate Enterprise</option>
+                    <option value="INSTITUTIONAL">Institutional / Trust</option>
+                  </select>
+                </div>
+
+                {customerType !== 'INDIVIDUAL' && (
+                  <div className="space-y-2 pt-1 border-t border-slate-200 dark:border-zinc-700">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] text-slate-500 block mb-0.5">Company / Entity Name</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Golden Citizens Trust"
+                          value={companyName}
+                          onChange={e => setCompanyName(e.target.value)}
+                          className="w-full p-1.5 rounded-lg bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-600 text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-500 block mb-0.5">Contact Person</label>
+                        <input
+                          type="text"
+                          placeholder="Authorized Signatory"
+                          value={contactPerson}
+                          onChange={e => setContactPerson(e.target.value)}
+                          className="w-full p-1.5 rounded-lg bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-600 text-xs"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <label className="text-[10px] text-slate-500 block mb-0.5">PAN Number</label>
+                        <input
+                          type="text"
+                          placeholder="ABCDE1234F"
+                          value={pan}
+                          onChange={e => setPan(e.target.value.toUpperCase())}
+                          className="w-full p-1.5 rounded-lg bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-600 text-xs font-mono uppercase"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-500 block mb-0.5">Payment Terms</label>
+                        <input
+                          type="text"
+                          value={paymentTerms}
+                          onChange={e => setPaymentTerms(e.target.value)}
+                          className="w-full p-1.5 rounded-lg bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-600 text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-500 block mb-0.5">Credit Days</label>
+                        <input
+                          type="number"
+                          value={creditDays}
+                          onChange={e => setCreditDays(Number(e.target.value))}
+                          className="w-full p-1.5 rounded-lg bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-600 text-xs font-mono"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-2">
