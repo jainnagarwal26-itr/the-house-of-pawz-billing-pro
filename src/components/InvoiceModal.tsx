@@ -990,8 +990,11 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
                 <tr className="bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 text-[10px] uppercase font-bold">
                   <th className="p-2 w-8 text-center">#</th>
                   <th className="p-2 min-w-[200px]">Item Description</th>
-                  <th className="p-2 w-20">HSN/SAC</th>
-                  <th className="p-2 w-24 text-right">Price (₹)</th>
+                  <th className="p-2 w-20 text-center">HSN/SAC</th>
+                  <th className="p-2 w-32 text-right">
+                    <span className="block">Invoice Rate (₹)</span>
+                    <span className="block text-[8px] font-normal text-slate-400 dark:text-zinc-500 lowercase">selling rate</span>
+                  </th>
                   <th className="p-2 w-16 text-center">Qty</th>
                   <th className="p-2 w-20 text-center">Disc %</th>
                   <th className="p-2 w-24 text-right">Taxable (₹)</th>
@@ -1009,7 +1012,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
                         type="text"
                         value={item.name}
                         onChange={e => handleItemChange(idx, 'name', e.target.value)}
-                        className="w-full p-1 rounded bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-xs font-semibold"
+                        className="w-full p-1.5 rounded bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-xs font-semibold"
                       />
                     </td>
                     <td className="p-2">
@@ -1017,24 +1020,27 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
                         type="text"
                         value={item.hsnSac}
                         onChange={e => handleItemChange(idx, 'hsnSac', e.target.value)}
-                        className="w-full p-1 rounded bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-xs font-mono text-center"
+                        className="w-full p-1.5 rounded bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-xs font-mono text-center"
                       />
                     </td>
                     <td className="p-2">
                       <input
                         type="number"
+                        step="any"
                         value={item.price}
                         onChange={e => handleItemChange(idx, 'price', Number(e.target.value))}
-                        className="w-full p-1 rounded bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-xs font-mono text-right"
+                        className="w-full p-1.5 rounded bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-700 text-xs font-mono font-bold text-right focus:ring-1 focus:ring-red-500"
+                        title="Actual selling rate for this invoice (master rate remains unchanged)"
                       />
                     </td>
                     <td className="p-2">
                       <input
                         type="number"
                         min="1"
+                        step="any"
                         value={item.qty}
                         onChange={e => handleItemChange(idx, 'qty', Number(e.target.value))}
-                        className="w-full p-1 rounded bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-xs font-mono text-center"
+                        className="w-full p-1.5 rounded bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-xs font-mono text-center"
                       />
                     </td>
                     <td className="p-2">
