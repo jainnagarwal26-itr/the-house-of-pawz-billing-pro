@@ -35,11 +35,13 @@ import { Footer } from './components/Footer';
 import { PickDropManager } from './components/PickDropManager';
 import { ServiceCatalogManager } from './components/ServiceCatalogManager';
 import { LongTermPackageManager } from './components/LongTermPackageManager';
+import { VaccinationManager } from './components/VaccinationManager';
 
 import { 
   PickDropBooking, PickDropDriver, PickDropVehicle, PickDropPricingRule, PickDropStatus, PickDropRecurringSchedule,
   ServiceCatalogItem, ServicePackageMaster, MonthlyServicePackage,
-  LongTermContract, LongTermContractItem, LongTermServiceUsage, LongTermBillingPeriod
+  LongTermContract, LongTermContractItem, LongTermServiceUsage, LongTermBillingPeriod,
+  VaccinationRecord
 } from './types';
 
 // Supabase Production Services
@@ -91,6 +93,12 @@ import {
   fetchLongTermBillingPeriodsFromSupabase,
   recordLongTermBillingPeriodToSupabase
 } from './lib/longTermPackageService';
+import {
+  fetchVaccinationsFromSupabase,
+  saveVaccinationToSupabase,
+  deleteVaccinationFromSupabase,
+  calculateVaccinationStatus
+} from './lib/vaccinationService';
 
 export default function App() {
   // Database Connection State
@@ -152,6 +160,9 @@ export default function App() {
   const [longTermUsages, setLongTermUsages] = useState<LongTermServiceUsage[]>([]);
   const [longTermBillingPeriods, setLongTermBillingPeriods] = useState<LongTermBillingPeriod[]>([]);
 
+  // Phase 5: Vaccination Management & Alerts
+  const [vaccinations, setVaccinations] = useState<VaccinationRecord[]>([]);
+
   // UI State
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
@@ -194,7 +205,8 @@ export default function App() {
         dbMonthlySubs,
         dbContracts,
         dbUsages,
-        dbBillingPeriods
+        dbBillingPeriods,
+        dbVaccinations
       ] = await Promise.all([
         fetchCustomersFromSupabase(),
         fetchPetsFromSupabase(),
@@ -213,7 +225,8 @@ export default function App() {
         fetchMonthlyPackagesFromSupabase(),
         fetchLongTermContractsFromSupabase(),
         fetchLongTermServiceUsagesFromSupabase(),
-        fetchLongTermBillingPeriodsFromSupabase()
+        fetchLongTermBillingPeriodsFromSupabase(),
+        fetchVaccinationsFromSupabase()
       ]);
 
       if (dbCustomers.length > 0) setCustomers(dbCustomers);
@@ -234,6 +247,7 @@ export default function App() {
       setLongTermContracts(dbContracts || []);
       setLongTermUsages(dbUsages || []);
       setLongTermBillingPeriods(dbBillingPeriods || []);
+      setVaccinations(dbVaccinations || []);
 
       // NOTE: Historical migration (Invoices 000001–000067) is complete.
       // The auto-trigger has been intentionally removed. Do NOT re-add it.
@@ -1277,6 +1291,7 @@ export default function App() {
           }}
           pendingPaymentCount={invoices.filter(i => !i.isCancelled && i.balanceDue > 0).length}
           activeBoardingCount={pets.filter(p => p.isBoardingNow).length}
+          vaccinationAlertCount={vaccinations.filter(v => calculateVaccinationStatus(v.nextDueDate) !== 'VALID').length}
           isMobileDrawerOpen={showMobileDrawer}
           onCloseMobileDrawer={() => setShowMobileDrawer(false)}
           onOpenMobileDrawer={() => setShowMobileDrawer(true)}
@@ -1292,6 +1307,7 @@ export default function App() {
               customers={customers}
               payments={payments}
               auditLogs={auditLogs}
+              vaccinations={vaccinations}
               userRole={currentUser.role}
               currentUser={currentUser}
               onNewInvoice={() => {
@@ -1398,6 +1414,52 @@ export default function App() {
               onEditPet={handleEditPet}
               onDeletePet={handleDeletePet}
               onToggleBoarding={handleToggleBoarding}
+            />
+          )}
+
+          {activeTab === 'vaccinations' && (
+            <VaccinationManager
+              vaccinations={vaccinations}
+              customers={customers}
+              pets={pets}
+              currentUser={currentUser}
+              settings={settings}
+              onSaveVaccination={async (rec) => {
+                const res = await saveVaccinationToSupabase(rec);
+                if (res.success && res.data) {
+                  setVaccinations(prev => {
+                    const idx = prev.findIndex(v => v.id === res.data!.id);
+                    if (idx >= 0) {
+                      const updated = [...prev];
+                      updated[idx] = res.data!;
+                      return updated;
+                    }
+                    return [res.data!, ...prev];
+                  });
+                  await logAuditEventToSupabase(
+                    rec.id ? 'VACCINATION_EDITED' : 'VACCINATION_CREATED',
+                    `Vaccination record ${res.data.vaccineName} for ${res.data.petName} (${res.data.customerName}) saved by ${currentUser.name || currentUser.username}`
+                  );
+                }
+                return res;
+              }}
+              onDeleteVaccination={async (id) => {
+                const target = vaccinations.find(v => v.id === id);
+                const res = await deleteVaccinationFromSupabase(id);
+                if (res.success) {
+                  setVaccinations(prev => prev.filter(v => v.id !== id));
+                  if (target) {
+                    await logAuditEventToSupabase(
+                      'VACCINATION_DELETED',
+                      `Vaccination record ${target.vaccineName} for ${target.petName} deleted by ${currentUser.name || currentUser.username}`
+                    );
+                  }
+                }
+                return res;
+              }}
+              onAddNewPetClick={() => {
+                setActiveTab('pets');
+              }}
             />
           )}
 

@@ -79,6 +79,26 @@ export interface Pet {
   roomNo?: string;
 }
 
+export type VaccinationStatus = 'VALID' | 'UPCOMING' | 'DUE_SOON' | 'EXPIRED';
+
+export interface VaccinationRecord {
+  id: string;
+  vaccinationId: string;
+  petId: string;
+  customerId: string;
+  petName: string;
+  customerName: string;
+  customerPhone?: string;
+  customerEmail?: string;
+  species: 'Dog' | 'Cat' | 'Bird' | 'Rabbit' | 'Other';
+  vaccineName: string;
+  vaccinationDate: string; // YYYY-MM-DD
+  nextDueDate: string;     // YYYY-MM-DD
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export type ItemType = 'SERVICE' | 'PRODUCT' | 'PACKAGE' | 'CUSTOM';
 
 export interface CatalogItem {

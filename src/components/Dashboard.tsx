@@ -13,8 +13,9 @@ import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, 
   BarChart, Bar, PieChart, Pie, Cell, CartesianGrid, Legend 
 } from 'recharts';
-import { Invoice, Pet, Customer, Payment, AuditLog, formatINR, UserRole, User } from '../types';
+import { Invoice, Pet, Customer, Payment, AuditLog, VaccinationRecord, formatINR, UserRole, User } from '../types';
 import { hasPermission } from '../lib/permissions';
+import { calculateVaccinationStatus } from '../lib/vaccinationService';
 
 interface DashboardProps {
   invoices: Invoice[];
@@ -22,6 +23,7 @@ interface DashboardProps {
   customers: Customer[];
   payments: Payment[];
   auditLogs: AuditLog[];
+  vaccinations?: VaccinationRecord[];
   userRole: UserRole;
   currentUser?: User | null;
   onNewInvoice: () => void;
@@ -36,6 +38,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   customers,
   payments,
   auditLogs,
+  vaccinations = [],
   userRole,
   currentUser,
   onNewInvoice,
@@ -218,7 +221,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
   ];
 
   const avgStayDuration = 4.2; // days
-  const vaccinationDueCount = pets.filter(p => p.vaccinationStatus === 'Pending' || p.vaccinationStatus === 'Overdue').length || 2;
+
+  // Real-time dynamic vaccination calculations
+  const vaccinationAlertMetrics = useMemo(() => {
+    const expired = vaccinations.filter(v => calculateVaccinationStatus(v.nextDueDate) === 'EXPIRED').length;
+    const dueSoon = vaccinations.filter(v => calculateVaccinationStatus(v.nextDueDate) === 'DUE_SOON').length;
+    const upcoming = vaccinations.filter(v => calculateVaccinationStatus(v.nextDueDate) === 'UPCOMING').length;
+    const totalAlerts = expired + dueSoon + upcoming;
+    return { expired, dueSoon, upcoming, totalAlerts };
+  }, [vaccinations]);
+
+  const vaccinationDueCount = vaccinationAlertMetrics.totalAlerts;
 
   // 6. BOARDING & KENNEL ANALYTICS
   const availableKennels = Math.max(0, TOTAL_KENNELS - activeBoardingPets.length);
@@ -1098,14 +1111,33 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </div>
             </div>
 
-            {/* Vaccination Alert */}
-            <div className="p-3 bg-amber-50 dark:bg-amber-950/40 rounded-xl border border-amber-200 dark:border-amber-800/60 text-xs space-y-1">
-              <p className="font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1">
-                <AlertTriangle className="w-3.5 h-3.5 text-amber-600" /> Vaccination Alerts ({vaccinationDueCount})
-              </p>
-              <p className="text-[11px] text-amber-700 dark:text-amber-400">
-                2 registered pets require Rabies / DHPP booster renewal before next boarding booking.
-              </p>
+            {/* Dynamic Live Vaccination Alert Card */}
+            <div 
+              onClick={() => onNavigateTab('vaccinations')}
+              className="p-3 bg-amber-50 dark:bg-amber-950/40 rounded-xl border border-amber-200 dark:border-amber-800/60 text-xs space-y-1.5 cursor-pointer hover:border-amber-400 hover:shadow-xs transition-all"
+            >
+              <div className="flex items-center justify-between">
+                <p className="font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <span>Vaccination Alerts ({vaccinationAlertMetrics.totalAlerts})</span>
+                </p>
+                <span className="text-[10px] font-bold text-amber-800 dark:text-amber-400 hover:underline flex items-center gap-0.5">
+                  <span>Manage</span>
+                  <ChevronRight className="w-3 h-3" />
+                </span>
+              </div>
+
+              {vaccinationAlertMetrics.totalAlerts === 0 ? (
+                <p className="text-[11px] text-emerald-700 dark:text-emerald-400 font-medium">
+                  ✓ All registered pet vaccinations are up to date and valid.
+                </p>
+              ) : (
+                <p className="text-[11px] text-amber-700 dark:text-amber-400 leading-tight">
+                  {vaccinationAlertMetrics.expired > 0 && `${vaccinationAlertMetrics.expired} overdue vaccination${vaccinationAlertMetrics.expired > 1 ? 's' : ''}. `}
+                  {vaccinationAlertMetrics.dueSoon > 0 && `${vaccinationAlertMetrics.dueSoon} due within 7 days. `}
+                  {vaccinationAlertMetrics.upcoming > 0 && `${vaccinationAlertMetrics.upcoming} expiring within 30 days.`}
+                </p>
+              )}
             </div>
           </div>
         </div>

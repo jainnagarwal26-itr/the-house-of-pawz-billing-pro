@@ -4,7 +4,7 @@ import {
   FileSpreadsheet, HardDrive, UserCog, History, Settings, 
   Repeat, PlusCircle, Lock, ShieldCheck, UserCheck, ChevronRight,
   ChevronLeft, PanelLeftClose, PanelLeftOpen, HelpCircle, Download,
-  Menu, X, Sparkles, Shield, Camera, Image as ImageIcon, Zap, Car, LogOut, Building2
+  Menu, X, Sparkles, Shield, Camera, Image as ImageIcon, Zap, Car, LogOut, Building2, Syringe
 } from 'lucide-react';
 import { UserRole, User } from '../types';
 import { hasPermission } from '../lib/permissions';
@@ -17,6 +17,7 @@ export type ActiveTab =
   | 'recurring'
   | 'customers' 
   | 'pets' 
+  | 'vaccinations'
   | 'pick_drop'
   | 'communication'
   | 'smart_import'
@@ -35,6 +36,7 @@ interface SidebarProps {
   onNewInvoice: () => void;
   pendingPaymentCount: number;
   activeBoardingCount: number;
+  vaccinationAlertCount?: number;
   isMobileDrawerOpen?: boolean;
   onCloseMobileDrawer?: () => void;
   onOpenMobileDrawer?: () => void;
@@ -53,6 +55,7 @@ export function isTabAllowedForUser(tab: ActiveTab, user?: User | null, userRole
       recurring: 'boarding_view',
       customers: 'customers_view',
       pets: 'pets_view',
+      vaccinations: 'vaccinations_view',
       pick_drop: 'pick_drop_view',
       communication: 'communication_center_view',
       smart_import: 'import_engine_view',
@@ -69,13 +72,13 @@ export function isTabAllowedForUser(tab: ActiveTab, user?: User | null, userRole
 
   if (role === 'ACCOUNTANT' || role === 'SUPER_ADMIN') return true;
   if (role === 'ADMIN') {
-    return ['dashboard', 'customers', 'pets', 'pick_drop', 'communication', 'payments'].includes(tab);
+    return ['dashboard', 'customers', 'pets', 'vaccinations', 'pick_drop', 'communication', 'payments'].includes(tab);
   }
   if (role === 'BILLING_STAFF') {
-    return ['invoices', 'customers', 'pets', 'pick_drop'].includes(tab);
+    return ['invoices', 'services', 'long_term_packages', 'customers', 'pets', 'vaccinations', 'pick_drop'].includes(tab);
   }
 
-  return ['invoices', 'pets', 'pick_drop'].includes(tab);
+  return ['invoices', 'pets', 'vaccinations', 'pick_drop'].includes(tab);
 }
 
 // Backwards compatibility alias
@@ -89,6 +92,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onNewInvoice,
   pendingPaymentCount,
   activeBoardingCount,
+  vaccinationAlertCount = 0,
   isMobileDrawerOpen = false,
   onCloseMobileDrawer,
   onOpenMobileDrawer,
@@ -147,6 +151,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       adminOnly: false,
       badge: activeBoardingCount > 0 ? `${activeBoardingCount}` : null,
       badgeColor: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200'
+    },
+    {
+      id: 'vaccinations' as ActiveTab,
+      label: 'Vaccinations',
+      icon: Syringe,
+      adminOnly: false,
+      badge: vaccinationAlertCount > 0 ? `${vaccinationAlertCount}` : null,
+      badgeColor: 'bg-red-500 text-white font-mono'
     },
     {
       id: 'pick_drop' as ActiveTab,

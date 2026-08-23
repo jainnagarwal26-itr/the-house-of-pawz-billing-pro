@@ -229,6 +229,19 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
       { key: 'long_term_billing_create', label: 'Generate Contract Invoices', description: 'Preview and generate GST invoices for service periods' },
       { key: 'long_term_billing_delete', label: 'Delete Billing History', description: 'Permanently delete billing period logs' }
     ]
+  },
+  {
+    id: 'vaccinations',
+    title: 'R. Vaccination Management & Alerts',
+    description: 'Pet vaccination schedules, automated expiry alerts, and manual WhatsApp/Email customer reminders',
+    iconName: 'Syringe',
+    permissions: [
+      { key: 'vaccinations_view', label: 'View Vaccinations & Alerts', description: 'Inspect pet vaccination history, upcoming renewals and overdue alerts' },
+      { key: 'vaccinations_create', label: 'Add Vaccination Record', description: 'Register new vaccination events for pets' },
+      { key: 'vaccinations_edit', label: 'Edit Vaccination Record', description: 'Update vaccine names, administration dates, and next due dates' },
+      { key: 'vaccinations_delete', label: 'Delete Vaccination Record', description: 'Permanently remove vaccination records (Admin/Accountant only)' },
+      { key: 'vaccinations_remind', label: 'Send Customer Reminders', description: 'Trigger manual WhatsApp and Email vaccination renewal reminders' }
+    ]
   }
 ];
 
@@ -311,55 +324,60 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
     long_term_usage_delete: true,
     long_term_billing_view: true,
     long_term_billing_create: true,
-    long_term_billing_delete: true
+    long_term_billing_delete: true,
+    vaccinations_view: true,
+    vaccinations_create: true,
+    vaccinations_edit: true,
+    vaccinations_delete: true,
+    vaccinations_remind: true
   },
 
   ADMIN: {
     dashboard_view: true,
-    invoices_view: false,
+    invoices_view: true,
     invoices_create: true,
-    invoices_edit: false,
+    invoices_edit: true,
     invoices_delete: false,
     invoices_change_number: false,
-    invoices_cancel: false,
+    invoices_cancel: true,
     invoices_download_pdf: true,
     invoices_print: true,
     invoices_whatsapp: true,
     invoices_email: true,
     customers_view: true,
     customers_create: true,
-    customers_edit: false,
+    customers_edit: true,
     customers_delete: false,
     pets_view: true,
     pets_create: true,
     pets_edit: true,
     pets_delete: false,
     pets_checkin_checkout: true,
-    boarding_view: false,
-    boarding_manage: false,
+    boarding_view: true,
+    boarding_manage: true,
     payments_view: true,
     payments_record: true,
     payments_delete: false,
-    gst_reports_view: false,
-    gst_reports_export: false,
-    excel_db_view: false,
-    excel_db_export: false,
+    gst_reports_view: true,
+    gst_reports_export: true,
+    excel_db_view: true,
+    excel_db_export: true,
     excel_db_restore: false,
     import_engine_view: false,
     import_engine_execute: false,
-    audit_logs_view: false,
+    audit_logs_view: true,
     communication_center_view: true,
     receipt_share: true,
-    statement_share: false,
-    user_management_view: false,
+    statement_share: true,
+    user_management_view: true,
     user_management_edit: false,
     user_management_permissions: false,
-    user_management_reset_password: false,
-    settings_view: false,
+    user_management_reset_password: true,
+    settings_view: true,
     settings_edit: false,
     settings_factory_reset: false,
-    reports_view: false,
-    reports_export: false,
+    reports_view: true,
+    reports_export: true,
     pick_drop_view: true,
     pick_drop_create: true,
     pick_drop_edit: true,
@@ -367,7 +385,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
     pick_drop_assign: true,
     pick_drop_status_update: true,
     pick_drop_pricing_view: true,
-    pick_drop_pricing_edit: true,
+    pick_drop_pricing_edit: false,
     pick_drop_reports_view: true,
     pick_drop_recurring_view: true,
     pick_drop_recurring_edit: true,
@@ -391,7 +409,12 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
     long_term_usage_delete: false,
     long_term_billing_view: true,
     long_term_billing_create: true,
-    long_term_billing_delete: false
+    long_term_billing_delete: false,
+    vaccinations_view: true,
+    vaccinations_create: true,
+    vaccinations_edit: true,
+    vaccinations_delete: true,
+    vaccinations_remind: true
   },
 
   SUPER_ADMIN: {
@@ -471,7 +494,12 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
     long_term_usage_delete: true,
     long_term_billing_view: true,
     long_term_billing_create: true,
-    long_term_billing_delete: true
+    long_term_billing_delete: true,
+    vaccinations_view: true,
+    vaccinations_create: true,
+    vaccinations_edit: true,
+    vaccinations_delete: true,
+    vaccinations_remind: true
   },
 
   USER: {
@@ -531,7 +559,12 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
     pick_drop_reports_view: false,
     pick_drop_recurring_view: false,
     pick_drop_recurring_edit: false,
-    pick_drop_reports_export: false
+    pick_drop_reports_export: false,
+    vaccinations_view: true,
+    vaccinations_create: true,
+    vaccinations_edit: true,
+    vaccinations_delete: false,
+    vaccinations_remind: true
   },
 
   BILLING_STAFF: {
@@ -593,17 +626,17 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
     pick_drop_recurring_edit: false,
     pick_drop_reports_export: false,
     service_catalog_view: true,
-    service_catalog_edit: false,
+    service_catalog_edit: true,
     service_catalog_delete: false,
     package_master_view: true,
-    package_master_edit: false,
+    package_master_edit: true,
     package_master_delete: false,
     monthly_package_view: true,
-    monthly_package_manage: false,
+    monthly_package_manage: true,
     monthly_package_delete: false,
     long_term_package_view: true,
-    long_term_package_create: false,
-    long_term_package_edit: false,
+    long_term_package_create: true,
+    long_term_package_edit: true,
     long_term_package_delete: false,
     long_term_usage_view: true,
     long_term_usage_create: true,
@@ -611,7 +644,12 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
     long_term_usage_delete: false,
     long_term_billing_view: true,
     long_term_billing_create: false,
-    long_term_billing_delete: false
+    long_term_billing_delete: false,
+    vaccinations_view: true,
+    vaccinations_create: true,
+    vaccinations_edit: true,
+    vaccinations_delete: false,
+    vaccinations_remind: true
   },
 
   MANAGER: {
