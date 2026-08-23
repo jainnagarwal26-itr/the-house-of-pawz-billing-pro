@@ -1382,14 +1382,21 @@ export default function App() {
           )}
 
           {activeTab === 'recurring' && (
-            <RecurringBilling
-              recurringList={recurringList}
-              customers={customers}
-              pets={pets}
-              userRole={currentUser.role}
-              onGenerateInvoiceForRecurring={handleGenerateInvoiceForRecurring}
-              onAddRecurring={handleAddRecurring}
-            />
+            isTabAllowedForUser('recurring', currentUser) ? (
+              <RecurringBilling
+                recurringList={recurringList}
+                customers={customers}
+                pets={pets}
+                userRole={currentUser.role}
+                onGenerateInvoiceForRecurring={handleGenerateInvoiceForRecurring}
+                onAddRecurring={handleAddRecurring}
+              />
+            ) : (
+              <div className="p-8 text-center text-slate-500 space-y-2">
+                <h3 className="text-base font-bold text-red-600">Access Restricted</h3>
+                <p className="text-xs">You do not have permission to access Recurring Billing.</p>
+              </div>
+            )
           )}
 
           {activeTab === 'customers' && (
@@ -1545,83 +1552,117 @@ export default function App() {
           )}
 
           {activeTab === 'gst_reports' && (
-            <GSTReports
-              invoices={invoices}
-              payments={payments}
-              customers={customers}
-              pets={pets}
-              settings={settings}
-              currentUser={currentUser}
-              isAdmin={currentUser.role === 'ADMIN'}
-            />
+            isTabAllowedForUser('gst_reports', currentUser) ? (
+              <GSTReports
+                invoices={invoices}
+                payments={payments}
+                customers={customers}
+                pets={pets}
+                settings={settings}
+                currentUser={currentUser}
+                isAdmin={currentUser.role === 'ADMIN'}
+              />
+            ) : (
+              <div className="p-8 text-center text-slate-500 space-y-2">
+                <h3 className="text-base font-bold text-red-600">Access Restricted</h3>
+                <p className="text-xs">You do not have permission to access GST Reports (CA).</p>
+              </div>
+            )
           )}
 
           {activeTab === 'excel' && (
-            <ExcelManager
-              customers={customers}
-              pets={pets}
-              invoices={invoices}
-              payments={payments}
-              users={users}
-              settings={settings}
-              auditLogs={auditLogs}
-              recurring={recurringList}
-              currentUser={currentUser}
-              onAddAuditLog={(action, details) => {
-                logAuditEventToSupabase(action, details);
-              }}
-            />
+            isTabAllowedForUser('excel', currentUser) ? (
+              <ExcelManager
+                customers={customers}
+                pets={pets}
+                invoices={invoices}
+                payments={payments}
+                users={users}
+                settings={settings}
+                auditLogs={auditLogs}
+                recurring={recurringList}
+                currentUser={currentUser}
+                onAddAuditLog={(action, details) => {
+                  logAuditEventToSupabase(action, details);
+                }}
+              />
+            ) : (
+              <div className="p-8 text-center text-slate-500 space-y-2">
+                <h3 className="text-base font-bold text-red-600">Access Restricted</h3>
+                <p className="text-xs">You do not have permission to access Excel Database.</p>
+              </div>
+            )
           )}
 
           {activeTab === 'users' && (
-            <UserManagement
-              users={users}
-              activeUser={currentUser}
-              onSwitchUserRole={handleSwitchRole}
-              onAddUser={async u => {
-                await updateUserRoleInSupabase(u.id, u.role);
-                const freshUsers = await fetchUsersFromSupabase();
-                setUsers(freshUsers);
-              }}
-              onUpdateUser={async u => {
-                // Save updated user permissions / role to Supabase
-                if (u.permissions) {
-                  for (const [key, val] of Object.entries(u.permissions)) {
-                    await updateUserPermissionInSupabase(u.id, key, val as boolean);
+            isTabAllowedForUser('users', currentUser) ? (
+              <UserManagement
+                users={users}
+                activeUser={currentUser}
+                onSwitchUserRole={handleSwitchRole}
+                onAddUser={async u => {
+                  await updateUserRoleInSupabase(u.id, u.role);
+                  const freshUsers = await fetchUsersFromSupabase();
+                  setUsers(freshUsers);
+                }}
+                onUpdateUser={async u => {
+                  if (u.permissions) {
+                    for (const [key, val] of Object.entries(u.permissions)) {
+                      await updateUserPermissionInSupabase(u.id, key, val as boolean);
+                    }
                   }
-                }
-                await updateUserRoleInSupabase(u.id, u.role);
+                  await updateUserRoleInSupabase(u.id, u.role);
 
-                const freshUsers = await fetchUsersFromSupabase();
-                setUsers(freshUsers);
+                  const freshUsers = await fetchUsersFromSupabase();
+                  setUsers(freshUsers);
 
-                if (session && (session.id === u.id || session.username.toLowerCase() === u.username.toLowerCase())) {
-                  const updatedActive = freshUsers.find(fu => fu.id === u.id || fu.username.toLowerCase() === u.username.toLowerCase());
-                  if (updatedActive) {
-                    setSession(updatedActive);
-                    setCurrentUser(updatedActive);
+                  if (session && (session.id === u.id || session.username.toLowerCase() === u.username.toLowerCase())) {
+                    const updatedActive = freshUsers.find(fu => fu.id === u.id || fu.username.toLowerCase() === u.username.toLowerCase());
+                    if (updatedActive) {
+                      setSession(updatedActive);
+                      setCurrentUser(updatedActive);
+                    }
                   }
-                }
 
-                logAuditEventToSupabase(
-                  'ROLE_SWITCHED' as any,
-                  `ADMIN ${currentUser.name} updated permissions for ${u.name} (${u.role})`
-                );
-              }}
-            />
+                  logAuditEventToSupabase(
+                    'ROLE_SWITCHED' as any,
+                    `User ${currentUser.name} updated permissions for ${u.name} (${u.role})`
+                  );
+                }}
+              />
+            ) : (
+              <div className="p-8 text-center text-slate-500 space-y-2">
+                <h3 className="text-base font-bold text-red-600">Access Restricted</h3>
+                <p className="text-xs">You do not have permission to access User Management.</p>
+              </div>
+            )
           )}
 
           {activeTab === 'audit' && (
-            <AuditLogs auditLogs={auditLogs} currentUser={currentUser} />
+            isTabAllowedForUser('audit', currentUser) ? (
+              <AuditLogs auditLogs={auditLogs} currentUser={currentUser} />
+            ) : (
+              <div className="p-8 text-center text-slate-500 space-y-2">
+                <h3 className="text-base font-bold text-red-600">Access Restricted</h3>
+                <p className="text-xs">You do not have permission to access Audit Logs.</p>
+              </div>
+            )
           )}
 
           {activeTab === 'settings' && (
-            <SettingsModal
-              settings={settings}
-              currentUser={currentUser}
-              onUpdateSettings={handleSaveSettings}
-              onFactoryReset={factoryResetDatabase}
-            />
+            isTabAllowedForUser('settings', currentUser) ? (
+              <SettingsModal
+                settings={settings}
+                currentUser={currentUser}
+                onUpdateSettings={handleSaveSettings}
+                onFactoryReset={factoryResetDatabase}
+              />
+            ) : (
+              <div className="p-8 text-center text-slate-500 space-y-2">
+                <h3 className="text-base font-bold text-red-600">Access Restricted</h3>
+                <p className="text-xs">You do not have permission to access Software Settings.</p>
+              </div>
+            )
           )}
         </main>
       </div>

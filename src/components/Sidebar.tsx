@@ -72,7 +72,18 @@ export function isTabAllowedForUser(tab: ActiveTab, user?: User | null, userRole
 
   if (role === 'ACCOUNTANT' || role === 'SUPER_ADMIN') return true;
   if (role === 'ADMIN') {
-    return ['dashboard', 'customers', 'pets', 'vaccinations', 'pick_drop', 'communication', 'payments'].includes(tab);
+    return [
+      'dashboard', 
+      'invoices', 
+      'services', 
+      'long_term_packages', 
+      'customers', 
+      'pets', 
+      'vaccinations', 
+      'pick_drop', 
+      'communication', 
+      'payments'
+    ].includes(tab);
   }
   if (role === 'BILLING_STAFF') {
     return ['invoices', 'services', 'long_term_packages', 'customers', 'pets', 'vaccinations', 'pick_drop'].includes(tab);

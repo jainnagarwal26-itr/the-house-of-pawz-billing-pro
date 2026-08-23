@@ -567,15 +567,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
       {/* 3. SECTION NAVIGATION TABS */}
       <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none border-b border-slate-200 dark:border-zinc-800">
         {[
-          { id: 'overview', label: '12 Executive KPIs', icon: BarChart3 },
-          { id: 'revenue', label: 'Revenue Analytics', icon: TrendingUp },
-          { id: 'services', label: 'Service Breakdown', icon: PieChartIcon },
-          { id: 'customers', label: 'Customer Intelligence', icon: Users },
-          { id: 'pets', label: 'Pet & Boarding', icon: Dog },
-          { id: 'payments', label: 'Payments & Collections', icon: CreditCard },
-          { id: 'gst', label: 'GST Analytics', icon: FileText },
-          { id: 'ca', label: 'Owner & CA Command', icon: ShieldCheck },
-        ].map(tab => {
+          { id: 'overview', label: '12 Executive KPIs', icon: BarChart3, allowed: true },
+          { id: 'revenue', label: 'Revenue Analytics', icon: TrendingUp, allowed: true },
+          { id: 'services', label: 'Service Breakdown', icon: PieChartIcon, allowed: true },
+          { id: 'customers', label: 'Customer Intelligence', icon: Users, allowed: true },
+          { id: 'pets', label: 'Pet & Boarding', icon: Dog, allowed: true },
+          { id: 'payments', label: 'Payments & Collections', icon: CreditCard, allowed: true },
+          { id: 'gst', label: 'GST Analytics', icon: FileText, allowed: hasPermission(currentUser, 'gst_reports_view') },
+          { id: 'ca', label: 'Owner & CA Command', icon: ShieldCheck, allowed: hasPermission(currentUser, 'gst_reports_view') },
+        ].filter(t => t.allowed).map(tab => {
           const Icon = tab.icon;
           const isActive = activeSection === tab.id;
           return (
