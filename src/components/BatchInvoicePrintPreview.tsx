@@ -164,9 +164,20 @@ export const BatchInvoicePrintPreview: React.FC<BatchInvoicePrintPreviewProps> =
                 <tr key={item.id || itemIdx} className="border-b border-slate-200">
                   <td className="p-1.5 border-r border-slate-200 text-center font-mono">{itemIdx + 1}</td>
                   <td className="p-1.5 border-r border-slate-200 font-medium">
-                    {item.name}
+                    <div>{item.name}</div>
+                    {item.serviceStartDate && item.serviceEndDate && (
+                      <div className="text-[8.5px] text-slate-600 font-normal mt-0.5">
+                        <strong>Period:</strong> {item.serviceStartDate} → {item.serviceEndDate}
+                        {item.duration ? ` (${item.duration} ${item.unit || 'Nights'})` : ''}
+                      </div>
+                    )}
+                    {!item.serviceStartDate && item.serviceDate && (
+                      <div className="text-[8.5px] text-slate-600 font-normal mt-0.5">
+                        <strong>Date:</strong> {item.serviceDate}
+                      </div>
+                    )}
                     {item.discount > 0 && (
-                      <span className="block text-[8px] text-emerald-600">
+                      <span className="block text-[8px] text-emerald-600 font-normal">
                         ({item.discount}% Disc Applied)
                       </span>
                     )}

@@ -280,7 +280,18 @@ export const InvoicePrintPreview: React.FC<InvoicePrintPreviewProps> = ({
                   <tr key={item.id || idx} className="border-b border-slate-200">
                     <td className="p-2 border-r border-slate-200 text-center font-mono">{idx + 1}</td>
                     <td className="p-2 border-r border-slate-200 font-medium">
-                      {item.name}
+                      <div>{item.name}</div>
+                      {item.serviceStartDate && item.serviceEndDate && (
+                        <div className="text-[10px] text-slate-600 font-normal mt-0.5">
+                          <strong>Service Period:</strong> {item.serviceStartDate} to {item.serviceEndDate}
+                          {item.duration ? ` (${item.duration} ${item.unit || 'Nights'})` : ''}
+                        </div>
+                      )}
+                      {!item.serviceStartDate && item.serviceDate && (
+                        <div className="text-[10px] text-slate-600 font-normal mt-0.5">
+                          <strong>Service Date:</strong> {item.serviceDate}
+                        </div>
+                      )}
                       {item.discount > 0 && (
                         <span className="block text-[9px] text-emerald-600 font-normal">
                           ({item.discount}% Disc Applied)

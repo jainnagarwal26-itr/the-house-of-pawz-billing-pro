@@ -818,8 +818,9 @@ export default function App() {
 
   const handleGenerateInvoiceForPickDropBooking = async (booking: PickDropBooking) => {
     const todayStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const bookingDateStr = booking.pickupDate || todayStr;
     const cust = customers.find(c => c.id === booking.customerId);
-    const nextInvNumber = await fetchNextInvoiceNumberFromDB('26-27');
+    const nextInvNumber = await fetchNextInvoiceNumberFromDB(undefined, bookingDateStr);
 
     const items: any[] = [];
 
@@ -1002,7 +1003,7 @@ export default function App() {
 
   const handleGenerateMonthlyInvoice = async (sub: MonthlyServicePackage) => {
     const todayStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    const nextInvNumber = await fetchNextInvoiceNumberFromDB('26-27');
+    const nextInvNumber = await fetchNextInvoiceNumberFromDB(undefined, todayStr);
 
     const draftInv: Invoice = {
       id: `INV-MON-${Date.now().toString().slice(-8)}`,
@@ -1037,7 +1038,9 @@ export default function App() {
           sgstAmount: sub.gstAmount / 2,
           igstRate: 0,
           igstAmount: 0,
-          total: sub.totalMonthlyAmount
+          total: sub.totalMonthlyAmount,
+          serviceStartDate: sub.startDate || undefined,
+          serviceEndDate: sub.endDate || undefined
         }
       ],
       subTotal: sub.monthlyAmount,
@@ -1115,7 +1118,7 @@ export default function App() {
     lineItems: any[];
   }) => {
     const todayStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    const nextInvNumber = await fetchNextInvoiceNumberFromDB('26-27');
+    const nextInvNumber = await fetchNextInvoiceNumberFromDB(undefined, todayStr);
     const cust = customers.find(c => c.id === preview.contract.customerId);
 
     const contractInv: Invoice = {
@@ -1141,6 +1144,7 @@ export default function App() {
         discount: 0,
         discountAmount: 0,
         taxableValue: item.taxableValue,
+        isGstApplicable: Number(item.gstRate) > 0,
         gstRate: item.gstRate,
         cgstRate: item.cgstRate,
         cgstAmount: item.cgstAmount,
@@ -1148,7 +1152,11 @@ export default function App() {
         sgstAmount: item.sgstAmount,
         igstRate: 0,
         igstAmount: 0,
-        total: item.total
+        total: item.total,
+        serviceStartDate: preview.startDate || undefined,
+        serviceEndDate: preview.endDate || undefined,
+        duration: item.qty || undefined,
+        unit: item.unit || undefined
       })),
       subTotal: preview.subTotal,
       totalDiscount: 0,

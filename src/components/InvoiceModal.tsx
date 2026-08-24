@@ -160,6 +160,12 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
   const [selectedPetId, setSelectedPetId] = useState<string>(invoice?.petId || '');
   const [petName, setPetName] = useState<string>(invoice?.petName || '');
 
+  const todayStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const [invoiceDate, setInvoiceDate] = useState<string>(invoice?.invoiceDate || todayStr);
+  const [dueDate, setDueDate] = useState<string>(invoice?.dueDate || todayStr);
+  const [placeOfSupply, setPlaceOfSupply] = useState<string>(invoice?.placeOfSupply || settings.stateCode);
+  const [isInterState, setIsInterState] = useState<boolean>(invoice?.isInterState || false);
+
   // Invoice Meta
   // NEW INVOICE: number starts empty ('') then is immediately populated
   // via the Supabase RPC in the useEffect below.
@@ -172,11 +178,11 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
   const [validationError, setValidationError] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  // On mount: fetch the next invoice number from Supabase RPC (new invoices only)
+  // On mount or when invoiceDate changes: fetch the next invoice number from Supabase RPC (new invoices only)
   useEffect(() => {
     if (!invoice) {
-      // Fetch from DB — fail-closed
-      fetchNextInvoiceNumberFromDB('26-27')
+      setInvoiceNumberLoading(true);
+      fetchNextInvoiceNumberFromDB(undefined, invoiceDate)
         .then(num => {
           setInvoiceNumber(num);
           setInvoiceNumberLoading(false);
@@ -190,14 +196,18 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
         });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [invoiceDate]);
 
+  // Expanded details toggle for line items
+  const [expandedItemIndex, setExpandedItemIndex] = useState<number | null>(null);
 
-  const todayStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
-  const [invoiceDate, setInvoiceDate] = useState<string>(invoice?.invoiceDate || todayStr);
-  const [dueDate, setDueDate] = useState<string>(invoice?.dueDate || todayStr);
-  const [placeOfSupply, setPlaceOfSupply] = useState<string>(invoice?.placeOfSupply || settings.stateCode);
-  const [isInterState, setIsInterState] = useState<boolean>(invoice?.isInterState || false);
+  const calculateDurationInNights = (fromStr: string, toStr: string): number => {
+    if (!fromStr || !toStr) return 0;
+    const d1 = new Date(fromStr);
+    const d2 = new Date(toStr);
+    const diff = Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
+    return Math.max(0, diff);
+  };
 
   // Line Items
   const [items, setItems] = useState<InvoiceItem[]>(invoice?.items || [
@@ -1005,83 +1015,199 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
               </thead>
               <tbody>
                 {items.map((item, idx) => (
-                  <tr key={item.id || idx} className="border-t border-slate-200 dark:border-zinc-800">
-                    <td className="p-2 text-center font-mono text-slate-400">{idx + 1}</td>
-                    <td className="p-2">
-                      <input
-                        type="text"
-                        value={item.name}
-                        onChange={e => handleItemChange(idx, 'name', e.target.value)}
-                        className="w-full p-1.5 rounded bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-xs font-semibold"
-                      />
-                    </td>
-                    <td className="p-2">
-                      <input
-                        type="text"
-                        value={item.hsnSac}
-                        onChange={e => handleItemChange(idx, 'hsnSac', e.target.value)}
-                        className="w-full p-1.5 rounded bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-xs font-mono text-center"
-                      />
-                    </td>
-                    <td className="p-2">
-                      <input
-                        type="number"
-                        step="any"
-                        value={item.price}
-                        onChange={e => handleItemChange(idx, 'price', Number(e.target.value))}
-                        className="w-full p-1.5 rounded bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-700 text-xs font-mono font-bold text-right focus:ring-1 focus:ring-red-500"
-                        title="Actual selling rate for this invoice (master rate remains unchanged)"
-                      />
-                    </td>
-                    <td className="p-2">
-                      <input
-                        type="number"
-                        min="1"
-                        step="any"
-                        value={item.qty}
-                        onChange={e => handleItemChange(idx, 'qty', Number(e.target.value))}
-                        className="w-full p-1.5 rounded bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-xs font-mono text-center"
-                      />
-                    </td>
-                    <td className="p-2">
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={item.discount}
-                        onChange={e => handleItemChange(idx, 'discount', Number(e.target.value))}
-                        className="w-full p-1 rounded bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-xs font-mono text-center"
-                      />
-                    </td>
-                    <td className="p-2 text-right font-mono font-bold text-slate-700 dark:text-zinc-300">
-                      ₹{item.taxableValue.toFixed(2)}
-                    </td>
-                    <td className="p-2 text-right">
-                      <select
-                        value={item.gstRate}
-                        onChange={e => handleItemChange(idx, 'gstRate', Number(e.target.value))}
-                        className="p-1 rounded bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-xs font-mono"
-                      >
-                        <option value={18}>18%</option>
-                        <option value={12}>12%</option>
-                        <option value={5}>5%</option>
-                        <option value={0}>0%</option>
-                      </select>
-                    </td>
-                    <td className="p-2 text-right font-mono font-extrabold text-[#D62828]">
-                      ₹{item.total.toFixed(2)}
-                    </td>
-                    <td className="p-2 text-center">
-                      <button
-                        type="button"
-                        onClick={() => removeItem(idx)}
-                        disabled={items.length <= 1}
-                        className="p-1 text-slate-400 hover:text-red-600 disabled:opacity-30"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </td>
-                  </tr>
+                  <React.Fragment key={item.id || idx}>
+                    <tr className="border-t border-slate-200 dark:border-zinc-800">
+                      <td className="p-2 text-center font-mono text-slate-400">{idx + 1}</td>
+                      <td className="p-2">
+                        <div className="space-y-1">
+                          <input
+                            type="text"
+                            value={item.name}
+                            onChange={e => handleItemChange(idx, 'name', e.target.value)}
+                            className="w-full p-1.5 rounded bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-xs font-semibold"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setExpandedItemIndex(expandedItemIndex === idx ? null : idx)}
+                            className="text-[10px] font-bold text-slate-500 hover:text-[#D62828] flex items-center gap-1 cursor-pointer"
+                          >
+                            <span>📅 {item.serviceStartDate && item.serviceEndDate ? `Period: ${item.serviceStartDate} → ${item.serviceEndDate}` : item.serviceDate ? `Date: ${item.serviceDate}` : '+ Set Service Date / Period'}</span>
+                          </button>
+                        </div>
+                      </td>
+                      <td className="p-2">
+                        <input
+                          type="text"
+                          value={item.hsnSac}
+                          onChange={e => handleItemChange(idx, 'hsnSac', e.target.value)}
+                          className="w-full p-1.5 rounded bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-xs font-mono text-center"
+                        />
+                      </td>
+                      <td className="p-2">
+                        <input
+                          type="number"
+                          step="any"
+                          value={item.price}
+                          onChange={e => handleItemChange(idx, 'price', Number(e.target.value))}
+                          className="w-full p-1.5 rounded bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-700 text-xs font-mono font-bold text-right focus:ring-1 focus:ring-red-500"
+                          title="Actual selling rate for this invoice (master rate remains unchanged)"
+                        />
+                      </td>
+                      <td className="p-2">
+                        <input
+                          type="number"
+                          min="1"
+                          step="any"
+                          value={item.qty}
+                          onChange={e => handleItemChange(idx, 'qty', Number(e.target.value))}
+                          className="w-full p-1.5 rounded bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-xs font-mono text-center"
+                        />
+                      </td>
+                      <td className="p-2">
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={item.discount}
+                          onChange={e => handleItemChange(idx, 'discount', Number(e.target.value))}
+                          className="w-full p-1 rounded bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-xs font-mono text-center"
+                        />
+                      </td>
+                      <td className="p-2 text-right font-mono font-bold text-slate-700 dark:text-zinc-300">
+                        ₹{item.taxableValue.toFixed(2)}
+                      </td>
+                      <td className="p-2 text-right">
+                        <select
+                          value={item.gstRate}
+                          onChange={e => handleItemChange(idx, 'gstRate', Number(e.target.value))}
+                          className="p-1 rounded bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-xs font-mono"
+                        >
+                          <option value={18}>18%</option>
+                          <option value={12}>12%</option>
+                          <option value={5}>5%</option>
+                          <option value={0}>0%</option>
+                        </select>
+                      </td>
+                      <td className="p-2 text-right font-mono font-extrabold text-[#D62828]">
+                        ₹{item.total.toFixed(2)}
+                      </td>
+                      <td className="p-2 text-center">
+                        <button
+                          type="button"
+                          onClick={() => removeItem(idx)}
+                          disabled={items.length <= 1}
+                          className="p-1 text-slate-400 hover:text-red-600 disabled:opacity-30"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+
+                    {/* Expandable Line-Level Service Date & Period Controls */}
+                    {expandedItemIndex === idx && (
+                      <tr className="bg-slate-50 dark:bg-zinc-800/60 border-t border-dashed border-slate-200 dark:border-zinc-700">
+                        <td colSpan={10} className="p-3">
+                          <div className="p-3 bg-white dark:bg-zinc-900 rounded-xl border border-slate-200 dark:border-zinc-700 space-y-3">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-extrabold text-slate-800 dark:text-zinc-200 flex items-center gap-1.5">
+                                <span>📅</span>
+                                <span>Service Period & Date Configuration for Line #{idx + 1}</span>
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setExpandedItemIndex(null)}
+                                className="text-[10px] font-bold text-slate-400 hover:text-slate-600 dark:hover:text-zinc-300"
+                              >
+                                Done
+                              </button>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+                              {/* Date Range Start */}
+                              <div>
+                                <label className="block text-[10px] font-bold text-slate-500 mb-1">From Date (Start):</label>
+                                <input
+                                  type="date"
+                                  value={item.serviceStartDate || ''}
+                                  onChange={e => {
+                                    const start = e.target.value;
+                                    const end = item.serviceEndDate || '';
+                                    const dur = calculateDurationInNights(start, end);
+                                    const updated = [...items];
+                                    updated[idx] = { 
+                                      ...updated[idx], 
+                                      serviceStartDate: start, 
+                                      duration: dur > 0 ? dur : updated[idx].duration 
+                                    };
+                                    setItems(updated);
+                                  }}
+                                  className="w-full p-1.5 rounded-lg bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 font-mono text-xs"
+                                />
+                              </div>
+
+                              {/* Date Range End */}
+                              <div>
+                                <label className="block text-[10px] font-bold text-slate-500 mb-1">To Date (End):</label>
+                                <input
+                                  type="date"
+                                  value={item.serviceEndDate || ''}
+                                  onChange={e => {
+                                    const end = e.target.value;
+                                    const start = item.serviceStartDate || '';
+                                    const dur = calculateDurationInNights(start, end);
+                                    const updated = [...items];
+                                    updated[idx] = { 
+                                      ...updated[idx], 
+                                      serviceEndDate: end, 
+                                      duration: dur > 0 ? dur : updated[idx].duration 
+                                    };
+                                    setItems(updated);
+                                  }}
+                                  className="w-full p-1.5 rounded-lg bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 font-mono text-xs"
+                                />
+                              </div>
+
+                              {/* Single Service Date */}
+                              <div>
+                                <label className="block text-[10px] font-bold text-slate-500 mb-1">Single Service Date:</label>
+                                <input
+                                  type="date"
+                                  value={item.serviceDate || ''}
+                                  onChange={e => handleItemChange(idx, 'serviceDate', e.target.value)}
+                                  className="w-full p-1.5 rounded-lg bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 font-mono text-xs"
+                                />
+                              </div>
+
+                              {/* Duration / Unit */}
+                              <div className="grid grid-cols-2 gap-1.5">
+                                <div>
+                                  <label className="block text-[10px] font-bold text-slate-500 mb-1">Duration:</label>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={item.duration || ''}
+                                    placeholder="Nights"
+                                    onChange={e => handleItemChange(idx, 'duration', Number(e.target.value))}
+                                    className="w-full p-1.5 rounded-lg bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 font-mono text-xs"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-bold text-slate-500 mb-1">Unit:</label>
+                                  <input
+                                    type="text"
+                                    value={item.unit || ''}
+                                    placeholder="Nights/Days"
+                                    onChange={e => handleItemChange(idx, 'unit', e.target.value)}
+                                    className="w-full p-1.5 rounded-lg bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-xs"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>

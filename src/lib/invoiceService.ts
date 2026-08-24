@@ -17,8 +17,25 @@ import { Invoice, InvoiceItem } from '../types';
  * NEVER use MAX+1, Date.now(), or hardcoded numbers as fallbacks.
  * The database RPC is the ONLY authority for invoice numbering.
  */
-export async function fetchNextInvoiceNumberFromDB(financialYear: string = '26-27'): Promise<string> {
-  const { data, error } = await supabase.rpc('generate_next_invoice_number' as any, { fy_input: financialYear });
+export async function fetchNextInvoiceNumberFromDB(
+  financialYear?: string,
+  invoiceDate?: string
+): Promise<string> {
+  // Convert DD/MM/YYYY to YYYY-MM-DD if needed
+  let sqlDate: string = new Date().toISOString().slice(0, 10);
+  if (invoiceDate && invoiceDate.includes('/')) {
+    const parts = invoiceDate.split('/');
+    if (parts.length === 3) {
+      sqlDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+    }
+  } else if (invoiceDate) {
+    sqlDate = invoiceDate;
+  }
+
+  const { data, error } = await supabase.rpc('generate_next_invoice_number' as any, { 
+    p_invoice_date: sqlDate,
+    p_fy_input: financialYear || null
+  });
 
   if (error) {
     throw new Error(
@@ -34,7 +51,6 @@ export async function fetchNextInvoiceNumberFromDB(financialYear: string = '26-2
 
   return data as string;
 }
-
 
 import { STORAGE_KEYS, loadStoredData } from './storage';
 
@@ -83,14 +99,20 @@ export async function fetchInvoicesFromSupabase(): Promise<Invoice[]> {
           discount: Number(it.discount_percent) || 0,
           discountAmount: Number(it.discount_amount) || 0,
           taxableValue: Number(it.taxable_value) || 0,
-          gstRate: Number(it.gst_rate) || 18,
-          cgstRate: Number(it.gst_rate) ? Number(it.gst_rate) / 2 : 9,
+          isGstApplicable: Number(it.gst_rate) > 0,
+          gstRate: Number(it.gst_rate) || 0,
+          cgstRate: Number(it.gst_rate) ? Number(it.gst_rate) / 2 : 0,
           cgstAmount: Number(it.cgst_amount) || 0,
-          sgstRate: Number(it.gst_rate) ? Number(it.gst_rate) / 2 : 9,
+          sgstRate: Number(it.gst_rate) ? Number(it.gst_rate) / 2 : 0,
           sgstAmount: Number(it.sgst_amount) || 0,
-          igstRate: Number(it.gst_rate) || 18,
+          igstRate: Number(it.gst_rate) || 0,
           igstAmount: Number(it.igst_amount) || 0,
-          total: Number(it.item_total) || 0
+          total: Number(it.item_total) || 0,
+          serviceDate: it.service_date || undefined,
+          serviceStartDate: it.service_start_date || undefined,
+          serviceEndDate: it.service_end_date || undefined,
+          duration: it.duration ? Number(it.duration) : undefined,
+          unit: it.unit || undefined
         });
         itemMap.set(it.internal_invoice_id, list);
       });
@@ -199,11 +221,16 @@ export async function createInvoiceInSupabase(inv: Omit<Invoice, 'id' | 'created
         discount_percent: item.discount || 0,
         discount_amount: item.discountAmount || 0,
         taxable_value: item.taxableValue,
-        gst_rate: item.gstRate || 18,
+        gst_rate: item.gstRate !== undefined ? item.gstRate : 18,
         cgst_amount: item.cgstAmount || 0,
         sgst_amount: item.sgstAmount || 0,
         igst_amount: item.igstAmount || 0,
-        item_total: item.total
+        item_total: item.total,
+        service_date: item.serviceDate || null,
+        service_start_date: item.serviceStartDate || null,
+        service_end_date: item.serviceEndDate || null,
+        duration: item.duration || null,
+        unit: item.unit || null
       }))
     });
 

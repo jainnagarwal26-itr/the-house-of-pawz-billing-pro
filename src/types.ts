@@ -125,7 +125,8 @@ export interface InvoiceItem {
   discount: number; // Percentage or flat
   discountAmount: number;
   taxableValue: number;
-  gstRate: number; // 18%
+  isGstApplicable?: boolean;
+  gstRate: number; // 18% or 0%
   cgstRate: number;
   cgstAmount: number;
   sgstRate: number;
@@ -133,6 +134,11 @@ export interface InvoiceItem {
   igstRate: number;
   igstAmount: number;
   total: number;
+  serviceDate?: string;       // YYYY-MM-DD (Single date)
+  serviceStartDate?: string;  // YYYY-MM-DD (Range start)
+  serviceEndDate?: string;    // YYYY-MM-DD (Range end)
+  duration?: number;          // Numeric duration (e.g. 180, 30, 1)
+  unit?: string;              // 'Nights', 'Days', 'Session', 'Unit'
 }
 
 export type PaymentStatus = 'PAID' | 'PARTIAL' | 'UNPAID' | 'CANCELLED';
