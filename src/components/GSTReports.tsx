@@ -111,10 +111,18 @@ export const GSTReports: React.FC<GSTReportsProps> = ({
 
   // Export Trigger
   const handleExportCAExcel = () => {
+    if (!hasPermission(currentUser, 'gst_reports_export')) {
+      alert('Access Denied: You do not have permission to export GST reports.');
+      return;
+    }
     exportGSTReportToExcel(invoices, settings);
   };
 
   const handleExportFullDB = () => {
+    if (!hasPermission(currentUser, 'excel_db_export')) {
+      alert('Access Denied: You do not have permission to export Excel database.');
+      return;
+    }
     exportFullDatabaseToExcel({
       invoices,
       customers: customers || [],
@@ -175,21 +183,25 @@ export const GSTReports: React.FC<GSTReportsProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={handleExportCAExcel}
-            className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl text-xs flex items-center space-x-2 shadow-sm transition-all"
-          >
-            <Download className="w-4 h-4" />
-            <span>Export CA GSTR-1 (.XLSX)</span>
-          </button>
+          {hasPermission(currentUser, 'gst_reports_export') && (
+            <button
+              onClick={handleExportCAExcel}
+              className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl text-xs flex items-center space-x-2 shadow-sm transition-all cursor-pointer"
+            >
+              <Download className="w-4 h-4" />
+              <span>Export CA GSTR-1 (.XLSX)</span>
+            </button>
+          )}
           
-          <button
-            onClick={handleExportFullDB}
-            className="px-3.5 py-2 bg-slate-900 hover:bg-black dark:bg-zinc-800 dark:hover:bg-zinc-700 text-white font-bold rounded-xl text-xs flex items-center space-x-2 shadow-sm transition-all"
-          >
-            <BookOpen className="w-4 h-4 text-amber-400" />
-            <span>Export Full Workbook (.XLSX)</span>
-          </button>
+          {hasPermission(currentUser, 'excel_db_export') && (
+            <button
+              onClick={handleExportFullDB}
+              className="px-3.5 py-2 bg-slate-900 hover:bg-black dark:bg-zinc-800 dark:hover:bg-zinc-700 text-white font-bold rounded-xl text-xs flex items-center space-x-2 shadow-sm transition-all cursor-pointer"
+            >
+              <BookOpen className="w-4 h-4 text-amber-400" />
+              <span>Export Full Workbook (.XLSX)</span>
+            </button>
+          )}
         </div>
       </div>
 

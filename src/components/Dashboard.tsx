@@ -409,7 +409,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <span>Print</span>
             </button>
 
-            {isAdmin && (
+            {hasPermission(currentUser, 'excel_db_export') && (
               <button
                 onClick={onExportExcel}
                 className="hidden sm:flex px-3 py-2.5 min-h-[44px] bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 font-bold rounded-xl text-xs items-center justify-center space-x-1.5 border border-emerald-800 cursor-pointer"

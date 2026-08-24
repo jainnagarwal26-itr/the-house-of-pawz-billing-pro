@@ -40,6 +40,7 @@ export const ExcelManager: React.FC<ExcelManagerProps> = ({
   settings,
   auditLogs,
   recurring,
+  currentUser,
   onRestoreBackup,
   onAddAuditLog
 }) => {
@@ -59,6 +60,10 @@ export const ExcelManager: React.FC<ExcelManagerProps> = ({
   const [backupError, setBackupError] = useState<string | null>(null);
 
   const handleCloudBackup = async () => {
+    if (!hasPermission(currentUser, 'excel_db_export')) {
+      alert('Access Denied: You do not have permission to generate Excel cloud backups.');
+      return;
+    }
     setIsGeneratingBackup(true);
     setBackupError(null);
     setBackupMeta(null);
@@ -117,6 +122,10 @@ export const ExcelManager: React.FC<ExcelManagerProps> = ({
   ]);
 
   const handleExportAll = () => {
+    if (!hasPermission(currentUser, 'excel_db_export')) {
+      alert('Access Denied: You do not have permission to export Excel database.');
+      return;
+    }
     exportFullDatabaseToExcel({
       customers,
       pets,

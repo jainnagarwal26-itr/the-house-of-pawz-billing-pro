@@ -377,7 +377,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, boolean>>
     settings_edit: false,
     settings_factory_reset: false,
     reports_view: true,
-    reports_export: true,
+    reports_export: false,
     pick_drop_view: true,
     pick_drop_create: true,
     pick_drop_edit: true,

@@ -1228,6 +1228,10 @@ export default function App() {
 
   // Excel Full Export
   const handleExportFullExcel = () => {
+    if (!hasPermission(currentUser, 'excel_db_export')) {
+      alert('Access Restricted: You do not have permission to export Excel data.');
+      return;
+    }
     exportFullDatabaseToExcel({
       customers,
       pets,
