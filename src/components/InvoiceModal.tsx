@@ -1125,7 +1125,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
                             <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
                               {/* Date Range Start */}
                               <div>
-                                <label className="block text-[10px] font-bold text-slate-500 mb-1">From Date (Start):</label>
+                                <label className="block text-[10px] font-bold text-slate-500 mb-1">From Date (Optional):</label>
                                 <input
                                   type="date"
                                   value={item.serviceStartDate || ''}
@@ -1147,7 +1147,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
 
                               {/* Date Range End */}
                               <div>
-                                <label className="block text-[10px] font-bold text-slate-500 mb-1">To Date (End):</label>
+                                <label className="block text-[10px] font-bold text-slate-500 mb-1">To Date (Optional):</label>
                                 <input
                                   type="date"
                                   value={item.serviceEndDate || ''}
@@ -1169,7 +1169,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
 
                               {/* Single Service Date */}
                               <div>
-                                <label className="block text-[10px] font-bold text-slate-500 mb-1">Single Service Date:</label>
+                                <label className="block text-[10px] font-bold text-slate-500 mb-1">Single Service Date (Optional):</label>
                                 <input
                                   type="date"
                                   value={item.serviceDate || ''}
@@ -1181,7 +1181,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
                               {/* Duration / Unit */}
                               <div className="grid grid-cols-2 gap-1.5">
                                 <div>
-                                  <label className="block text-[10px] font-bold text-slate-500 mb-1">Duration:</label>
+                                  <label className="block text-[10px] font-bold text-slate-500 mb-1">Duration (Optional):</label>
                                   <input
                                     type="number"
                                     min="0"
@@ -1192,7 +1192,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
                                   />
                                 </div>
                                 <div>
-                                  <label className="block text-[10px] font-bold text-slate-500 mb-1">Unit:</label>
+                                  <label className="block text-[10px] font-bold text-slate-500 mb-1">Unit (Optional):</label>
                                   <input
                                     type="text"
                                     value={item.unit || ''}
@@ -1273,9 +1273,10 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
               </div>
 
               <div>
-                <label className="text-[10px] text-slate-500">Invoice Notes / Special Instructions:</label>
+                <label className="text-[10px] text-slate-500">Invoice Notes / Special Instructions (Optional):</label>
                 <textarea
                   rows={2}
+                  placeholder="Enter description/notes if required..."
                   value={notes}
                   onChange={e => setNotes(e.target.value)}
                   className="w-full p-2 rounded-lg bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-700 text-xs"
