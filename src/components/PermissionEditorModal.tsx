@@ -40,6 +40,8 @@ export const PermissionEditorModal: React.FC<PermissionEditorModalProps> = ({
   const [viewMode, setViewMode] = useState<'EDITOR' | 'SUMMARY' | 'HISTORY'>('EDITOR');
   const [errorMessage, setErrorMessage] = useState<string>('');
 
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+
   // Check if this user is the only active ADMIN
   const activeAdmins = allUsers.filter(u => (u.role === 'ADMIN' || u.role === 'SUPER_ADMIN') && u.isActive);
   const isOnlyAdmin = activeAdmins.length === 1 && activeAdmins[0].id === targetUser.id;
@@ -74,12 +76,15 @@ export const PermissionEditorModal: React.FC<PermissionEditorModalProps> = ({
     setLocalPermissions(resetMap);
   };
 
-  const handleSaveSubmit = () => {
+  const handleSaveSubmit = async () => {
     // Safety check: Ensure Admin still has user_management permission if only 1 admin
     if (isOnlyAdmin && (!localPermissions['user_management_permissions'] || !localPermissions['user_management_view'])) {
       setErrorMessage('Safety Guard Block: As the only active Admin, you must retain User Management & Permission rights.');
       return;
     }
+
+    setIsSaving(true);
+    setErrorMessage('');
 
     // Generate change history records for accountability
     const nowStr = new Date().toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'medium' });
@@ -114,7 +119,15 @@ export const PermissionEditorModal: React.FC<PermissionEditorModalProps> = ({
       permissionHistory: updatedHistory
     };
 
-    onSave(updatedUser);
+    try {
+      await onSave(updatedUser);
+      onClose();
+    } catch (err: any) {
+      console.error('Error saving user permissions:', err);
+      setErrorMessage(err?.message || 'Failed to save permissions to Supabase. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // Helper icon mapper
@@ -448,10 +461,13 @@ export const PermissionEditorModal: React.FC<PermissionEditorModalProps> = ({
 
             <button
               onClick={handleSaveSubmit}
-              className="px-6 py-2 bg-gradient-to-r from-[#D62828] to-red-700 hover:from-red-700 hover:to-red-800 text-white text-xs font-bold rounded-xl shadow-lg shadow-red-900/30 flex items-center space-x-2 transition-all active:scale-95"
+              disabled={isSaving}
+              className={`px-6 py-2 bg-gradient-to-r from-[#D62828] to-red-700 hover:from-red-700 hover:to-red-800 text-white text-xs font-bold rounded-xl shadow-lg shadow-red-900/30 flex items-center space-x-2 transition-all active:scale-95 ${
+                isSaving ? 'opacity-70 cursor-not-allowed' : ''
+              }`}
             >
-              <Save className="w-4 h-4" />
-              <span>SAVE CHANGES</span>
+              <Save className={`w-4 h-4 ${isSaving ? 'animate-spin' : ''}`} />
+              <span>{isSaving ? 'SAVING TO DATABASE...' : 'SAVE CHANGES'}</span>
             </button>
           </div>
         </div>

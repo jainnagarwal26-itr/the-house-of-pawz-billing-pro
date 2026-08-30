@@ -50,6 +50,51 @@ export async function fetchUsersFromSupabase(): Promise<User[]> {
   }
 }
 
+export async function updateUserPermissionsBatchInSupabase(
+  userId: string,
+  permissions: Record<string, boolean>
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const rows = Object.entries(permissions).map(([permissionKey, isGranted]) => ({
+      user_id: userId,
+      permission_key: permissionKey,
+      is_granted: isGranted,
+      updated_at: new Date().toISOString()
+    }));
+
+    if (rows.length === 0) return { success: true };
+
+    const { error } = await supabase
+      .from('user_permissions')
+      .upsert(rows as any, { onConflict: 'user_id,permission_key' });
+
+    if (error) {
+      console.error('Error batch updating user permissions:', error);
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  } catch (err: any) {
+    console.error('Exception in updateUserPermissionsBatchInSupabase:', err);
+    return { success: false, error: err.message || 'Unknown network error' };
+  }
+}
+
+export async function resetUserPermissionsInSupabase(
+  userId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { error } = await supabase
+      .from('user_permissions')
+      .delete()
+      .eq('user_id', userId);
+
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
 export async function updateUserPermissionInSupabase(
   userId: string,
   permissionKey: string,
@@ -70,7 +115,8 @@ export async function updateUserPermissionInSupabase(
         .upsert({
           user_id: userId,
           permission_key: permissionKey,
-          is_granted: overrideValue
+          is_granted: overrideValue,
+          updated_at: new Date().toISOString()
         } as any, { onConflict: 'user_id,permission_key' });
 
       if (error) return { success: false, error: error.message };

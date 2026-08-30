@@ -13,7 +13,7 @@ interface UserManagementProps {
   onSwitchUserRole: (role: UserRole) => void;
   onSwitchUser?: (user: User) => void;
   onAddUser: (user: User) => void;
-  onUpdateUser?: (user: User) => void;
+  onUpdateUser?: (user: User) => Promise<void> | void;
 }
 
 export const UserManagement: React.FC<UserManagementProps> = ({
@@ -406,11 +406,10 @@ export const UserManagement: React.FC<UserManagementProps> = ({
           targetUser={editingPermissionsUser}
           adminUser={activeUser}
           allUsers={users}
-          onSave={updatedUser => {
+          onSave={async updatedUser => {
             if (onUpdateUser) {
-              onUpdateUser(updatedUser);
+              await onUpdateUser(updatedUser);
             }
-            setEditingPermissionsUser(null);
           }}
           onClose={() => setEditingPermissionsUser(null)}
         />

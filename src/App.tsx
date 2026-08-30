@@ -52,7 +52,7 @@ import { fetchInvoicesFromSupabase, createInvoiceInSupabase, cancelInvoiceInSupa
 import { executeLiveProductionImport } from './lib/migrationService';
 import { fetchPaymentsFromSupabase, recordPaymentInSupabase } from './lib/paymentService';
 import { fetchCompanySettingsFromSupabase, updateCompanySettingsInSupabase } from './lib/settingsService';
-import { fetchUsersFromSupabase, updateUserPermissionInSupabase, updateUserRoleInSupabase } from './lib/userService';
+import { fetchUsersFromSupabase, updateUserPermissionInSupabase, updateUserPermissionsBatchInSupabase, updateUserRoleInSupabase } from './lib/userService';
 import { fetchAuditLogsFromSupabase, logAuditEventToSupabase } from './lib/auditService';
 import {
   fetchServiceCatalogFromSupabase,
@@ -327,12 +327,14 @@ export default function App() {
 
   // Action Handler: Role & User Switcher
   const handleSwitchUser = async (targetUser: User) => {
-    setCurrentUser(targetUser);
-    setSession(targetUser);
-    saveStoredData(STORAGE_KEYS.SESSION, targetUser);
+    const freshUsers = await fetchUsersFromSupabase();
+    const freshTarget = freshUsers.find(u => u.id === targetUser.id || u.username.toLowerCase() === targetUser.username.toLowerCase()) || targetUser;
+    setCurrentUser(freshTarget);
+    setSession(freshTarget);
+    saveStoredData(STORAGE_KEYS.SESSION, freshTarget);
     logAuditEventToSupabase(
       'ROLE_SWITCHED', 
-      `Switched active session to ${targetUser.name} (${targetUser.role})`
+      `Switched active session to ${freshTarget.name} (${freshTarget.role})`
     );
   };
 
@@ -1626,17 +1628,34 @@ export default function App() {
                 onSwitchUserRole={handleSwitchRole}
                 onSwitchUser={handleSwitchUser}
                 onAddUser={async u => {
-                  await updateUserRoleInSupabase(u.id, u.role);
+                  const roleRes = await updateUserRoleInSupabase(u.id, u.role);
+                  if (!roleRes.success) {
+                    alert(`Error saving user role: ${roleRes.error}`);
+                    return;
+                  }
                   const freshUsers = await fetchUsersFromSupabase();
                   setUsers(freshUsers);
                 }}
                 onUpdateUser={async u => {
+                  let permSuccess = true;
+                  let permError = '';
                   if (u.permissions) {
-                    for (const [key, val] of Object.entries(u.permissions)) {
-                      await updateUserPermissionInSupabase(u.id, key, val as boolean);
+                    const res = await updateUserPermissionsBatchInSupabase(u.id, u.permissions);
+                    if (!res.success) {
+                      permSuccess = false;
+                      permError = res.error || 'Failed to update permissions';
                     }
                   }
-                  await updateUserRoleInSupabase(u.id, u.role);
+                  const roleRes = await updateUserRoleInSupabase(u.id, u.role);
+                  if (!roleRes.success) {
+                    alert(`Error updating user role: ${roleRes.error}`);
+                    throw new Error(roleRes.error);
+                  }
+
+                  if (!permSuccess) {
+                    alert(`Error saving permissions: ${permError}`);
+                    throw new Error(permError);
+                  }
 
                   const freshUsers = await fetchUsersFromSupabase();
                   setUsers(freshUsers);
@@ -1646,6 +1665,7 @@ export default function App() {
                     if (updatedActive) {
                       setSession(updatedActive);
                       setCurrentUser(updatedActive);
+                      saveStoredData(STORAGE_KEYS.SESSION, updatedActive);
                     }
                   }
 
