@@ -68,11 +68,19 @@ export const BatchInvoicePrintPreview: React.FC<BatchInvoicePrintPreviewProps> =
             return new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0])).getTime();
           }
         }
+        const clean = dStr.replace(/(\d+)(st|nd|rd|th)/i, '$1');
+        const parsed = new Date(clean).getTime();
+        if (!isNaN(parsed) && parsed > 0) return parsed;
         return new Date(dStr).getTime() || 0;
       };
       const tA = parseDate(a.paymentDate);
       const tB = parseDate(b.paymentDate);
       if (tA !== tB) return tA - tB;
+
+      const cA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const cB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      if (cA !== cB) return cA - cB;
+
       return (a.id || '').localeCompare(b.id || '');
     });
   };
@@ -231,11 +239,11 @@ export const BatchInvoicePrintPreview: React.FC<BatchInvoicePrintPreviewProps> =
             <span className="font-bold text-slate-800 uppercase tracking-wider text-[9px]">
               💳 PAYMENT HISTORY
             </span>
-            {invPays.length > 0 && (
-              <span className="text-[8.5px] font-mono text-slate-500 font-semibold">
-                {invPays.length} entry{invPays.length > 1 ? 'ies' : ''}
-              </span>
-            )}
+            <span className="text-[8.5px] font-mono text-slate-500 font-semibold">
+              {invPays.length > 0
+                ? (invPays.length === 1 ? '1 entry' : `${invPays.length} entries`)
+                : (invoice.paidAmount > 0 ? '1 entry' : '0 entries')}
+            </span>
           </div>
           
           {invPays.length > 0 ? (

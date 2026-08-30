@@ -39,7 +39,7 @@ export const InvoicePrintPreview: React.FC<InvoicePrintPreviewProps> = ({
     setPortalContainer(el);
   }, []);
 
-  // Filter and sort payment entries for this invoice chronologically (payment_date ASC)
+  // Filter and sort payment entries for this invoice chronologically (payment_date ASC, created_at ASC)
   const invoicePayments = useMemo(() => {
     if (!payments || payments.length === 0) return [];
     
@@ -57,11 +57,19 @@ export const InvoicePrintPreview: React.FC<InvoicePrintPreviewProps> = ({
             return new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0])).getTime();
           }
         }
+        const clean = dStr.replace(/(\d+)(st|nd|rd|th)/i, '$1');
+        const parsed = new Date(clean).getTime();
+        if (!isNaN(parsed) && parsed > 0) return parsed;
         return new Date(dStr).getTime() || 0;
       };
       const tA = parseDate(a.paymentDate);
       const tB = parseDate(b.paymentDate);
       if (tA !== tB) return tA - tB;
+      
+      const cA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const cB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      if (cA !== cB) return cA - cB;
+
       return (a.id || '').localeCompare(b.id || '');
     });
   }, [payments, invoice]);
@@ -276,11 +284,11 @@ export const InvoicePrintPreview: React.FC<InvoicePrintPreviewProps> = ({
           <span className="font-bold text-slate-800 uppercase tracking-wider text-[9px]">
             💳 PAYMENT HISTORY
           </span>
-          {invoicePayments.length > 0 && (
-            <span className="text-[8.5px] font-mono text-slate-500 font-semibold">
-              {invoicePayments.length} entry{invoicePayments.length > 1 ? 'ies' : ''}
-            </span>
-          )}
+          <span className="text-[8.5px] font-mono text-slate-500 font-semibold">
+            {invoicePayments.length > 0
+              ? (invoicePayments.length === 1 ? '1 entry' : `${invoicePayments.length} entries`)
+              : (invoice.paidAmount > 0 ? '1 entry' : '0 entries')}
+          </span>
         </div>
         
         {invoicePayments.length > 0 ? (
