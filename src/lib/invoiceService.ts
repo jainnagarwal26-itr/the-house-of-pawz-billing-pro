@@ -228,7 +228,15 @@ export async function createInvoiceInSupabase(inv: Omit<Invoice, 'id' | 'created
       notes: inv.notes || null,
       created_by_role: inv.createdByRole || 'ADMIN',
       created_by_name: inv.createdByName || 'Chirag Jain',
-      is_cancelled: inv.isCancelled || false
+      is_cancelled: inv.isCancelled || false,
+      payments: (inv.initialPayments || (inv as any).payments || []).map((p: any, idx: number) => ({
+        payment_id: p.id || undefined,
+        payment_date: p.paymentDate,
+        amount: Number(p.amount) || 0,
+        payment_mode: p.paymentMode || 'UPI',
+        transaction_ref: p.transactionRef || undefined,
+        notes: p.notes || undefined
+      }))
     };
 
     // Execute atomic transactional RPC create_invoice_with_items

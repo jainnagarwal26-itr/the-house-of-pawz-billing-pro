@@ -518,7 +518,8 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
         notes,
         createdByRole: (currentUser?.role || userRole || 'USER') as UserRole,
         createdByName: userName,
-        createdAt: invoice?.createdAt || new Date().toISOString()
+        createdAt: invoice?.createdAt || new Date().toISOString(),
+        initialPayments: !invoice ? paymentEntries.filter(p => Number(p.amount) > 0) : undefined
       };
 
       await onSaveInvoice(savedInvoice);
@@ -1288,7 +1289,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
               <div className="flex items-center justify-between">
                 <label className="font-bold text-slate-800 dark:text-zinc-200 uppercase tracking-wider text-[10px] flex items-center gap-1.5">
                   <CreditCard className="w-3.5 h-3.5 text-[#D62828]" />
-                  <span>Payment Collection Ledger ({paymentEntries.length})</span>
+                  <span>💳 PAYMENT COLLECTION ({paymentEntries.length === 1 ? '1 entry' : `${paymentEntries.length} entries`})</span>
                 </label>
                 <div className="flex items-center space-x-1.5">
                   <button
@@ -1361,6 +1362,11 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
                             Ref: {pe.transactionRef}
                           </span>
                         )}
+                        {pe.notes && (
+                          <span className="text-[10px] text-slate-400 italic">
+                            ({pe.notes})
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center space-x-2">
                         <span className="font-mono font-extrabold text-emerald-600 dark:text-emerald-400">
@@ -1395,7 +1401,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
                   className="w-full py-1.5 bg-white dark:bg-zinc-900 hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-200 rounded-lg border border-dashed border-slate-300 dark:border-zinc-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors"
                 >
                   <Plus className="w-3.5 h-3.5 text-[#D62828]" />
-                  <span>+ Add Payment Entry</span>
+                  <span>{paymentEntries.length === 0 ? '+ Add Payment' : '+ Add Another Payment'}</span>
                 </button>
               ) : (
                 <div className="p-3 bg-white dark:bg-zinc-900 rounded-lg border border-red-200 dark:border-red-900 space-y-2">

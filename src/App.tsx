@@ -425,7 +425,7 @@ export default function App() {
     ]);
     if (freshInvs.length > 0) setInvoices(freshInvs);
     if (freshCusts.length > 0) setCustomers(freshCusts);
-    if (freshPays.length > 0) setPayments(freshPays);
+    setPayments(freshPays || []);
     setLongTermContracts(freshContracts);
 
     setShowInvoiceModal(false);

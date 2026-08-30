@@ -179,6 +179,14 @@ export interface Invoice {
   createdAt: string;
   isCancelled?: boolean;
   cancelledReason?: string;
+  initialPayments?: Array<{
+    id?: string;
+    paymentDate: string;
+    amount: number;
+    paymentMode: PaymentMode;
+    transactionRef?: string;
+    notes?: string;
+  }>;
 }
 
 export interface Payment {
