@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { 
   Invoice, InvoiceItem, Customer, Pet, CatalogItem, 
-  CompanySettings, UserRole, formatINR, PaymentStatus, PaymentMode, User,
+  CompanySettings, UserRole, formatINR, PaymentStatus, PaymentMode, User, Payment,
   ServiceCatalogItem, ServicePackageMaster, PickDropBooking, LongTermContract
 } from '../types';
 import { CATALOG_ITEMS } from '../lib/storage';
@@ -17,6 +17,7 @@ interface InvoiceModalProps {
   allInvoices?: Invoice[];
   customers: Customer[];
   pets: Pet[];
+  payments?: Payment[];
   services?: ServiceCatalogItem[];
   packages?: ServicePackageMaster[];
   longTermPackages?: LongTermContract[];
@@ -36,6 +37,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
   allInvoices = [],
   customers,
   pets,
+  payments = [],
   services = [],
   packages = [],
   longTermPackages = [],
@@ -241,17 +243,98 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
     transactionRef?: string;
     notes?: string;
   }>>(() => {
-    if (invoice && invoice.paidAmount > 0) {
-      return [{
-        id: `PAY-INIT-1`,
-        amount: invoice.paidAmount,
-        paymentDate: invoice.invoiceDate || todayStr,
-        paymentMode: invoice.paymentMode || 'UPI',
-        notes: invoice.notes || ''
-      }];
+    if (invoice) {
+      const matched = (payments || []).filter(p => 
+        (p.invoiceId && (p.invoiceId === invoice.id || p.invoiceId === (invoice as any).internalInvoiceId || p.invoiceId === (invoice as any).internal_invoice_id)) ||
+        (p.invoiceNumber && p.invoiceNumber === invoice.invoiceNumber)
+      );
+
+      if (matched.length > 0) {
+        return [...matched].sort((a, b) => {
+          const parseDate = (dStr?: string) => {
+            if (!dStr) return 0;
+            if (dStr.includes('/')) {
+              const parts = dStr.split('/');
+              if (parts.length === 3) {
+                return new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0])).getTime();
+              }
+            }
+            const clean = dStr.replace(/(\d+)(st|nd|rd|th)/i, '$1');
+            const parsed = new Date(clean).getTime();
+            if (!isNaN(parsed) && parsed > 0) return parsed;
+            return new Date(dStr).getTime() || 0;
+          };
+          const tA = parseDate(a.paymentDate);
+          const tB = parseDate(b.paymentDate);
+          if (tA !== tB) return tA - tB;
+          const cA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const cB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          if (cA !== cB) return cA - cB;
+          return (a.id || '').localeCompare(b.id || '');
+        }).map(p => ({
+          id: p.id,
+          amount: Number(p.amount) || 0,
+          paymentDate: p.paymentDate,
+          paymentMode: p.paymentMode || 'UPI',
+          transactionRef: p.transactionRef || undefined,
+          notes: p.notes || undefined
+        }));
+      }
+
+      if (invoice.paidAmount > 0) {
+        return [{
+          id: `PAY-INIT-1`,
+          amount: invoice.paidAmount,
+          paymentDate: invoice.invoiceDate || todayStr,
+          paymentMode: invoice.paymentMode || 'UPI',
+          notes: invoice.notes || ''
+        }];
+      }
     }
     return [];
   });
+
+  // Re-sync payment entries whenever editing invoice or payments change
+  useEffect(() => {
+    if (invoice) {
+      const matched = (payments || []).filter(p => 
+        (p.invoiceId && (p.invoiceId === invoice.id || p.invoiceId === (invoice as any).internalInvoiceId || p.invoiceId === (invoice as any).internal_invoice_id)) ||
+        (p.invoiceNumber && p.invoiceNumber === invoice.invoiceNumber)
+      );
+
+      if (matched.length > 0) {
+        setPaymentEntries([...matched].sort((a, b) => {
+          const parseDate = (dStr?: string) => {
+            if (!dStr) return 0;
+            if (dStr.includes('/')) {
+              const parts = dStr.split('/');
+              if (parts.length === 3) {
+                return new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0])).getTime();
+              }
+            }
+            const clean = dStr.replace(/(\d+)(st|nd|rd|th)/i, '$1');
+            const parsed = new Date(clean).getTime();
+            if (!isNaN(parsed) && parsed > 0) return parsed;
+            return new Date(dStr).getTime() || 0;
+          };
+          const tA = parseDate(a.paymentDate);
+          const tB = parseDate(b.paymentDate);
+          if (tA !== tB) return tA - tB;
+          const cA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const cB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          if (cA !== cB) return cA - cB;
+          return (a.id || '').localeCompare(b.id || '');
+        }).map(p => ({
+          id: p.id,
+          amount: Number(p.amount) || 0,
+          paymentDate: p.paymentDate,
+          paymentMode: p.paymentMode || 'UPI',
+          transactionRef: p.transactionRef || undefined,
+          notes: p.notes || undefined
+        })));
+      }
+    }
+  }, [invoice, payments]);
 
   const [showAddEntry, setShowAddEntry] = useState(false);
   const [newPayDate, setNewPayDate] = useState(todayStr);

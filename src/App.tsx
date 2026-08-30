@@ -1767,6 +1767,7 @@ export default function App() {
           allInvoices={invoices}
           customers={customers}
           pets={pets}
+          payments={payments}
           services={serviceCatalog}
           packages={packageMaster}
           longTermPackages={longTermContracts}

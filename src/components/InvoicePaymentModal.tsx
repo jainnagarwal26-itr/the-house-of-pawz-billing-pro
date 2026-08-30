@@ -43,7 +43,10 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
   if (!isOpen || !invoice) return null;
 
   // Payments for this specific invoice
-  const invoicePayments = payments.filter(p => p.invoiceId === invoice.id);
+  const invoicePayments = payments.filter(p => 
+    (p.invoiceId && (p.invoiceId === invoice.id || p.invoiceId === (invoice as any).internalInvoiceId || p.invoiceId === (invoice as any).internal_invoice_id)) ||
+    (p.invoiceNumber && p.invoiceNumber === invoice.invoiceNumber)
+  );
   const totalPaid = invoicePayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
   const balanceDue = Math.max(0, invoice.grandTotal - totalPaid);
   const overpaidAmount = totalPaid > invoice.grandTotal ? totalPaid - invoice.grandTotal : 0;
