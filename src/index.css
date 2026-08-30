@@ -125,23 +125,19 @@
     visibility: visible !important;
   }
 
-  /* Individual Invoice Page: Exactly 1 A4 Page per invoice */
+  /* Individual Invoice Page: Natural Compact A4 Flow */
   .invoice-print-page {
     width: 210mm !important;
-    min-height: 297mm !important;
-    height: 297mm !important;
-    max-height: 297mm !important;
     box-sizing: border-box !important;
-    padding: 8mm 10mm !important;
+    padding: 6mm 10mm !important;
     margin: 0 !important;
     position: relative !important;
-    display: flex !important;
-    flex-direction: column !important;
-    justify-content: space-between !important;
+    display: block !important;
     break-after: page !important;
     page-break-after: always !important;
-    overflow: hidden !important;
     background: #ffffff !important;
+    font-size: 10px !important;
+    line-height: 1.25 !important;
   }
 
   .invoice-print-page:last-child {

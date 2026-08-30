@@ -660,6 +660,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
       {selectedInvoiceForPreview && (
         <InvoicePrintPreview
           invoice={selectedInvoiceForPreview}
+          payments={payments}
           settings={settings}
           userRole={userRole}
           autoDownloadPDF={isAutoDownloadPDF}
@@ -675,6 +676,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
       {showBatchPrintPreview && (
         <BatchInvoicePrintPreview
           invoices={filteredInvoices.filter(inv => selectedInvoiceIds.includes(inv.id))}
+          payments={payments}
           settings={settings}
           onClose={() => setShowBatchPrintPreview(false)}
         />

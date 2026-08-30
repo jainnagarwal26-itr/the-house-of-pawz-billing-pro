@@ -1,16 +1,18 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Printer, ArrowLeft, X } from 'lucide-react';
-import { Invoice, CompanySettings, formatINR } from '../types';
+import { Printer, ArrowLeft, X, QrCode } from 'lucide-react';
+import { Invoice, CompanySettings, formatINR, Payment } from '../types';
 
 interface BatchInvoicePrintPreviewProps {
   invoices: Invoice[];
+  payments?: Payment[];
   settings: CompanySettings;
   onClose: () => void;
 }
 
 export const BatchInvoicePrintPreview: React.FC<BatchInvoicePrintPreviewProps> = ({
   invoices,
+  payments = [],
   settings,
   onClose
 }) => {
@@ -50,33 +52,61 @@ export const BatchInvoicePrintPreview: React.FC<BatchInvoicePrintPreviewProps> =
     }, 1000);
   };
 
-  const renderSingleInvoiceContent = (invoice: Invoice, isScreenPreview = false) => (
-    <div className={isScreenPreview ? 'p-6 sm:p-10 border-b-4 border-slate-900 mb-8 bg-white' : 'invoice-print-page'}>
-      {/* Header & Company Details */}
-      <div>
-        <div className="flex items-start justify-between pb-4 border-b-2 border-slate-900 gap-4">
+  const getInvoicePayments = (invoice: Invoice) => {
+    if (!payments || payments.length === 0) return [];
+    const matched = payments.filter(p => 
+      (p.invoiceId && (p.invoiceId === invoice.id || p.invoiceId === (invoice as any).internalInvoiceId || p.invoiceId === (invoice as any).internal_invoice_id)) ||
+      (p.invoiceNumber && p.invoiceNumber === invoice.invoiceNumber)
+    );
+
+    return [...matched].sort((a, b) => {
+      const parseDate = (dStr?: string) => {
+        if (!dStr) return 0;
+        if (dStr.includes('/')) {
+          const parts = dStr.split('/');
+          if (parts.length === 3) {
+            return new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0])).getTime();
+          }
+        }
+        return new Date(dStr).getTime() || 0;
+      };
+      const tA = parseDate(a.paymentDate);
+      const tB = parseDate(b.paymentDate);
+      if (tA !== tB) return tA - tB;
+      return (a.id || '').localeCompare(b.id || '');
+    });
+  };
+
+  const renderSingleInvoiceContent = (invoice: Invoice, isScreenPreview = false) => {
+    const invPays = getInvoicePayments(invoice);
+    const overpaidAmount = invoice.paidAmount > invoice.grandTotal ? invoice.paidAmount - invoice.grandTotal : 0;
+
+    return (
+      <div key={invoice.id} className={isScreenPreview ? 'p-4 sm:p-6 border-b-4 border-slate-900 mb-8 bg-white rounded-xl shadow-lg' : 'invoice-print-page'}>
+        {/* 1. Header & Company Details */}
+        <div className="flex items-start justify-between pb-3 border-b-2 border-slate-900 gap-3">
           <div>
             <div className="flex items-center space-x-3">
               {settings.logoPath ? (
                 <img
                   src={settings.logoPath}
                   alt={settings.companyName}
-                  className="h-14 sm:h-16 w-auto max-w-[150px] object-contain shrink-0"
+                  className="h-12 sm:h-14 w-auto max-w-[130px] object-contain shrink-0"
                   onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
                 />
               ) : (
-                <div className="w-12 h-12 rounded-lg bg-[#D62828] text-white flex items-center justify-center font-extrabold text-lg font-mono shrink-0 shadow-sm">
+                <div className="w-10 h-10 rounded-lg bg-[#D62828] text-white flex items-center justify-center font-extrabold text-base font-mono shrink-0 shadow-xs">
                   HOP
                 </div>
               )}
               <div>
-                <h1 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight uppercase leading-none">
+                <h1 className="text-base sm:text-lg font-black text-slate-900 tracking-tight uppercase leading-tight">
                   {settings.companyName}
                 </h1>
                 <p className="text-[10px] text-red-700 font-bold mt-0.5">{settings.tagline}</p>
               </div>
             </div>
-            <p className="text-[10px] text-slate-600 mt-2 leading-tight">
+            <p className="text-[9.5px] text-slate-600 mt-1 leading-tight">
               {settings.address}, {settings.cityStateZip}<br />
               Phone: {settings.phone} | Email: {settings.email}<br />
               Website: <span className="text-blue-700 font-semibold">https://www.wisdomcentre.co.in/</span><br />
@@ -85,10 +115,10 @@ export const BatchInvoicePrintPreview: React.FC<BatchInvoicePrintPreviewProps> =
           </div>
 
           <div className="text-right">
-            <span className="inline-block px-3 py-1 bg-red-700 text-white font-black text-xs uppercase tracking-widest rounded">
+            <span className="inline-block px-2.5 py-0.5 bg-red-700 text-white font-black text-[10px] uppercase tracking-widest rounded">
               TAX INVOICE
             </span>
-            <table className="mt-2 text-[10px] text-left border-collapse ml-auto">
+            <table className="mt-1.5 text-[10px] text-left border-collapse ml-auto">
               <tbody>
                 <tr>
                   <td className="font-bold pr-2 text-slate-600">Invoice No:</td>
@@ -111,10 +141,10 @@ export const BatchInvoicePrintPreview: React.FC<BatchInvoicePrintPreviewProps> =
           </div>
         </div>
 
-        {/* Customer & Pet Details */}
-        <div className="grid grid-cols-2 gap-3 bg-slate-50 p-2.5 rounded-lg border border-slate-200 my-3 text-[10px]">
+        {/* 2. Customer & Pet Details */}
+        <div className="grid grid-cols-2 gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-200 my-2 text-[10px]">
           <div>
-            <p className="font-bold text-slate-400 uppercase tracking-wider text-[9px] mb-0.5">
+            <p className="font-bold text-slate-400 uppercase tracking-wider text-[8.5px] mb-0.5">
               Billed To (Customer):
             </p>
             <p className="font-bold text-xs text-slate-900">{invoice.customerName}</p>
@@ -126,29 +156,30 @@ export const BatchInvoicePrintPreview: React.FC<BatchInvoicePrintPreviewProps> =
           </div>
 
           <div>
-            <p className="font-bold text-slate-400 uppercase tracking-wider text-[9px] mb-0.5">
-              Pet Boarding & Care Ref:
+            <p className="font-bold text-slate-400 uppercase tracking-wider text-[8.5px] mb-0.5">
+              Pet Boarding & Care Reference:
             </p>
             {invoice.petName ? (
               <div>
                 <p className="font-bold text-slate-900 text-xs">Pet Name: {invoice.petName}</p>
-                <p className="text-slate-600">Services rendered at The House of Pawz</p>
+                <p className="text-slate-600 leading-tight">Services rendered at The House of Pawz</p>
               </div>
             ) : (
               <p className="text-slate-500 italic">General Pet Care / Product Purchase</p>
             )}
-            <div className="mt-1 pt-1 border-t border-slate-200 flex items-center justify-between">
-              <span className="text-slate-600 font-medium">Payment Mode:</span>
-              <span className="font-bold text-slate-900">{invoice.paymentMode}</span>
-            </div>
+            {invoice.notes && (
+              <p className="text-[9px] text-slate-500 mt-1 italic leading-tight">
+                <strong>Notes:</strong> {invoice.notes}
+              </p>
+            )}
           </div>
         </div>
 
-        {/* Line Items Table */}
-        <div className="border border-slate-300 rounded-lg overflow-hidden my-3">
+        {/* 3. Line Items Table */}
+        <div className="border border-slate-300 rounded-lg overflow-hidden my-2">
           <table className="w-full text-left border-collapse text-[10px]">
             <thead>
-              <tr className="bg-slate-100 text-slate-700 uppercase tracking-wider font-bold border-b border-slate-300 text-[9px]">
+              <tr className="bg-slate-100 text-slate-700 uppercase tracking-wider font-bold border-b border-slate-300 text-[8.5px]">
                 <th className="p-1.5 border-r border-slate-300 text-center w-6">#</th>
                 <th className="p-1.5 border-r border-slate-300">Item Description</th>
                 <th className="p-1.5 border-r border-slate-300 text-center">HSN/SAC</th>
@@ -161,23 +192,23 @@ export const BatchInvoicePrintPreview: React.FC<BatchInvoicePrintPreviewProps> =
             </thead>
             <tbody>
               {invoice.items.map((item, itemIdx) => (
-                <tr key={item.id || itemIdx} className="border-b border-slate-200">
+                <tr key={item.id || itemIdx} className="border-b border-slate-200 last:border-b-0">
                   <td className="p-1.5 border-r border-slate-200 text-center font-mono">{itemIdx + 1}</td>
                   <td className="p-1.5 border-r border-slate-200 font-medium">
                     <div>{item.name}</div>
                     {item.serviceStartDate && item.serviceEndDate && (
-                      <div className="text-[8.5px] text-slate-600 font-normal mt-0.5">
+                      <div className="text-[8.5px] text-slate-600 font-normal leading-tight">
                         <strong>Period:</strong> {item.serviceStartDate} → {item.serviceEndDate}
                         {item.duration ? ` (${item.duration} ${item.unit || 'Nights'})` : ''}
                       </div>
                     )}
                     {!item.serviceStartDate && item.serviceDate && (
-                      <div className="text-[8.5px] text-slate-600 font-normal mt-0.5">
+                      <div className="text-[8.5px] text-slate-600 font-normal leading-tight">
                         <strong>Date:</strong> {item.serviceDate}
                       </div>
                     )}
                     {item.discount > 0 && (
-                      <span className="block text-[8px] text-emerald-600 font-normal">
+                      <span className="block text-[8px] text-emerald-600">
                         ({item.discount}% Disc Applied)
                       </span>
                     )}
@@ -193,12 +224,92 @@ export const BatchInvoicePrintPreview: React.FC<BatchInvoicePrintPreviewProps> =
             </tbody>
           </table>
         </div>
-      </div>
 
-      {/* Footer Section (Totals, Bank, Terms, Signature) */}
-      <div>
+        {/* 4. Payment History Section */}
+        <div className="border border-slate-300 rounded-lg overflow-hidden my-2">
+          <div className="bg-slate-100 px-2.5 py-1 border-b border-slate-300 flex items-center justify-between">
+            <span className="font-bold text-slate-800 uppercase tracking-wider text-[9px]">
+              💳 PAYMENT HISTORY
+            </span>
+            {invPays.length > 0 && (
+              <span className="text-[8.5px] font-mono text-slate-500 font-semibold">
+                {invPays.length} entry{invPays.length > 1 ? 'ies' : ''}
+              </span>
+            )}
+          </div>
+          
+          {invPays.length > 0 ? (
+            <table className="w-full text-left border-collapse text-[9.5px]">
+              <thead>
+                <tr className="bg-slate-50 text-slate-600 uppercase tracking-wider font-bold border-b border-slate-200 text-[8.5px]">
+                  <th className="py-1 px-2 border-r border-slate-200">Date</th>
+                  <th className="py-1 px-2 border-r border-slate-200">Payment Mode</th>
+                  <th className="py-1 px-2 border-r border-slate-200">Reference / Notes</th>
+                  <th className="py-1 px-2 text-right">Amount (₹)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {invPays.map((p, pIdx) => (
+                  <tr key={p.id || pIdx} className="border-b border-slate-100 last:border-b-0">
+                    <td className="py-1 px-2 border-r border-slate-100 font-mono font-bold text-slate-900">
+                      {p.paymentDate || invoice.invoiceDate}
+                    </td>
+                    <td className="py-1 px-2 border-r border-slate-100 font-medium text-slate-800">
+                      {p.paymentMode || 'UPI'}
+                    </td>
+                    <td className="py-1 px-2 border-r border-slate-100 text-slate-600">
+                      {p.transactionRef ? (
+                        <span className="font-mono text-slate-800 font-semibold">{p.transactionRef}</span>
+                      ) : p.notes ? (
+                        <span>{p.notes}</span>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
+                    </td>
+                    <td className="py-1 px-2 text-right font-mono font-bold text-slate-900">
+                      {formatINR(p.amount)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : invoice.paidAmount > 0 ? (
+            <table className="w-full text-left border-collapse text-[9.5px]">
+              <thead>
+                <tr className="bg-slate-50 text-slate-600 uppercase tracking-wider font-bold border-b border-slate-200 text-[8.5px]">
+                  <th className="py-1 px-2 border-r border-slate-200">Date</th>
+                  <th className="py-1 px-2 border-r border-slate-200">Payment Mode</th>
+                  <th className="py-1 px-2 border-r border-slate-200">Reference / Notes</th>
+                  <th className="py-1 px-2 text-right">Amount (₹)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="py-1 px-2 border-r border-slate-100 font-mono font-bold text-slate-900">
+                    {invoice.invoiceDate}
+                  </td>
+                  <td className="py-1 px-2 border-r border-slate-100 font-medium text-slate-800">
+                    {invoice.paymentMode || 'UPI'}
+                  </td>
+                  <td className="py-1 px-2 border-r border-slate-100 text-slate-600">
+                    <span className="text-slate-400">—</span>
+                  </td>
+                  <td className="py-1 px-2 text-right font-mono font-bold text-slate-900">
+                    {formatINR(invoice.paidAmount)}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          ) : (
+            <div className="py-1.5 px-3 text-center text-[9px] text-slate-500 italic">
+              No payments recorded (Invoice marked as UNPAID).
+            </div>
+          )}
+        </div>
+
+        {/* 5. Bank Gateway & Financial Summary */}
         <div className="grid grid-cols-2 gap-3 my-2 text-[10px]">
-          <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg space-y-1">
+          <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg space-y-1.5">
             <p className="font-bold text-slate-800 uppercase tracking-wider text-[9px]">
               Bank & UPI Payment Gateway
             </p>
@@ -208,7 +319,7 @@ export const BatchInvoicePrintPreview: React.FC<BatchInvoicePrintPreviewProps> =
               <p><strong>Account No:</strong> {settings.accountNo}</p>
               <p><strong>IFSC Code:</strong> {settings.ifscCode}</p>
               <p><strong>Branch:</strong> {settings.branch}</p>
-              <p className="text-red-700 font-bold mt-1">UPI ID: {settings.upiId}</p>
+              <p className="text-red-700 font-bold mt-0.5">UPI ID: {settings.upiId}</p>
             </div>
           </div>
 
@@ -256,20 +367,30 @@ export const BatchInvoicePrintPreview: React.FC<BatchInvoicePrintPreviewProps> =
                 <td className="p-1 text-right font-mono text-[#D62828]">{formatINR(invoice.grandTotal)}</td>
               </tr>
               <tr>
-                <td className="py-0.5 text-emerald-700 font-semibold">Paid Amount:</td>
+                <td className="py-0.5 text-emerald-700 font-semibold">Total Paid:</td>
                 <td className="py-0.5 text-right font-mono font-bold text-emerald-700">{formatINR(invoice.paidAmount)}</td>
               </tr>
-              {invoice.balanceDue > 0 && (
+              {invoice.balanceDue > 0 ? (
                 <tr className="text-red-700 font-bold bg-red-50">
                   <td className="p-0.5">Balance Due:</td>
                   <td className="p-0.5 text-right font-mono">{formatINR(invoice.balanceDue)}</td>
+                </tr>
+              ) : overpaidAmount > 0 ? (
+                <tr className="text-blue-700 font-semibold bg-blue-50 text-[9px]">
+                  <td className="p-0.5">Overpaid / Rounding:</td>
+                  <td className="p-0.5 text-right font-mono font-bold">+{formatINR(overpaidAmount)}</td>
+                </tr>
+              ) : (
+                <tr className="text-emerald-700 font-bold bg-emerald-50 text-[9px]">
+                  <td className="p-0.5">Balance Due:</td>
+                  <td className="p-0.5 text-right font-mono">₹ 0.00 (PAID)</td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
 
-        {/* Terms & Authorization */}
+        {/* 6. Terms & Authorization */}
         <div className="grid grid-cols-2 gap-3 border-t border-slate-300 pt-2 text-[9px] text-slate-600 mt-2">
           <div>
             <p className="font-bold text-slate-800 uppercase mb-0.5">Terms & Conditions:</p>
@@ -280,7 +401,7 @@ export const BatchInvoicePrintPreview: React.FC<BatchInvoicePrintPreviewProps> =
             </ol>
           </div>
 
-          <div className="text-right flex flex-col justify-between items-end min-h-[70px]">
+          <div className="text-right flex flex-col justify-between items-end min-h-[70px] pt-1">
             <p className="font-bold text-slate-900 uppercase">For {settings.companyName}</p>
             <div className="flex flex-col items-end">
               {settings.signaturePath ? (
@@ -300,8 +421,8 @@ export const BatchInvoicePrintPreview: React.FC<BatchInvoicePrintPreviewProps> =
           </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <>
@@ -352,7 +473,7 @@ export const BatchInvoicePrintPreview: React.FC<BatchInvoicePrintPreviewProps> =
         </div>
       </div>
 
-      {/* 2. Standalone React Portal to #global-print-portal at document.body level (For Chrome Print / Save-as-PDF Engine) */}
+      {/* 2. Standalone React Portal to #global-print-portal at document.body level */}
       {portalContainer && createPortal(
         <>
           {invoices.map(invoice => renderSingleInvoiceContent(invoice, false))}
