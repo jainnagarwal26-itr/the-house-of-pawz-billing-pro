@@ -142,7 +142,7 @@ export interface InvoiceItem {
 }
 
 export type PaymentStatus = 'PAID' | 'PARTIAL' | 'UNPAID' | 'CANCELLED';
-export type PaymentMode = 'UPI' | 'Cash' | 'Card' | 'Net Banking' | 'Cheque';
+export type PaymentMode = 'UPI' | 'Cash' | 'Card' | 'Net Banking' | 'Cheque' | 'Bank Transfer' | 'Online';
 
 export interface Invoice {
   id: string;
@@ -193,6 +193,7 @@ export interface Payment {
   transactionRef?: string;
   notes?: string;
   receivedBy: string;
+  createdAt?: string;
 }
 
 export interface RecurringSubscription {

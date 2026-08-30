@@ -85,6 +85,7 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     permissions: [
       { key: 'payments_view', label: 'View Payments Log', description: 'Inspect payment history and transaction modes' },
       { key: 'payments_record', label: 'Record Payment', description: 'Log incoming customer cash/UPI/card payments' },
+      { key: 'payments_edit', label: 'Edit Payment', description: 'Modify recorded payment amount, mode, date or reference' },
       { key: 'payments_delete', label: 'Delete Payment Record', description: 'Remove payment transaction entries' }
     ]
   },

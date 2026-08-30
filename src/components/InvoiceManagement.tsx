@@ -2,19 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { 
   Receipt, Search, PlusCircle, Printer, Share2, 
   Trash2, XCircle, Eye, Lock, Filter, ShieldAlert, FileSpreadsheet, KeyRound, Download,
-  ChevronLeft, ChevronRight
+  ChevronLeft, ChevronRight, CreditCard
 } from 'lucide-react';
-import { Invoice, Customer, Pet, CompanySettings, UserRole, formatINR, PaymentStatus, User } from '../types';
+import { Invoice, Customer, Pet, CompanySettings, UserRole, formatINR, PaymentStatus, User, Payment } from '../types';
 import { hasPermission } from '../lib/permissions';
 import { compareInvoicesDesc } from '../lib/invoiceService';
 import { InvoicePrintPreview } from './InvoicePrintPreview';
 import { BatchInvoicePrintPreview } from './BatchInvoicePrintPreview';
 import { AdminApprovalModal } from './AdminApprovalModal';
+import { InvoicePaymentModal } from './InvoicePaymentModal';
 
 interface InvoiceManagementProps {
   invoices: Invoice[];
   customers: Customer[];
   pets: Pet[];
+  payments?: Payment[];
   settings: CompanySettings;
   userRole: UserRole;
   userName: string;
@@ -24,12 +26,16 @@ interface InvoiceManagementProps {
   onCancelInvoice: (invoiceId: string) => void;
   onDeleteInvoice?: (invoiceId: string) => void;
   onExportExcel: () => void;
+  onRecordPayment?: (payment: Omit<Payment, 'id'> & { id?: string }) => Promise<void>;
+  onUpdatePayment?: (payment: Payment) => Promise<void>;
+  onDeletePayment?: (paymentId: string) => Promise<void>;
 }
 
 export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   invoices,
   customers,
   pets,
+  payments = [],
   settings,
   userRole,
   userName,
@@ -38,12 +44,18 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   onOpenEditModal,
   onCancelInvoice,
   onDeleteInvoice,
-  onExportExcel
+  onExportExcel,
+  onRecordPayment,
+  onUpdatePayment,
+  onDeletePayment
 }) => {
   const isAdmin = userRole === 'ADMIN' || userRole === 'SUPER_ADMIN' || userRole === 'ACCOUNTANT' || currentUser?.role === 'ACCOUNTANT';
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | PaymentStatus>('ALL');
+
+  // Payment Ledger Modal State
+  const [selectedInvoiceForPayments, setSelectedInvoiceForPayments] = useState<Invoice | null>(null);
 
   // Multi-select Batch Invoices State
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<string[]>([]);
@@ -348,6 +360,16 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                     <span>PDF</span>
                   </button>
                 )}
+                {hasPermission(currentUser, 'payments_view') && (
+                  <button
+                    onClick={() => setSelectedInvoiceForPayments(inv)}
+                    className="px-2.5 py-1.5 min-h-[36px] bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
+                    title="View & Add Payments"
+                  >
+                    <CreditCard className="w-3.5 h-3.5" />
+                    <span>Payments</span>
+                  </button>
+                )}
                 {hasPermission(currentUser, 'invoices_whatsapp') && (
                   <button
                     onClick={() => handleTriggerAction('SHARE', inv)}
@@ -508,6 +530,17 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                         </button>
                       )}
 
+                      {/* Payment Ledger */}
+                      {hasPermission(currentUser, 'payments_view') && (
+                        <button
+                          onClick={() => setSelectedInvoiceForPayments(inv)}
+                          className="p-1.5 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/60 rounded-lg transition-colors"
+                          title="View / Add Payments"
+                        >
+                          <CreditCard className="w-4 h-4" />
+                        </button>
+                      )}
+
                       {/* Edit Invoice */}
                       {hasPermission(currentUser, 'invoices_edit') && (
                         <button
@@ -644,6 +677,40 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
           invoices={filteredInvoices.filter(inv => selectedInvoiceIds.includes(inv.id))}
           settings={settings}
           onClose={() => setShowBatchPrintPreview(false)}
+        />
+      )}
+
+      {/* Invoice Payment Ledger Modal */}
+      {selectedInvoiceForPayments && (
+        <InvoicePaymentModal
+          isOpen={!!selectedInvoiceForPayments}
+          onClose={() => setSelectedInvoiceForPayments(null)}
+          invoice={selectedInvoiceForPayments}
+          payments={payments}
+          currentUser={currentUser}
+          userName={userName}
+          onRecordPayment={async (payment) => {
+            if (onRecordPayment) {
+              await onRecordPayment(payment);
+              // Update selected invoice reference from freshly updated invoice in list if available
+              const updatedInv = invoices.find(i => i.id === selectedInvoiceForPayments.id);
+              if (updatedInv) setSelectedInvoiceForPayments(updatedInv);
+            }
+          }}
+          onUpdatePayment={async (payment) => {
+            if (onUpdatePayment) {
+              await onUpdatePayment(payment);
+              const updatedInv = invoices.find(i => i.id === selectedInvoiceForPayments.id);
+              if (updatedInv) setSelectedInvoiceForPayments(updatedInv);
+            }
+          }}
+          onDeletePayment={async (paymentId) => {
+            if (onDeletePayment) {
+              await onDeletePayment(paymentId);
+              const updatedInv = invoices.find(i => i.id === selectedInvoiceForPayments.id);
+              if (updatedInv) setSelectedInvoiceForPayments(updatedInv);
+            }
+          }}
         />
       )}
     </div>

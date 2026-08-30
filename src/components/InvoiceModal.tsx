@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   X, Plus, Trash2, QrCode, Search, Calculator, 
-  CheckCircle2, AlertCircle, ShieldAlert, Sparkles, Loader2
+  CheckCircle2, AlertCircle, ShieldAlert, Sparkles, Loader2, CreditCard
 } from 'lucide-react';
 import { 
   Invoice, InvoiceItem, Customer, Pet, CatalogItem, 
@@ -232,10 +232,33 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
     }
   ]);
 
-  // Payment Status
-  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>(invoice?.paymentStatus || 'PAID');
-  const [paymentMode, setPaymentMode] = useState<PaymentMode>(invoice?.paymentMode || 'UPI');
-  const [paidAmountInput, setPaidAmountInput] = useState<number>(invoice?.paidAmount || 0);
+  // Payment State & Multi-Entry Ledger
+  const [paymentEntries, setPaymentEntries] = useState<Array<{
+    id: string;
+    amount: number;
+    paymentDate: string;
+    paymentMode: PaymentMode;
+    transactionRef?: string;
+    notes?: string;
+  }>>(() => {
+    if (invoice && invoice.paidAmount > 0) {
+      return [{
+        id: `PAY-INIT-1`,
+        amount: invoice.paidAmount,
+        paymentDate: invoice.invoiceDate || todayStr,
+        paymentMode: invoice.paymentMode || 'UPI',
+        notes: invoice.notes || ''
+      }];
+    }
+    return [];
+  });
+
+  const [showAddEntry, setShowAddEntry] = useState(false);
+  const [newPayDate, setNewPayDate] = useState(todayStr);
+  const [newPayAmount, setNewPayAmount] = useState<number>(0);
+  const [newPayMode, setNewPayMode] = useState<PaymentMode>('UPI');
+  const [newPayRef, setNewPayRef] = useState('');
+  const [newPayNotes, setNewPayNotes] = useState('');
   const [notes, setNotes] = useState<string>(invoice?.notes || 'Services provided at The House of Pawz.');
 
   // Quick Catalog Picker State
@@ -370,16 +393,53 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
   const grandTotal = Math.round(rawGrandTotal);
   const roundOff = Number((grandTotal - rawGrandTotal).toFixed(2));
 
-  // Handle Payment Status change & auto update paidAmount
-  useEffect(() => {
-    if (paymentStatus === 'PAID') {
-      setPaidAmountInput(grandTotal);
-    } else if (paymentStatus === 'UNPAID') {
-      setPaidAmountInput(0);
-    }
-  }, [paymentStatus, grandTotal]);
+  // Payment Multi-Entry Calculations
+  const totalPaid = paymentEntries.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+  const balanceDue = Math.max(0, grandTotal - totalPaid);
+  const paymentStatus: PaymentStatus = totalPaid >= grandTotal ? 'PAID' : totalPaid > 0 ? 'PARTIAL' : 'UNPAID';
+  const overpaidAmount = totalPaid > grandTotal ? totalPaid - grandTotal : 0;
+  const paymentMode: PaymentMode = paymentEntries[0]?.paymentMode || 'UPI';
 
-  const balanceDue = Math.max(0, grandTotal - paidAmountInput);
+  const handleQuickFullPaid = (mode: PaymentMode = 'UPI') => {
+    setPaymentEntries([{
+      id: `PAY-FULL-${Date.now()}`,
+      amount: grandTotal,
+      paymentDate: invoiceDate || todayStr,
+      paymentMode: mode,
+      notes: 'Full payment upon invoice creation'
+    }]);
+  };
+
+  const handleQuickClearPayments = () => {
+    setPaymentEntries([]);
+  };
+
+  const handleAddPaymentEntry = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPayAmount <= 0) {
+      alert('Please enter an amount greater than 0.');
+      return;
+    }
+    setPaymentEntries(prev => [
+      ...prev,
+      {
+        id: `PAY-${Date.now()}`,
+        amount: Number(newPayAmount),
+        paymentDate: newPayDate || todayStr,
+        paymentMode: newPayMode,
+        transactionRef: newPayRef.trim() || undefined,
+        notes: newPayNotes.trim() || undefined
+      }
+    ]);
+    setShowAddEntry(false);
+    setNewPayAmount(0);
+    setNewPayRef('');
+    setNewPayNotes('');
+  };
+
+  const handleRemovePaymentEntry = (id: string) => {
+    setPaymentEntries(prev => prev.filter(p => p.id !== id));
+  };
 
   // Form Submission — async with double-submit protection
   const handleSubmit = async (e: React.FormEvent) => {
@@ -451,7 +511,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
         totalGst,
         roundOff,
         grandTotal,
-        paidAmount: paidAmountInput,
+        paidAmount: totalPaid,
         balanceDue,
         paymentStatus,
         paymentMode,
@@ -588,8 +648,16 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
                       <button
                         type="button"
                         onClick={() => {
-                          setPaymentMode('UPI');
-                          setPaidAmountInput(Math.min(grandTotal, selectedCust.advanceBalance || 0));
+                          const creditAmount = Math.min(grandTotal, selectedCust.advanceBalance || 0);
+                          setPaymentEntries([
+                            {
+                              id: `PAY-ADV-${Date.now()}`,
+                              amount: creditAmount,
+                              paymentDate: invoiceDate || todayStr,
+                              paymentMode: 'Bank Transfer',
+                              notes: 'Client advance credit adjusted'
+                            }
+                          ]);
                         }}
                         className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded shadow-xs"
                       >
@@ -1215,65 +1283,197 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
 
           {/* Section 4: Totals Summary & Payment Status */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-            {/* Payment Record Inputs */}
+            {/* Payment Collection Multi-Entry Ledger */}
             <div className="space-y-3 bg-slate-50 dark:bg-zinc-800/40 p-4 rounded-xl border border-slate-200 dark:border-zinc-800">
-              <label className="font-bold text-slate-800 dark:text-zinc-200 uppercase tracking-wider text-[10px]">
-                Payment Collection Status:
-              </label>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[10px] text-slate-500">Status:</label>
-                  <select
-                    value={paymentStatus}
-                    onChange={e => setPaymentStatus(e.target.value as PaymentStatus)}
-                    className="w-full p-2 rounded-lg bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-700 text-xs font-bold"
+              <div className="flex items-center justify-between">
+                <label className="font-bold text-slate-800 dark:text-zinc-200 uppercase tracking-wider text-[10px] flex items-center gap-1.5">
+                  <CreditCard className="w-3.5 h-3.5 text-[#D62828]" />
+                  <span>Payment Collection Ledger ({paymentEntries.length})</span>
+                </label>
+                <div className="flex items-center space-x-1.5">
+                  <button
+                    type="button"
+                    onClick={() => handleQuickFullPaid('UPI')}
+                    className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-300 dark:border-emerald-800 hover:bg-emerald-100 transition-colors"
                   >
-                    <option value="PAID">PAID (Full)</option>
-                    <option value="PARTIAL">PARTIAL Payment</option>
-                    <option value="UNPAID">UNPAID / Dues</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-[10px] text-slate-500">Mode:</label>
-                  <select
-                    value={paymentMode}
-                    onChange={e => setPaymentMode(e.target.value as PaymentMode)}
-                    className="w-full p-2 rounded-lg bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-700 text-xs font-bold"
+                    Paid in Full
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleQuickClearPayments}
+                    className="text-[10px] font-bold text-slate-600 dark:text-zinc-400 bg-slate-100 dark:bg-zinc-800 px-2 py-0.5 rounded border border-slate-300 dark:border-zinc-700 hover:bg-slate-200 transition-colors"
                   >
-                    <option value="UPI">UPI / QR Code</option>
-                    <option value="Cash">Cash</option>
-                    <option value="Card">Credit / Debit Card</option>
-                    <option value="Net Banking">Net Banking</option>
-                    <option value="Cheque">Cheque</option>
-                  </select>
+                    Unpaid
+                  </button>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              {/* Summary KPIs */}
+              <div className="grid grid-cols-3 gap-2 bg-white dark:bg-zinc-900 p-2.5 rounded-lg border border-slate-200 dark:border-zinc-700 text-center font-mono">
                 <div>
-                  <label className="text-[10px] text-slate-500">Collected Amount (₹):</label>
-                  <input
-                    type="number"
-                    value={paidAmountInput}
-                    onChange={e => setPaidAmountInput(Number(e.target.value))}
-                    className="w-full p-2 rounded-lg bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-700 text-xs font-mono font-bold"
-                  />
+                  <span className="text-[9px] uppercase font-bold text-slate-400 block">Total Paid</span>
+                  <span className="text-xs font-black text-emerald-600 dark:text-emerald-400">
+                    {formatINR(totalPaid)}
+                  </span>
                 </div>
                 <div>
-                  <label className="text-[10px] text-slate-500">Remaining Balance (₹):</label>
-                  <input
-                    type="text"
-                    disabled
-                    value={`₹ ${balanceDue.toFixed(2)}`}
-                    className="w-full p-2 rounded-lg bg-slate-200 dark:bg-zinc-800 border border-slate-300 dark:border-zinc-700 text-xs font-mono font-bold text-red-600"
-                  />
+                  <span className="text-[9px] uppercase font-bold text-slate-400 block">Balance Due</span>
+                  <span className={`text-xs font-black ${balanceDue > 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-700 dark:text-zinc-300'}`}>
+                    {formatINR(balanceDue)}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[9px] uppercase font-bold text-slate-400 block">Status</span>
+                  <span className={`inline-block px-1.5 py-0.2 rounded text-[9px] font-extrabold ${
+                    paymentStatus === 'PAID'
+                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                      : paymentStatus === 'PARTIAL'
+                      ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                      : 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300'
+                  }`}>
+                    {paymentStatus}
+                  </span>
                 </div>
               </div>
+
+              {/* Overpayment Warning */}
+              {overpaidAmount > 0 && (
+                <div className="p-2 bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 rounded-lg text-blue-900 dark:text-blue-200 text-[11px] flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                  <span>Collections exceed invoice grand total by <strong>+{formatINR(overpaidAmount)}</strong> (Rounding / Advance retained).</span>
+                </div>
+              )}
+
+              {/* Payment Entries List */}
+              {paymentEntries.length > 0 ? (
+                <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                  {paymentEntries.map((pe, idx) => (
+                    <div key={pe.id || idx} className="flex items-center justify-between p-2 bg-white dark:bg-zinc-900 rounded-lg border border-slate-200 dark:border-zinc-700 text-xs">
+                      <div className="flex items-center space-x-2">
+                        <span className="font-mono font-bold text-slate-900 dark:text-white">
+                          {pe.paymentDate}
+                        </span>
+                        <span className="px-1.5 py-0.5 bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 rounded text-[10px] font-semibold">
+                          {pe.paymentMode}
+                        </span>
+                        {pe.transactionRef && (
+                          <span className="text-[10px] text-slate-500 font-mono">
+                            Ref: {pe.transactionRef}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="font-mono font-extrabold text-emerald-600 dark:text-emerald-400">
+                          {formatINR(pe.amount)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemovePaymentEntry(pe.id)}
+                          className="p-1 text-slate-400 hover:text-red-600 transition-colors"
+                          title="Remove payment entry"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[11px] text-slate-400 italic text-center py-2">
+                  No payment collected yet (Invoice will be marked UNPAID).
+                </p>
+              )}
+
+              {/* + Add Payment Row */}
+              {!showAddEntry ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewPayAmount(balanceDue > 0 ? balanceDue : 0);
+                    setShowAddEntry(true);
+                  }}
+                  className="w-full py-1.5 bg-white dark:bg-zinc-900 hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-200 rounded-lg border border-dashed border-slate-300 dark:border-zinc-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5 text-[#D62828]" />
+                  <span>+ Add Payment Entry</span>
+                </button>
+              ) : (
+                <div className="p-3 bg-white dark:bg-zinc-900 rounded-lg border border-red-200 dark:border-red-900 space-y-2">
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="text-[9px] text-slate-500 font-bold block mb-0.5">Date (DD/MM/YYYY):</label>
+                      <input
+                        type="text"
+                        value={newPayDate}
+                        onChange={e => setNewPayDate(e.target.value)}
+                        className="w-full p-1.5 rounded bg-slate-50 dark:bg-zinc-800 border border-slate-300 dark:border-zinc-700 text-xs font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[9px] text-slate-500 font-bold block mb-0.5">Amount (₹):</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0.01"
+                        value={newPayAmount}
+                        onChange={e => setNewPayAmount(Number(e.target.value))}
+                        className="w-full p-1.5 rounded bg-slate-50 dark:bg-zinc-800 border border-slate-300 dark:border-zinc-700 text-xs font-mono font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[9px] text-slate-500 font-bold block mb-0.5">Mode:</label>
+                      <select
+                        value={newPayMode}
+                        onChange={e => setNewPayMode(e.target.value as PaymentMode)}
+                        className="w-full p-1.5 rounded bg-slate-50 dark:bg-zinc-800 border border-slate-300 dark:border-zinc-700 text-xs font-bold"
+                      >
+                        <option value="UPI">UPI</option>
+                        <option value="Cash">Cash</option>
+                        <option value="Bank Transfer">Bank Transfer</option>
+                        <option value="Net Banking">Net Banking</option>
+                        <option value="Online">Online</option>
+                        <option value="Card">Card</option>
+                        <option value="Cheque">Cheque</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      placeholder="Transaction / UTR Ref (Optional)"
+                      value={newPayRef}
+                      onChange={e => setNewPayRef(e.target.value)}
+                      className="p-1.5 rounded bg-slate-50 dark:bg-zinc-800 border border-slate-300 dark:border-zinc-700 text-xs font-mono"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Notes / Remarks (Optional)"
+                      value={newPayNotes}
+                      onChange={e => setNewPayNotes(e.target.value)}
+                      className="p-1.5 rounded bg-slate-50 dark:bg-zinc-800 border border-slate-300 dark:border-zinc-700 text-xs"
+                    />
+                  </div>
+                  <div className="flex justify-end space-x-1.5 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowAddEntry(false)}
+                      className="px-2.5 py-1 bg-slate-200 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 rounded text-xs font-bold"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAddPaymentEntry}
+                      className="px-3 py-1 bg-[#D62828] text-white rounded text-xs font-extrabold hover:bg-red-700 transition-colors"
+                    >
+                      Add Entry
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div>
-                <label className="text-[10px] text-slate-500">Invoice Notes / Special Instructions (Optional):</label>
+                <label className="text-[10px] text-slate-500 font-bold">Invoice Notes / Special Instructions (Optional):</label>
                 <textarea
                   rows={2}
                   placeholder="Enter description/notes if required..."

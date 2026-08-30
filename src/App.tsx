@@ -50,7 +50,7 @@ import { fetchCustomersFromSupabase, createCustomerInSupabase, updateCustomerInS
 import { fetchPetsFromSupabase, createPetInSupabase, updatePetInSupabase, deletePetFromSupabase } from './lib/petService';
 import { fetchInvoicesFromSupabase, createInvoiceInSupabase, updateInvoiceInSupabase, cancelInvoiceInSupabase, deleteInvoiceFromSupabase, fetchNextInvoiceNumberFromDB } from './lib/invoiceService';
 import { executeLiveProductionImport } from './lib/migrationService';
-import { fetchPaymentsFromSupabase, recordPaymentInSupabase } from './lib/paymentService';
+import { fetchPaymentsFromSupabase, recordInvoicePaymentInSupabase, updateInvoicePaymentInSupabase, deleteInvoicePaymentInSupabase } from './lib/paymentService';
 import { fetchCompanySettingsFromSupabase, updateCompanySettingsInSupabase } from './lib/settingsService';
 import { fetchUsersFromSupabase, updateUserPermissionInSupabase, updateUserPermissionsBatchInSupabase, updateUserRoleInSupabase } from './lib/userService';
 import { fetchAuditLogsFromSupabase, logAuditEventToSupabase } from './lib/auditService';
@@ -471,41 +471,73 @@ export default function App() {
     setInvoices(freshInvs);
   };
 
-  // Action Handler: Record Payment against invoice
-  const handleRecordPayment = async (newPay: Payment) => {
+  // Action Handler: Record Payment
+  const handleRecordPayment = async (newPay: Omit<Payment, 'id'> & { id?: string }) => {
     if (!hasPermission(currentUser, 'payments_record')) {
-      alert('Access Denied: You do not have permission to record payments.');
-      return;
+      throw new Error('Access Denied: You do not have permission to record payments.');
     }
 
-    const res = await recordPaymentInSupabase(newPay);
+    const res = await recordInvoicePaymentInSupabase(newPay);
     if (res.error) {
-      alert(`Error recording payment: ${res.error}`);
-      return;
+      throw new Error(`Error recording payment: ${res.error}`);
     }
 
     logAuditEventToSupabase('PAYMENT_RECORDED', `Recorded payment ₹ ${newPay.amount} for Invoice ${newPay.invoiceNumber} via ${newPay.paymentMode}`);
 
-    const [freshInvs, freshPays] = await Promise.all([
+    const [freshInvs, freshPays, freshCusts] = await Promise.all([
       fetchInvoicesFromSupabase(),
-      fetchPaymentsFromSupabase()
+      fetchPaymentsFromSupabase(),
+      fetchCustomersFromSupabase()
     ]);
     if (freshInvs.length > 0) setInvoices(freshInvs);
     if (freshPays.length > 0) setPayments(freshPays);
+    if (freshCusts.length > 0) setCustomers(freshCusts);
+  };
+
+  // Action Handler: Update Payment
+  const handleUpdatePayment = async (updatedPay: Payment) => {
+    if (!hasPermission(currentUser, 'payments_edit') && !hasPermission(currentUser, 'payments_record')) {
+      throw new Error('Access Denied: You do not have permission to edit payments.');
+    }
+
+    const res = await updateInvoicePaymentInSupabase(updatedPay);
+    if (res.error) {
+      throw new Error(`Error updating payment: ${res.error}`);
+    }
+
+    logAuditEventToSupabase('PAYMENT_RECORDED' as any, `Updated payment ${updatedPay.id} (₹ ${updatedPay.amount}) for Invoice ${updatedPay.invoiceNumber}`);
+
+    const [freshInvs, freshPays, freshCusts] = await Promise.all([
+      fetchInvoicesFromSupabase(),
+      fetchPaymentsFromSupabase(),
+      fetchCustomersFromSupabase()
+    ]);
+    if (freshInvs.length > 0) setInvoices(freshInvs);
+    if (freshPays.length > 0) setPayments(freshPays);
+    if (freshCusts.length > 0) setCustomers(freshCusts);
   };
 
   // Action Handler: Delete Payment
   const handleDeletePayment = async (paymentId: string) => {
     if (!hasPermission(currentUser, 'payments_delete')) {
-      alert('Access Denied: You do not have permission to delete payment records.');
-      return;
+      throw new Error('Access Denied: You do not have permission to delete payment records.');
     }
-    const target = payments.find(p => p.id === paymentId);
-    if (!target) return;
 
-    logAuditEventToSupabase('PAYMENT_RECORDED' as any, `Deleted Payment Record ${target.id} (₹${target.amount})`);
-    const freshPays = await fetchPaymentsFromSupabase();
-    setPayments(freshPays);
+    const res = await deleteInvoicePaymentInSupabase(paymentId);
+    if (res.error) {
+      throw new Error(`Error deleting payment: ${res.error}`);
+    }
+
+    logAuditEventToSupabase('PAYMENT_RECORDED' as any, `Deleted Payment Record ${paymentId}`);
+
+    const [freshInvs, freshPays, freshCusts] = await Promise.all([
+      fetchInvoicesFromSupabase(),
+      fetchPaymentsFromSupabase(),
+      fetchCustomersFromSupabase()
+    ]);
+    if (freshInvs.length > 0) setInvoices(freshInvs);
+    if (freshPays.length > 0) setPayments(freshPays);
+    if (freshCusts.length > 0) setCustomers(freshCusts);
   };
 
   // Action Handler: Add / Edit / Delete Customer
@@ -1357,6 +1389,7 @@ export default function App() {
               invoices={invoices}
               customers={customers}
               pets={pets}
+              payments={payments}
               settings={settings}
               userRole={currentUser.role}
               userName={currentUser.name}
@@ -1372,6 +1405,9 @@ export default function App() {
               onCancelInvoice={handleCancelInvoice}
               onDeleteInvoice={handleDeleteInvoice}
               onExportExcel={handleExportFullExcel}
+              onRecordPayment={handleRecordPayment}
+              onUpdatePayment={handleUpdatePayment}
+              onDeletePayment={handleDeletePayment}
             />
           )}
 
