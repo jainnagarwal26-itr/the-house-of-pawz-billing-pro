@@ -11,6 +11,7 @@ interface UserManagementProps {
   users: User[];
   activeUser: User;
   onSwitchUserRole: (role: UserRole) => void;
+  onSwitchUser?: (user: User) => void;
   onAddUser: (user: User) => void;
   onUpdateUser?: (user: User) => void;
 }
@@ -19,6 +20,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({
   users,
   activeUser,
   onSwitchUserRole,
+  onSwitchUser,
   onAddUser,
   onUpdateUser
 }) => {
@@ -217,7 +219,13 @@ export const UserManagement: React.FC<UserManagementProps> = ({
                 </button>
 
                 <button
-                  onClick={() => onSwitchUserRole(u.role)}
+                  onClick={() => {
+                    if (onSwitchUser) {
+                      onSwitchUser(u);
+                    } else {
+                      onSwitchUserRole(u.role);
+                    }
+                  }}
                   className="px-3 py-1 bg-slate-900 dark:bg-zinc-800 hover:bg-[#D62828] text-white font-bold rounded-lg text-xs"
                 >
                   Switch Session

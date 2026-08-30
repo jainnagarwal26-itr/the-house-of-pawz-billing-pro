@@ -325,13 +325,25 @@ export default function App() {
     logAuditEventToSupabase('PASSWORD_RESET', `Password reset for account ${updatedUser.name} (${updatedUser.username})`);
   };
 
-  // Action Handler: Role Switcher
-  const handleSwitchRole = async (newRole: UserRole) => {
-    const updatedUser = { ...currentUser, role: newRole };
-    setCurrentUser(updatedUser);
+  // Action Handler: Role & User Switcher
+  const handleSwitchUser = async (targetUser: User) => {
+    setCurrentUser(targetUser);
+    setSession(targetUser);
+    saveStoredData(STORAGE_KEYS.SESSION, targetUser);
     logAuditEventToSupabase(
       'ROLE_SWITCHED', 
-      `Switched active role to ${newRole === 'ADMIN' ? 'Admin (CA/Owner)' : 'Billing Staff User'}`
+      `Switched active session to ${targetUser.name} (${targetUser.role})`
+    );
+  };
+
+  const handleSwitchRole = async (newRole: UserRole) => {
+    const matchedUser = users.find(u => u.role === newRole) || { ...currentUser, role: newRole };
+    setCurrentUser(matchedUser);
+    setSession(matchedUser);
+    saveStoredData(STORAGE_KEYS.SESSION, matchedUser);
+    logAuditEventToSupabase(
+      'ROLE_SWITCHED', 
+      `Switched active role to ${newRole === 'ADMIN' ? 'Admin (CA/Owner)' : newRole}`
     );
   };
 
@@ -1612,6 +1624,7 @@ export default function App() {
                 users={users}
                 activeUser={currentUser}
                 onSwitchUserRole={handleSwitchRole}
+                onSwitchUser={handleSwitchUser}
                 onAddUser={async u => {
                   await updateUserRoleInSupabase(u.id, u.role);
                   const freshUsers = await fetchUsersFromSupabase();

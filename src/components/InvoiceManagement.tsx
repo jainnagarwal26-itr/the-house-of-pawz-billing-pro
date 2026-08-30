@@ -39,7 +39,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
   onDeleteInvoice,
   onExportExcel
 }) => {
-  const isAdmin = userRole === 'ADMIN' || userRole === 'SUPER_ADMIN';
+  const isAdmin = userRole === 'ADMIN' || userRole === 'SUPER_ADMIN' || userRole === 'ACCOUNTANT' || currentUser?.role === 'ACCOUNTANT';
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | PaymentStatus>('ALL');
@@ -77,16 +77,24 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
       return;
     }
 
-    if (isAdmin) {
-      if (type === 'EDIT') onOpenEditModal(inv);
-      if (type === 'CANCEL') {
+    if (type === 'EDIT') {
+      if (hasPermission(currentUser, 'invoices_edit')) {
+        onOpenEditModal(inv);
+        return;
+      }
+      setApprovalRequest({ type, invoice: inv });
+      return;
+    }
+
+    if (type === 'CANCEL') {
+      if (hasPermission(currentUser, 'invoices_cancel')) {
         if (window.confirm(`Are you sure you want to cancel Invoice ${inv.invoiceNumber}?`)) {
           onCancelInvoice(inv.id);
         }
+        return;
       }
-    } else {
-      // Non-admin billing staff -> trigger Admin PIN Approval Modal for edit/cancel
       setApprovalRequest({ type, invoice: inv });
+      return;
     }
   };
 
@@ -498,7 +506,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                         <button
                           onClick={() => handleTriggerAction('SHARE', inv)}
                           className="p-1.5 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/60 rounded-lg transition-colors"
-                          title={isAdmin ? 'Share via WhatsApp' : 'Requires Admin PIN Approval for Staff'}
+                          title="Share via WhatsApp"
                         >
                           <Share2 className="w-4 h-4" />
                         </button>
@@ -509,7 +517,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                         <button
                           onClick={() => handleTriggerAction('EDIT', inv)}
                           className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/60 rounded-lg transition-colors"
-                          title={isAdmin ? 'Edit Invoice' : 'Requires Admin PIN Approval for Staff'}
+                          title="Edit Invoice"
                         >
                           <Receipt className="w-4 h-4" />
                         </button>
@@ -520,7 +528,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                         <button
                           onClick={() => handleTriggerAction('CANCEL', inv)}
                           className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/60 rounded-lg transition-colors"
-                          title={isAdmin ? 'Cancel Invoice' : 'Requires Admin PIN Approval for Staff'}
+                          title="Cancel Invoice"
                         >
                           <XCircle className="w-4 h-4" />
                         </button>
