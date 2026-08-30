@@ -48,7 +48,7 @@ import {
 import { fetchActiveSessionUser, logoutSupabase } from './lib/authService';
 import { fetchCustomersFromSupabase, createCustomerInSupabase, updateCustomerInSupabase, deleteCustomerFromSupabase } from './lib/customerService';
 import { fetchPetsFromSupabase, createPetInSupabase, updatePetInSupabase, deletePetFromSupabase } from './lib/petService';
-import { fetchInvoicesFromSupabase, createInvoiceInSupabase, cancelInvoiceInSupabase, deleteInvoiceFromSupabase, fetchNextInvoiceNumberFromDB } from './lib/invoiceService';
+import { fetchInvoicesFromSupabase, createInvoiceInSupabase, updateInvoiceInSupabase, cancelInvoiceInSupabase, deleteInvoiceFromSupabase, fetchNextInvoiceNumberFromDB } from './lib/invoiceService';
 import { executeLiveProductionImport } from './lib/migrationService';
 import { fetchPaymentsFromSupabase, recordPaymentInSupabase } from './lib/paymentService';
 import { fetchCompanySettingsFromSupabase, updateCompanySettingsInSupabase } from './lib/settingsService';
@@ -357,14 +357,20 @@ export default function App() {
       throw new Error(`Access Denied: You do not have permission to ${isEdit ? 'edit' : 'create'} invoices.`);
     }
 
-    const res = await createInvoiceInSupabase(savedInv);
+    const res = isEdit
+      ? await updateInvoiceInSupabase(savedInv)
+      : await createInvoiceInSupabase(savedInv);
+
     if (res.error) {
       // Throw so InvoiceModal's try/catch catches it and shows validationError
       // (isSubmitting will be unlocked in finally, allowing retry)
       throw new Error(`Error saving invoice to Supabase: ${res.error}`);
     }
 
-    logAuditEventToSupabase('INVOICE_CREATED', `Created Tax Invoice ${savedInv.invoiceNumber} for ${savedInv.customerName} (₹ ${savedInv.grandTotal.toFixed(2)})`);
+    logAuditEventToSupabase(
+      isEdit ? 'INVOICE_UPDATED' : 'INVOICE_CREATED',
+      `${isEdit ? 'Updated' : 'Created'} Tax Invoice ${savedInv.invoiceNumber} for ${savedInv.customerName} (₹ ${savedInv.grandTotal.toFixed(2)})`
+    );
 
     // If invoice includes a Long-Term Package item, ensure customer-specific active contract assignment is recorded
     const ltpItems = savedInv.items.filter(item => item.type === 'PACKAGE' && item.catalogItemId);

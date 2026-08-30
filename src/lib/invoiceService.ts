@@ -283,6 +283,95 @@ export async function createInvoiceInSupabase(inv: Omit<Invoice, 'id' | 'created
   }
 }
 
+export async function updateInvoiceInSupabase(inv: Invoice): Promise<{ invoice: Invoice | null; error?: string }> {
+  try {
+    const internalId = inv.id;
+    if (!internalId) {
+      return { invoice: null, error: 'Cannot update invoice: missing internal invoice ID' };
+    }
+
+    const invoicePayload = {
+      internal_invoice_id: internalId,
+      invoice_number: inv.invoiceNumber,
+      financial_year: '2026-27',
+      invoice_date: inv.invoiceDate,
+      due_date: inv.dueDate || null,
+      customer_id: inv.customerId,
+      customer_name: inv.customerName,
+      customer_phone: inv.customerPhone || null,
+      customer_email: inv.customerEmail || null,
+      customer_gstin: inv.customerGSTIN || null,
+      pet_id: inv.petId || null,
+      pet_name: inv.petName || null,
+      place_of_supply: inv.placeOfSupply || '27-Maharashtra',
+      is_inter_state: inv.isInterState || false,
+      sub_total: inv.subTotal,
+      total_discount: inv.totalDiscount || 0,
+      taxable_amount: inv.taxableAmount,
+      cgst_total: inv.cgstTotal || 0,
+      sgst_total: inv.sgstTotal || 0,
+      igst_total: inv.igstTotal || 0,
+      total_gst: inv.totalGst,
+      round_off: inv.roundOff || 0,
+      grand_total: inv.grandTotal,
+      paid_amount: inv.paidAmount || 0,
+      balance_due: inv.balanceDue || 0,
+      payment_status: inv.paymentStatus || 'UNPAID',
+      payment_mode: inv.paymentMode || 'UPI',
+      notes: inv.notes || null,
+      created_by_role: inv.createdByRole || 'ADMIN',
+      created_by_name: inv.createdByName || 'Chirag Jain',
+      is_cancelled: inv.isCancelled || false
+    };
+
+    const { data: rpcResult, error: rpcError } = await (supabase.rpc as any)('update_invoice_with_items', {
+      p_invoice: invoicePayload,
+      p_items: (inv.items || []).map((item, idx) => ({
+        line_item_id: item.id || `ITEM-${internalId}-${idx + 1}`,
+        internal_invoice_id: internalId,
+        invoice_number: inv.invoiceNumber,
+        catalog_item_id: item.catalogItemId || null,
+        item_type: item.type || 'SERVICE',
+        item_name: item.name,
+        hsn_sac: item.hsnSac || '999799',
+        price: item.price,
+        quantity: item.qty,
+        discount_percent: item.discount || 0,
+        discount_amount: item.discountAmount || 0,
+        taxable_value: item.taxableValue,
+        gst_rate: item.gstRate !== undefined ? item.gstRate : 18,
+        cgst_amount: item.cgstAmount || 0,
+        sgst_amount: item.sgstAmount || 0,
+        igst_amount: item.igstAmount || 0,
+        item_total: item.total,
+        service_date: item.serviceDate || null,
+        service_start_date: item.serviceStartDate || null,
+        service_end_date: item.serviceEndDate || null,
+        duration: item.duration || null,
+        unit: item.unit || null
+      }))
+    });
+
+    if (rpcError || !rpcResult) {
+      console.error('[updateInvoiceInSupabase] Atomic RPC update_invoice_with_items failed:', rpcError);
+      return { 
+        invoice: null, 
+        error: rpcError?.message || 'Atomic invoice update failed on database.' 
+      };
+    }
+
+    const updated: Invoice = {
+      ...inv,
+      id: rpcResult.internal_invoice_id || internalId,
+      createdAt: rpcResult.created_at || inv.createdAt || new Date().toISOString()
+    };
+
+    return { invoice: updated };
+  } catch (err: any) {
+    return { invoice: null, error: err.message };
+  }
+}
+
 export async function cancelInvoiceInSupabase(internalId: string, reason: string): Promise<{ success: boolean; error?: string }> {
   try {
     const { error } = await supabase
