@@ -54,11 +54,40 @@ export async function fetchNextInvoiceNumberFromDB(
 
 import { STORAGE_KEYS, loadStoredData } from './storage';
 
-// Helper: extract numeric suffix from invoice_number e.g. 'HOP/26-27/000067' → 67
-function invoiceNumericSuffix(invNum: string): number {
-  if (!invNum) return 0;
-  const parts = invNum.split('/');
-  return parseInt(parts[parts.length - 1], 10) || 0;
+// Helper: compare invoices in descending chronological order (newest first)
+export function compareInvoicesDesc(a: Invoice, b: Invoice): number {
+  // 1. Primary: Compare by creation timestamp (createdAt)
+  const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+  const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+  if (!isNaN(timeA) && !isNaN(timeB) && timeA !== timeB && timeA > 0 && timeB > 0) {
+    return timeB - timeA;
+  }
+
+  // 2. Secondary: Parse invoiceDate
+  const parseDate = (dStr: string): number => {
+    if (!dStr) return 0;
+    // Format: YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}/.test(dStr)) {
+      const t = new Date(dStr).getTime();
+      if (!isNaN(t)) return t;
+    }
+    // Format: DD/MM/YYYY
+    const ddmmyyyy = dStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (ddmmyyyy) {
+      return new Date(Number(ddmmyyyy[3]), Number(ddmmyyyy[2]) - 1, Number(ddmmyyyy[1])).getTime();
+    }
+    const t = new Date(dStr).getTime();
+    return isNaN(t) ? 0 : t;
+  };
+
+  const dateA = parseDate(a.invoiceDate);
+  const dateB = parseDate(b.invoiceDate);
+  if (dateA !== dateB && dateA > 0 && dateB > 0) {
+    return dateB - dateA;
+  }
+
+  // 3. Tertiary: Tie breaker on internal ID
+  return (b.id || '').localeCompare(a.id || '');
 }
 
 export async function fetchInvoicesFromSupabase(): Promise<Invoice[]> {
@@ -71,7 +100,7 @@ export async function fetchInvoicesFromSupabase(): Promise<Invoice[]> {
       const { data: selectInvs } = await supabase
         .from('invoices')
         .select('*')
-        .order('invoice_number', { ascending: false });
+        .order('created_at', { ascending: false });
       invs = selectInvs;
     }
 
@@ -155,8 +184,8 @@ export async function fetchInvoicesFromSupabase(): Promise<Invoice[]> {
       cancelledReason: i.cancelled_reason || ''
     }));
 
-    // Sort descending by numeric invoice number (newest first)
-    mapped.sort((a, b) => invoiceNumericSuffix(b.invoiceNumber) - invoiceNumericSuffix(a.invoiceNumber));
+    // Sort descending chronologically (newest first)
+    mapped.sort(compareInvoicesDesc);
 
     return mapped;
   } catch (err) {

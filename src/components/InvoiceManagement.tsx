@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Invoice, Customer, Pet, CompanySettings, UserRole, formatINR, PaymentStatus, User } from '../types';
 import { hasPermission } from '../lib/permissions';
+import { compareInvoicesDesc } from '../lib/invoiceService';
 import { InvoicePrintPreview } from './InvoicePrintPreview';
 import { BatchInvoicePrintPreview } from './BatchInvoicePrintPreview';
 import { AdminApprovalModal } from './AdminApprovalModal';
@@ -128,12 +129,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
 
       return matchesSearch && matchesStatus;
     })
-    .sort((a, b) => {
-      // Sort by numeric invoice suffix (descending: newest first)
-      const numA = parseInt(a.invoiceNumber.split('/').pop() || '0', 10);
-      const numB = parseInt(b.invoiceNumber.split('/').pop() || '0', 10);
-      return numB - numA;
-    });
+    .sort(compareInvoicesDesc);
 
 
   // Calculate dynamic pagination
