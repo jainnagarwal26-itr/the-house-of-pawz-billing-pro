@@ -98,7 +98,8 @@ export async function fetchLongTermContractsFromSupabase(): Promise<LongTermCont
  */
 export async function saveLongTermContractToSupabase(contract: LongTermContract): Promise<{ success: boolean; contractId?: string; error?: string }> {
   try {
-    const isNew = !contract.id || contract.id.startsWith('ltp-local-') || contract.id.startsWith('LTP-');
+    const isUuid = !!(contract.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(contract.id));
+    const isNew = !isUuid;
     const contractPayload = {
       contract_code: contract.contractCode,
       contract_name: contract.contractName,
@@ -170,8 +171,8 @@ export async function saveLongTermContractToSupabase(contract: LongTermContract)
           updated_at: new Date().toISOString()
         };
 
-        const isNewComp = !comp.id || comp.id.startsWith('comp-local-');
-        if (isNewComp) {
+        const isCompUuid = !!(comp.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(comp.id));
+        if (!isCompUuid) {
           await supabase.from('long_term_contract_items').insert(compPayload);
         } else {
           await supabase.from('long_term_contract_items').update(compPayload).eq('id', comp.id);

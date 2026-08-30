@@ -1332,42 +1332,55 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
           </div>
 
           {/* Modal Footer Controls (Sticky on mobile) */}
-          <div className="sticky bottom-0 bg-white dark:bg-zinc-900 -mx-3 sm:-mx-6 -mb-3 sm:-mb-6 p-3 sm:p-4 border-t border-slate-200 dark:border-zinc-800 flex items-center justify-end space-x-2 sm:space-x-3 shadow-lg z-20">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={isSubmitting}
-              className="px-4 py-2.5 min-h-[44px] bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 rounded-xl text-xs font-bold disabled:opacity-50 transition-colors"
-            >
-              Cancel
-            </button>
+          <div className="sticky bottom-0 bg-white dark:bg-zinc-900 -mx-3 sm:-mx-6 -mb-3 sm:-mb-6 p-3 sm:p-4 border-t border-slate-200 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 shadow-lg z-20">
+            {validationError ? (
+              <div className="text-red-600 dark:text-red-400 font-bold text-xs flex items-center gap-1.5 animate-in fade-in max-w-lg">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{validationError}</span>
+              </div>
+            ) : (
+              <div className="text-xs text-slate-400 hidden sm:block">
+                Tax Invoice will be generated and saved to Supabase database.
+              </div>
+            )}
 
-            <button
-              type="submit"
-              disabled={isSubmitting || invoiceNumberLoading}
-              className={`px-5 sm:px-6 py-2.5 min-h-[44px] font-extrabold rounded-xl text-xs flex items-center justify-center space-x-2 shadow-lg transition-all ${
-                isSubmitting || invoiceNumberLoading
-                  ? 'bg-slate-400 cursor-not-allowed text-white opacity-70'
-                  : 'bg-[#D62828] hover:bg-red-700 text-white shadow-red-900/40 active:scale-95'
-              }`}
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Saving Invoice…</span>
-                </>
-              ) : invoiceNumberLoading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Fetching Invoice No…</span>
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>{isEditing ? 'Update GST Invoice' : 'Save & Issue GST Invoice'}</span>
-                </>
-              )}
-            </button>
+            <div className="flex items-center space-x-2 sm:space-x-3 ml-auto">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={isSubmitting}
+                className="px-4 py-2.5 min-h-[44px] bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 rounded-xl text-xs font-bold disabled:opacity-50 transition-colors"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="submit"
+                disabled={isSubmitting || invoiceNumberLoading}
+                className={`px-5 sm:px-6 py-2.5 min-h-[44px] font-extrabold rounded-xl text-xs flex items-center justify-center space-x-2 shadow-lg transition-all ${
+                  isSubmitting || invoiceNumberLoading
+                    ? 'bg-slate-400 cursor-not-allowed text-white opacity-70'
+                    : 'bg-[#D62828] hover:bg-red-700 text-white shadow-red-900/40 active:scale-95'
+                }`}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Saving Invoice…</span>
+                  </>
+                ) : invoiceNumberLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Fetching Invoice No…</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>{isEditing ? 'Update GST Invoice' : 'Save & Issue GST Invoice'}</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </form>
 
