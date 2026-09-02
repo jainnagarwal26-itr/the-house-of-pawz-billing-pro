@@ -54,39 +54,119 @@ export async function fetchNextInvoiceNumberFromDB(
 
 import { STORAGE_KEYS, loadStoredData } from './storage';
 
-// Helper: compare invoices in descending chronological order (newest first)
+/**
+ * Helper: converts month index (1-12) to fiscal rank in April-March financial year.
+ * April (4) -> 1, May (5) -> 2, June (6) -> 3, July (7) -> 4, August (8) -> 5, September (9) -> 6,
+ * October (10) -> 7, November (11) -> 8, December (12) -> 9, January (1) -> 10, February (2) -> 11, March (3) -> 12.
+ */
+export function getFiscalMonthRank(month: number): number {
+  if (month >= 4 && month <= 12) {
+    return month - 3;
+  }
+  if (month >= 1 && month <= 3) {
+    return month + 9;
+  }
+  return 0;
+}
+
+/**
+ * Parses an invoice number for high-precision financial year, fiscal month, and numeric serial sorting.
+ */
+export function parseInvoiceNumberForSort(invoiceNumber?: string, invoiceDate?: string): {
+  fyYear: number;
+  fiscalRank: number;
+  serial: number;
+  hasSerial: boolean;
+} {
+  const clean = (invoiceNumber || '').trim();
+  let fyYear = 2026;
+  let month = 0;
+  let serial = 0;
+
+  // Pattern 1: Monthly format e.g. HOP/26-27/08/000020 or HOP/2026-2027/08/000020
+  const m1 = clean.match(/^([a-zA-Z]+)\/(\d{2,4}-\d{2,4})\/(\d{1,2})\/(\d+)$/i);
+  if (m1) {
+    const fyPart = m1[2].split('-')[0];
+    fyYear = fyPart.length === 2 ? 2000 + parseInt(fyPart, 10) : parseInt(fyPart, 10);
+    month = parseInt(m1[3], 10);
+    serial = parseInt(m1[4], 10);
+    return { fyYear, fiscalRank: getFiscalMonthRank(month), serial, hasSerial: true };
+  }
+
+  // Pattern 2: Historical annual series e.g. HOP/26-27/000067 (July base series)
+  const m2 = clean.match(/^([a-zA-Z]+)\/(\d{2,4}-\d{2,4})\/(\d+)$/i);
+  if (m2) {
+    const fyPart = m2[2].split('-')[0];
+    fyYear = fyPart.length === 2 ? 2000 + parseInt(fyPart, 10) : parseInt(fyPart, 10);
+    // Historical initial series was July (month 7)
+    month = 7;
+    serial = parseInt(m2[3], 10);
+    return { fyYear, fiscalRank: getFiscalMonthRank(month), serial, hasSerial: true };
+  }
+
+  // Pattern 3: Legacy variant e.g. HOP/08/001/26-27
+  const m3 = clean.match(/^([a-zA-Z]+)\/(\d{1,2})\/(\d+)\/(\d{2,4}-\d{2,4})$/i);
+  if (m3) {
+    const fyPart = m3[4].split('-')[0];
+    fyYear = fyPart.length === 2 ? 2000 + parseInt(fyPart, 10) : parseInt(fyPart, 10);
+    month = parseInt(m3[2], 10);
+    serial = parseInt(m3[3], 10);
+    return { fyYear, fiscalRank: getFiscalMonthRank(month), serial, hasSerial: true };
+  }
+
+  // Generic fallback: extract last numeric segment as serial
+  const lastDigits = clean.match(/(\d+)$/);
+  if (lastDigits) {
+    serial = parseInt(lastDigits[1], 10);
+  }
+
+  // Parse date if month not extracted
+  if (invoiceDate) {
+    const ddmmyyyy = invoiceDate.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (ddmmyyyy) {
+      month = parseInt(ddmmyyyy[2], 10);
+      fyYear = parseInt(ddmmyyyy[3], 10);
+    }
+  }
+
+  return { fyYear, fiscalRank: getFiscalMonthRank(month), serial, hasSerial: Boolean(lastDigits) };
+}
+
+/**
+ * Compares invoices according to GST Invoice Management requirement:
+ * LEVEL 1: Financial Year (newest FY first)
+ * LEVEL 2: Invoice series / Fiscal month rank (newest month first: Sep > Aug > Jul ...)
+ * LEVEL 3: Numeric invoice serial DESCENDING (e.g. 20 > 6 > 5 > 1, 67 > 66 > ...)
+ * LEVEL 4: Creation timestamp fallback
+ * LEVEL 5: Internal ID tie-breaker
+ */
 export function compareInvoicesDesc(a: Invoice, b: Invoice): number {
-  // 1. Primary: Compare by creation timestamp (createdAt)
+  const pA = parseInvoiceNumberForSort(a.invoiceNumber, a.invoiceDate);
+  const pB = parseInvoiceNumberForSort(b.invoiceNumber, b.invoiceDate);
+
+  // LEVEL 1: Financial Year (Newest FY first)
+  if (pA.fyYear !== pB.fyYear) {
+    return pB.fyYear - pA.fyYear;
+  }
+
+  // LEVEL 2: Fiscal Month Rank (Newest Month in FY first)
+  if (pA.fiscalRank !== pB.fiscalRank) {
+    return pB.fiscalRank - pA.fiscalRank;
+  }
+
+  // LEVEL 3: Numeric Serial DESC (Highest serial first)
+  if (pA.hasSerial && pB.hasSerial && pA.serial !== pB.serial) {
+    return pB.serial - pA.serial;
+  }
+
+  // LEVEL 4: Primary creation timestamp (createdAt)
   const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
   const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
   if (!isNaN(timeA) && !isNaN(timeB) && timeA !== timeB && timeA > 0 && timeB > 0) {
     return timeB - timeA;
   }
 
-  // 2. Secondary: Parse invoiceDate
-  const parseDate = (dStr: string): number => {
-    if (!dStr) return 0;
-    // Format: YYYY-MM-DD
-    if (/^\d{4}-\d{2}-\d{2}/.test(dStr)) {
-      const t = new Date(dStr).getTime();
-      if (!isNaN(t)) return t;
-    }
-    // Format: DD/MM/YYYY
-    const ddmmyyyy = dStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-    if (ddmmyyyy) {
-      return new Date(Number(ddmmyyyy[3]), Number(ddmmyyyy[2]) - 1, Number(ddmmyyyy[1])).getTime();
-    }
-    const t = new Date(dStr).getTime();
-    return isNaN(t) ? 0 : t;
-  };
-
-  const dateA = parseDate(a.invoiceDate);
-  const dateB = parseDate(b.invoiceDate);
-  if (dateA !== dateB && dateA > 0 && dateB > 0) {
-    return dateB - dateA;
-  }
-
-  // 3. Tertiary: Tie breaker on internal ID
+  // LEVEL 5: Tertiary tie breaker on internal ID
   return (b.id || '').localeCompare(a.id || '');
 }
 
