@@ -1,0 +1,26 @@
+# ----------------------------------------------------------------------
+# The House of Pawz – React SPA .htaccess for cPanel / LiteSpeed / Apache
+# ----------------------------------------------------------------------
+
+# 1. Enable Rewrite Engine for Single Page Application
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^ index.html [L]
+</IfModule>
+
+# 2. Prevent directory indexing
+Options -Indexes
+
+# 3. Proper MIME types for modern JS/CSS modules
+<IfModule mod_mime.c>
+  AddType text/javascript .js .mjs
+  AddType text/css .css
+  AddType image/svg+xml .svg
+</IfModule>
+
+# 4. Security & CORS headers
+<IfModule mod_headers.c>
+  Header set X-Content-Type-Options "nosniff"
+</IfModule>
