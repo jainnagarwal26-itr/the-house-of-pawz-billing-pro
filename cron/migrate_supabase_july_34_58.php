@@ -85,6 +85,40 @@ function decimalCompareStr($a, $b, $scale = 2) {
     return $aDec === $bDec;
 }
 
+function toMysqlDateTime($val, $default = null) {
+    if ($val === null || $val === '') {
+        return $default !== null ? $default : date('Y-m-d H:i:s');
+    }
+    $str = trim((string)$val);
+    try {
+        $dt = new DateTime($str);
+        return $dt->format('Y-m-d H:i:s');
+    } catch (Exception $e) {
+        $timestamp = strtotime($str);
+        if ($timestamp !== false && $timestamp > 0) {
+            return date('Y-m-d H:i:s', $timestamp);
+        }
+        return $default !== null ? $default : date('Y-m-d H:i:s');
+    }
+}
+
+function toMysqlDate($val, $default = null) {
+    if ($val === null || $val === '') {
+        return $default !== null ? $default : date('Y-m-d');
+    }
+    $str = trim((string)$val);
+    try {
+        $dt = new DateTime($str);
+        return $dt->format('Y-m-d');
+    } catch (Exception $e) {
+        $timestamp = strtotime($str);
+        if ($timestamp !== false && $timestamp > 0) {
+            return date('Y-m-d', $timestamp);
+        }
+        return $default !== null ? $default : date('Y-m-d');
+    }
+}
+
 // ------------------------------------------------------------------------------
 // 4. LOGGING & LOCK FILE MANAGEMENT
 // ------------------------------------------------------------------------------
@@ -566,7 +600,7 @@ try {
                 'customer_id' => $sbCustId,
                 'name' => $c['full_name'] ?? ($c['name'] ?? 'Customer'),
                 'full_name' => $c['full_name'] ?? ($c['name'] ?? 'Customer'),
-                'phone' => $phone,
+                'phone' => $phone ?: null,
                 'email' => $c['email'] ?? null,
                 'address' => $c['address'] ?? null,
                 'gstin' => $c['gstin'] ?? null,
@@ -575,8 +609,8 @@ try {
                 'emergency_contact' => $c['emergency_contact'] ?? null,
                 'outstanding_balance' => toDecimalStr($c['outstanding_balance'] ?? 0),
                 'advance_balance' => toDecimalStr($c['advance_balance'] ?? 0),
-                'created_at' => $c['created_at'] ?? date('Y-m-d H:i:s'),
-                'updated_at' => $c['updated_at'] ?? date('Y-m-d H:i:s')
+                'created_at' => toMysqlDateTime($c['created_at'] ?? null),
+                'updated_at' => toMysqlDateTime($c['updated_at'] ?? null)
             ];
             execInsert($pdo, 'customers', $custData);
             $customerMapping[$sbCustId] = $sbCustId;
@@ -625,11 +659,11 @@ try {
                 'microchip_id' => $p['microchip_id'] ?? ($p['microchip_number'] ?? null),
                 'barcode' => $p['barcode'] ?? null,
                 'is_boarding_now' => !empty($p['is_boarding_now']) ? 1 : 0,
-                'check_in_date' => $p['check_in_date'] ?? null,
-                'check_out_date' => $p['check_out_date'] ?? null,
+                'check_in_date' => !empty($p['check_in_date']) ? toMysqlDateTime($p['check_in_date']) : null,
+                'check_out_date' => !empty($p['check_out_date']) ? toMysqlDateTime($p['check_out_date']) : null,
                 'room_no' => $p['room_no'] ?? 'Standard Care',
-                'created_at' => $p['created_at'] ?? date('Y-m-d H:i:s'),
-                'updated_at' => $p['updated_at'] ?? date('Y-m-d H:i:s')
+                'created_at' => toMysqlDateTime($p['created_at'] ?? null),
+                'updated_at' => toMysqlDateTime($p['updated_at'] ?? null)
             ];
             execInsert($pdo, 'pets', $petData);
             $petMapping[$sbPetId] = $sbPetId;
@@ -652,8 +686,8 @@ try {
             'internal_invoice_id' => $inv['internal_invoice_id'],
             'invoice_number' => $inv['invoice_number'],
             'financial_year' => $inv['financial_year'] ?? '2026-27',
-            'invoice_date' => $inv['invoice_date'],
-            'due_date' => $inv['due_date'] ?? $inv['invoice_date'],
+            'invoice_date' => toMysqlDate($inv['invoice_date'] ?? null),
+            'due_date' => toMysqlDate($inv['due_date'] ?? ($inv['invoice_date'] ?? null)),
             'customer_id' => $mappedCustId,
             'customer_name' => $inv['customer_name'],
             'customer_phone' => $inv['customer_phone'] ?? null,
@@ -682,8 +716,8 @@ try {
             'created_by_name' => $inv['created_by_name'] ?? 'Chirag Jain',
             'is_cancelled' => !empty($inv['is_cancelled']) ? 1 : 0,
             'cancelled_reason' => $inv['cancelled_reason'] ?? null,
-            'created_at' => $inv['created_at'] ?? date('Y-m-d H:i:s'),
-            'updated_at' => $inv['updated_at'] ?? date('Y-m-d H:i:s')
+            'created_at' => toMysqlDateTime($inv['created_at'] ?? null),
+            'updated_at' => toMysqlDateTime($inv['updated_at'] ?? null)
         ];
         execInsert($pdo, 'invoices', $invData);
         $invInserted++;
@@ -715,8 +749,8 @@ try {
             'sgst_amount' => toDecimalStr($item['sgst_amount'] ?? 0),
             'igst_amount' => toDecimalStr($item['igst_amount'] ?? 0),
             'item_total' => toDecimalStr($item['item_total']),
-            'created_at' => $item['created_at'] ?? date('Y-m-d H:i:s'),
-            'updated_at' => $item['updated_at'] ?? date('Y-m-d H:i:s')
+            'created_at' => toMysqlDateTime($item['created_at'] ?? null),
+            'updated_at' => toMysqlDateTime($item['updated_at'] ?? null)
         ];
         execInsert($pdo, 'invoice_items', $itemData);
         $itemsInserted++;
@@ -739,13 +773,13 @@ try {
             'customer_id' => $mappedCustId,
             'customer_name' => $pay['customer_name'],
             'amount' => toDecimalStr($pay['amount']),
-            'payment_date' => $pay['payment_date'],
+            'payment_date' => toMysqlDate($pay['payment_date'] ?? null),
             'payment_mode' => $pay['payment_mode'] ?? 'Online',
             'transaction_ref' => $pay['transaction_ref'] ?? null,
             'notes' => $pay['notes'] ?? null,
             'received_by' => $pay['received_by'] ?? 'Chirag Jain',
-            'created_at' => $pay['created_at'] ?? date('Y-m-d H:i:s'),
-            'updated_at' => $pay['updated_at'] ?? date('Y-m-d H:i:s')
+            'created_at' => toMysqlDateTime($pay['created_at'] ?? null),
+            'updated_at' => toMysqlDateTime($pay['updated_at'] ?? null)
         ];
         execInsert($pdo, 'payments', $payData);
         $paymentsInserted++;

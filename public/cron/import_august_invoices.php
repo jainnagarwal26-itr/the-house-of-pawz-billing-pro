@@ -3044,6 +3044,7 @@ try {
         } else {
             $targetCustId = 'CUST-' . strtoupper(substr(md5($custName . $custPhone . microtime(true)), 0, 12));
             $custData = [
+                'id' => $targetCustId,
                 'customer_id' => $targetCustId,
                 'name' => $custName,
                 'full_name' => $custName,
@@ -3073,6 +3074,7 @@ try {
             } else {
                 $targetPetId = 'PET-' . strtoupper(substr(md5($targetCustId . $petName . microtime(true)), 0, 12));
                 $petData = [
+                    'id' => $targetPetId,
                     'pet_id' => $targetPetId,
                     'customer_id' => $targetCustId,
                     'customer_name' => $custName,
@@ -3109,6 +3111,7 @@ try {
 
         // D. Insert Invoice Header
         $invHeaderData = [
+            'id' => $internalId,
             'internal_invoice_id' => $internalId,
             'invoice_number' => $invNum,
             'financial_year' => '2026-27',
@@ -3151,6 +3154,7 @@ try {
         foreach ($inv['items'] as $itemIdx => $it) {
             $lineItemId = 'ITEM-' . strtoupper(substr(md5($internalId . $itemIdx . microtime(true)), 0, 12));
             $itemData = [
+                'id' => $lineItemId,
                 'line_item_id' => $lineItemId,
                 'invoice_id' => $mysqlInvId,
                 'internal_invoice_id' => $internalId,
@@ -3181,6 +3185,7 @@ try {
             foreach ($inv['payments'] as $pIdx => $p) {
                 $payId = 'PAY-' . strtoupper(substr(md5($internalId . $pIdx . microtime(true)), 0, 12));
                 $payData = [
+                    'id' => $payId,
                     'payment_id' => $payId,
                     'invoice_id' => $mysqlInvId,
                     'internal_invoice_id' => $internalId,
