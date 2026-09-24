@@ -385,11 +385,11 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
         </div>
 
         {/* Desktop View: Table */}
-        <div className="hidden md:block overflow-x-auto">
-          <table className="w-full text-left border-collapse table-fixed min-w-[950px]">
+        <div className="hidden md:block overflow-x-auto rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-xs">
+          <table className="w-full text-left border-collapse table-fixed min-w-[1180px]">
             <thead>
               <tr className="bg-slate-100 dark:bg-zinc-800/80 text-slate-700 dark:text-zinc-300 text-[10px] uppercase tracking-wider font-extrabold border-b border-slate-200 dark:border-zinc-800">
-                <th className="py-3 px-3 w-[4%] text-center">
+                <th className="py-3 px-3 w-[3%] min-w-[40px] text-center">
                   <input
                     type="checkbox"
                     checked={isAllSelected}
@@ -398,14 +398,14 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                     title="Select All Invoices on Page"
                   />
                 </th>
-                <th className="py-3 px-3 w-[18%]">Invoice Details</th>
-                <th className="py-3 px-3 w-[16%]">Customer & Pet</th>
-                <th className="py-3 px-3 text-right w-[11%]">Taxable (₹)</th>
-                <th className="py-3 px-3 text-right w-[10%]">GST (18%)</th>
-                <th className="py-3 px-3 text-right w-[14%]">Grand Total</th>
-                <th className="py-3 px-3 text-right w-[11%]">Balance Due</th>
-                <th className="py-3 px-3 text-center w-[8%]">Status</th>
-                <th className="py-3 px-3 text-center w-[12%] min-w-[130px]">Actions</th>
+                <th className="py-3 px-3 w-[14%] min-w-[140px]">Invoice Details</th>
+                <th className="py-3 px-3 w-[14%] min-w-[140px]">Customer & Pet</th>
+                <th className="py-3 px-3 text-right w-[9%] min-w-[90px]">Taxable (₹)</th>
+                <th className="py-3 px-3 text-right w-[8%] min-w-[80px]">GST (18%)</th>
+                <th className="py-3 px-3 text-right w-[11%] min-w-[110px]">Grand Total</th>
+                <th className="py-3 px-3 text-right w-[9%] min-w-[90px]">Balance Due</th>
+                <th className="py-3 px-3 text-center w-[10%] min-w-[100px] whitespace-nowrap">Status</th>
+                <th className="py-3 px-3 text-center w-[22%] min-w-[220px] whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-zinc-800/80 text-xs">
@@ -474,8 +474,8 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                   </td>
 
                   {/* Status Badge */}
-                  <td className="p-3 text-center">
-                    <span className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-extrabold font-mono ${
+                  <td className="p-3 text-center whitespace-nowrap">
+                    <span className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-extrabold font-mono shrink-0 ${
                       inv.paymentStatus === 'PAID'
                         ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
                         : inv.paymentStatus === 'CANCELLED'
@@ -489,8 +489,8 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                   </td>
 
                   {/* Actions */}
-                  <td className="p-3 text-center">
-                    <div className="flex items-center justify-center space-x-1">
+                  <td className="p-3 text-center whitespace-nowrap">
+                    <div className="flex items-center justify-center gap-1 shrink-0">
                       {/* View Preview */}
                       {hasPermission(currentUser, 'invoices_view') && (
                         <button
@@ -498,7 +498,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                             setIsAutoDownloadPDF(false);
                             setSelectedInvoiceForPreview(inv);
                           }}
-                          className="p-1.5 text-slate-600 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
+                          className="p-1.5 text-slate-600 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer"
                           title="View Invoice Preview"
                         >
                           <Eye className="w-4 h-4" />
@@ -512,7 +512,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                             setSelectedInvoiceForPreview(inv);
                             setIsAutoDownloadPDF(true);
                           }}
-                          className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/60 rounded-lg transition-colors"
+                          className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/60 rounded-lg transition-colors cursor-pointer"
                           title="Download Tax Invoice as PDF"
                         >
                           <Download className="w-4 h-4" />
@@ -523,7 +523,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                       {hasPermission(currentUser, 'invoices_whatsapp') && (
                         <button
                           onClick={() => handleTriggerAction('SHARE', inv)}
-                          className="p-1.5 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/60 rounded-lg transition-colors"
+                          className="p-1.5 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/60 rounded-lg transition-colors cursor-pointer"
                           title="Share via WhatsApp"
                         >
                           <Share2 className="w-4 h-4" />
@@ -534,7 +534,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                       {hasPermission(currentUser, 'payments_view') && (
                         <button
                           onClick={() => setSelectedInvoiceForPayments(inv)}
-                          className="p-1.5 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/60 rounded-lg transition-colors"
+                          className="p-1.5 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/60 rounded-lg transition-colors cursor-pointer"
                           title="View / Add Payments"
                         >
                           <CreditCard className="w-4 h-4" />
@@ -545,7 +545,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                       {hasPermission(currentUser, 'invoices_edit') && (
                         <button
                           onClick={() => handleTriggerAction('EDIT', inv)}
-                          className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/60 rounded-lg transition-colors"
+                          className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/60 rounded-lg transition-colors cursor-pointer"
                           title="Edit Invoice"
                         >
                           <Receipt className="w-4 h-4" />
@@ -556,7 +556,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                       {!inv.isCancelled && hasPermission(currentUser, 'invoices_cancel') && (
                         <button
                           onClick={() => handleTriggerAction('CANCEL', inv)}
-                          className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/60 rounded-lg transition-colors"
+                          className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/60 rounded-lg transition-colors cursor-pointer"
                           title="Cancel Invoice"
                         >
                           <XCircle className="w-4 h-4" />
@@ -571,7 +571,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
                               onDeleteInvoice(inv.id);
                             }
                           }}
-                          className="p-1.5 text-zinc-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/60 rounded-lg transition-colors"
+                          className="p-1.5 text-zinc-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/60 rounded-lg transition-colors cursor-pointer"
                           title="Permanently Delete Invoice"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -583,7 +583,7 @@ export const InvoiceManagement: React.FC<InvoiceManagementProps> = ({
               ))}
               {paginatedInvoices.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="p-8 text-center text-slate-400 italic text-xs">
+                  <td colSpan={9} className="p-8 text-center text-slate-400 italic text-xs">
                     No matching tax invoices found.
                   </td>
                 </tr>
