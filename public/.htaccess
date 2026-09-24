@@ -2,25 +2,41 @@
 # The House of Pawz – React SPA .htaccess for cPanel / LiteSpeed / Apache
 # ----------------------------------------------------------------------
 
-# 1. Enable Rewrite Engine for Single Page Application
+# 1. Protect sensitive files (.env, .log, .sql, .lock)
+<FilesMatch "^\.env|\.(log|sql|lock|md)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# 2. Enable Rewrite Engine for Single Page Application
 <IfModule mod_rewrite.c>
   RewriteEngine On
+
+  # Block direct web/browser access to cron and logs folders
+  RewriteRule ^(cron|logs)/ - [F,L]
+
+  # Normal SPA rewrite rules
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteRule ^ index.html [L]
 </IfModule>
 
-# 2. Prevent directory indexing
+# 3. Prevent directory indexing
 Options -Indexes
 
-# 3. Proper MIME types for modern JS/CSS modules
+# 4. Proper MIME types for modern JS/CSS modules
 <IfModule mod_mime.c>
   AddType text/javascript .js .mjs
   AddType text/css .css
   AddType image/svg+xml .svg
 </IfModule>
 
-# 4. Security & CORS headers
+# 5. Security & CORS headers
 <IfModule mod_headers.c>
   Header set X-Content-Type-Options "nosniff"
 </IfModule>
