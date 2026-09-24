@@ -41,35 +41,30 @@ if ($method === 'POST') {
     }
 
     try {
-        $stmt = $pdo->prepare("
-            INSERT INTO customers (
-                id, customer_id, name, phone, email, address, gstin, state, pincode, notes, created_at, updated_at
-            ) VALUES (
-                :id, :customer_id, :name, :phone, :email, :address, :gstin, :state, :pincode, :notes, NOW(), NOW()
-            ) ON DUPLICATE KEY UPDATE
-                name = VALUES(name),
-                phone = VALUES(phone),
-                email = VALUES(email),
-                address = VALUES(address),
-                gstin = VALUES(gstin),
-                state = VALUES(state),
-                pincode = VALUES(pincode),
-                notes = VALUES(notes),
-                updated_at = NOW()
-        ");
+        $chk = $pdo->prepare("SELECT id, customer_id FROM customers WHERE customer_id = :cid OR id = :cid2 LIMIT 1");
+        $chk->execute([':cid' => $custId, ':cid2' => $custId]);
+        $existing = $chk->fetch();
 
-        $stmt->execute([
-            ':id' => isset($c['id']) && strlen($c['id']) > 30 ? $c['id'] : generateUuidV4(),
-            ':customer_id' => $custId,
-            ':name' => $name,
-            ':phone' => isset($c['phone']) ? $c['phone'] : '',
-            ':email' => isset($c['email']) ? $c['email'] : null,
-            ':address' => isset($c['address']) ? $c['address'] : null,
-            ':gstin' => isset($c['gstin']) ? $c['gstin'] : null,
-            ':state' => isset($c['state']) ? $c['state'] : 'Maharashtra',
-            ':pincode' => isset($c['pincode']) ? $c['pincode'] : null,
-            ':notes' => isset($c['notes']) ? $c['notes'] : null
-        ]);
+        $custRecord = [
+            'name' => $name,
+            'phone' => isset($c['phone']) ? $c['phone'] : '',
+            'email' => isset($c['email']) ? $c['email'] : null,
+            'address' => isset($c['address']) ? $c['address'] : null,
+            'gstin' => isset($c['gstin']) ? $c['gstin'] : null,
+            'state' => isset($c['state']) ? $c['state'] : 'Maharashtra',
+            'pincode' => isset($c['pincode']) ? $c['pincode'] : null,
+            'notes' => isset($c['notes']) ? $c['notes'] : null,
+            'updated_at' => date('Y-m-d H:i:s')
+        ];
+
+        if ($existing) {
+            dynamicUpdate($pdo, 'customers', $custRecord, ['customer_id' => $existing['customer_id']]);
+        } else {
+            $custRecord['id'] = isset($c['id']) && strlen($c['id']) > 30 ? $c['id'] : generateUuidV4();
+            $custRecord['customer_id'] = $custId;
+            $custRecord['created_at'] = date('Y-m-d H:i:s');
+            dynamicInsert($pdo, 'customers', $custRecord);
+        }
 
         sendJsonResponse([
             'success' => true,

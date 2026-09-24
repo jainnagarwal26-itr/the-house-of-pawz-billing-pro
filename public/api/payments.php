@@ -86,32 +86,24 @@ if ($method === 'POST') {
         $notes = isset($paymentData['notes']) ? $paymentData['notes'] : null;
         $receivedBy = isset($paymentData['received_by']) ? $paymentData['received_by'] : (isset($paymentData['receivedBy']) ? $paymentData['receivedBy'] : 'Staff');
 
-        $insStmt = $pdo->prepare("
-            INSERT INTO payments (
-                id, payment_id, internal_invoice_id, invoice_number, customer_id, customer_name,
-                amount, payment_date, payment_mode, transaction_ref, notes, received_by,
-                created_at, updated_at
-            ) VALUES (
-                :id, :payment_id, :internal_invoice_id, :invoice_number, :customer_id, :customer_name,
-                :amount, :payment_date, :payment_mode, :transaction_ref, :notes, :received_by,
-                NOW(), NOW()
-            )
-        ");
+        $payRecord = [
+            'id' => generateUuidV4(),
+            'payment_id' => $paymentId,
+            'internal_invoice_id' => $realIntId,
+            'invoice_number' => $invoiceNumber,
+            'customer_id' => $customerId,
+            'customer_name' => $customerName,
+            'amount' => $amount,
+            'payment_date' => $paymentDate,
+            'payment_mode' => $paymentMode,
+            'transaction_ref' => $txRef,
+            'notes' => $notes,
+            'received_by' => $receivedBy,
+            'created_at' => date('Y-m-d H:i:s'),
+            'updated_at' => date('Y-m-d H:i:s')
+        ];
 
-        $insStmt->execute([
-            ':id' => generateUuidV4(),
-            ':payment_id' => $paymentId,
-            ':internal_invoice_id' => $realIntId,
-            ':invoice_number' => $invoiceNumber,
-            ':customer_id' => $customerId,
-            ':customer_name' => $customerName,
-            ':amount' => $amount,
-            ':payment_date' => $paymentDate,
-            ':payment_mode' => $paymentMode,
-            ':transaction_ref' => $txRef,
-            ':notes' => $notes,
-            ':received_by' => $receivedBy
-        ]);
+        dynamicInsert($pdo, 'payments', $payRecord);
 
         // 3. Atomically recalculate invoice paid_amount, balance_due, and payment_status
         $sumStmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) FROM payments WHERE internal_invoice_id = :int_id");
@@ -121,22 +113,14 @@ if ($method === 'POST') {
         $newBalance = max(0.0, round($grandTotal - $newPaidTotal, 2));
         $newStatus = $newPaidTotal >= $grandTotal ? 'PAID' : ($newPaidTotal > 0 ? 'PARTIAL' : 'UNPAID');
 
-        $updStmt = $pdo->prepare("
-            UPDATE invoices SET 
-                paid_amount = :paid, 
-                balance_due = :bal, 
-                payment_status = :st,
-                payment_mode = :pm,
-                updated_at = NOW()
-            WHERE internal_invoice_id = :int_id
-        ");
-        $updStmt->execute([
-            ':paid' => $newPaidTotal,
-            ':bal' => $newBalance,
-            ':st' => $newStatus,
-            ':pm' => $paymentMode,
-            ':int_id' => $realIntId
-        ]);
+        $updInvoice = [
+            'paid_amount' => $newPaidTotal,
+            'balance_due' => $newBalance,
+            'payment_status' => $newStatus,
+            'payment_mode' => $paymentMode,
+            'updated_at' => date('Y-m-d H:i:s')
+        ];
+        dynamicUpdate($pdo, 'invoices', $updInvoice, ['internal_invoice_id' => $realIntId]);
 
         $pdo->commit();
 
@@ -190,25 +174,15 @@ if ($method === 'PUT') {
         $txRef = isset($paymentData['transaction_ref']) ? $paymentData['transaction_ref'] : (isset($paymentData['transactionRef']) ? $paymentData['transactionRef'] : $existing['transaction_ref']);
         $notes = isset($paymentData['notes']) ? $paymentData['notes'] : $existing['notes'];
 
-        $updPay = $pdo->prepare("
-            UPDATE payments SET 
-                amount = :amt, 
-                payment_date = :pdate, 
-                payment_mode = :pmode, 
-                transaction_ref = :txref, 
-                notes = :notes,
-                updated_at = NOW()
-            WHERE payment_id = :pid OR id = :pid2
-        ");
-        $updPay->execute([
-            ':amt' => $amount,
-            ':pdate' => $payDate,
-            ':pmode' => $payMode,
-            ':txref' => $txRef,
-            ':notes' => $notes,
-            ':pid' => $payIdentifier,
-            ':pid2' => $payIdentifier
-        ]);
+        $updPay = [
+            'amount' => $amount,
+            'payment_date' => $payDate,
+            'payment_mode' => $payMode,
+            'transaction_ref' => $txRef,
+            'notes' => $notes,
+            'updated_at' => date('Y-m-d H:i:s')
+        ];
+        dynamicUpdate($pdo, 'payments', $updPay, ['payment_id' => $existing['payment_id']]);
 
         // Recalculate invoice totals
         $invStmt = $pdo->prepare("SELECT grand_total FROM invoices WHERE internal_invoice_id = :int_id");
@@ -222,20 +196,13 @@ if ($method === 'PUT') {
         $newBalance = max(0.0, round($grandTotal - $newPaidTotal, 2));
         $newStatus = $newPaidTotal >= $grandTotal ? 'PAID' : ($newPaidTotal > 0 ? 'PARTIAL' : 'UNPAID');
 
-        $updInv = $pdo->prepare("
-            UPDATE invoices SET 
-                paid_amount = :paid, 
-                balance_due = :bal, 
-                payment_status = :st,
-                updated_at = NOW()
-            WHERE internal_invoice_id = :int_id
-        ");
-        $updInv->execute([
-            ':paid' => $newPaidTotal,
-            ':bal' => $newBalance,
-            ':st' => $newStatus,
-            ':int_id' => $realIntId
-        ]);
+        $updInv = [
+            'paid_amount' => $newPaidTotal,
+            'balance_due' => $newBalance,
+            'payment_status' => $newStatus,
+            'updated_at' => date('Y-m-d H:i:s')
+        ];
+        dynamicUpdate($pdo, 'invoices', $updInv, ['internal_invoice_id' => $realIntId]);
 
         $pdo->commit();
 
@@ -289,20 +256,13 @@ if ($method === 'DELETE') {
         $newBalance = max(0.0, round($grandTotal - $newPaidTotal, 2));
         $newStatus = $newPaidTotal >= $grandTotal ? 'PAID' : ($newPaidTotal > 0 ? 'PARTIAL' : 'UNPAID');
 
-        $updInv = $pdo->prepare("
-            UPDATE invoices SET 
-                paid_amount = :paid, 
-                balance_due = :bal, 
-                payment_status = :st,
-                updated_at = NOW()
-            WHERE internal_invoice_id = :int_id
-        ");
-        $updInv->execute([
-            ':paid' => $newPaidTotal,
-            ':bal' => $newBalance,
-            ':st' => $newStatus,
-            ':int_id' => $realIntId
-        ]);
+        $updInv = [
+            'paid_amount' => $newPaidTotal,
+            'balance_due' => $newBalance,
+            'payment_status' => $newStatus,
+            'updated_at' => date('Y-m-d H:i:s')
+        ];
+        dynamicUpdate($pdo, 'invoices', $updInv, ['internal_invoice_id' => $realIntId]);
 
         $pdo->commit();
 

@@ -150,136 +150,101 @@ if ($method === 'POST') {
         $balanceDue = max(0.0, round($grandTotal - $totalPaid, 2));
         $paymentStatus = $totalPaid >= $grandTotal ? 'PAID' : ($totalPaid > 0 ? 'PARTIAL' : 'UNPAID');
 
-        // Insert into invoices table
-        $invStmt = $pdo->prepare("
-            INSERT INTO invoices (
-                id, internal_invoice_id, invoice_number, financial_year, invoice_date, due_date,
-                customer_id, customer_name, customer_phone, customer_email, customer_address, customer_gstin,
-                pet_id, pet_name, place_of_supply, is_inter_state,
-                sub_total, total_discount, taxable_amount,
-                cgst_total, sgst_total, igst_total, total_gst, round_off,
-                grand_total, paid_amount, balance_due, payment_status, payment_mode,
-                notes, created_by_role, created_by_name, is_cancelled, created_at, updated_at
-            ) VALUES (
-                :id, :internal_invoice_id, :invoice_number, :financial_year, :invoice_date, :due_date,
-                :customer_id, :customer_name, :customer_phone, :customer_email, :customer_address, :customer_gstin,
-                :pet_id, :pet_name, :place_of_supply, :is_inter_state,
-                :sub_total, :total_discount, :taxable_amount,
-                :cgst_total, :sgst_total, :igst_total, :total_gst, :round_off,
-                :grand_total, :paid_amount, :balance_due, :payment_status, :payment_mode,
-                :notes, :created_by_role, :created_by_name, 0, NOW(), NOW()
-            )
-        ");
+        // Insert into invoices table dynamically
+        $invRecord = [
+            'id' => $uuid,
+            'internal_invoice_id' => $internalId,
+            'invoice_number' => $invoiceNumber,
+            'financial_year' => isset($invoiceData['financial_year']) ? $invoiceData['financial_year'] : (isset($invoiceData['financialYear']) ? $invoiceData['financialYear'] : '2026-27'),
+            'invoice_date' => isset($invoiceData['invoice_date']) ? $invoiceData['invoice_date'] : (isset($invoiceData['invoiceDate']) ? $invoiceData['invoiceDate'] : date('d/m/Y')),
+            'due_date' => isset($invoiceData['due_date']) ? $invoiceData['due_date'] : (isset($invoiceData['dueDate']) ? $invoiceData['dueDate'] : null),
+            'customer_id' => isset($invoiceData['customer_id']) ? $invoiceData['customer_id'] : (isset($invoiceData['customerId']) ? $invoiceData['customerId'] : 'CUST-001'),
+            'customer_name' => isset($invoiceData['customer_name']) ? $invoiceData['customer_name'] : (isset($invoiceData['customerName']) ? $invoiceData['customerName'] : 'Customer'),
+            'customer_phone' => isset($invoiceData['customer_phone']) ? $invoiceData['customer_phone'] : (isset($invoiceData['customerPhone']) ? $invoiceData['customerPhone'] : ''),
+            'customer_email' => isset($invoiceData['customer_email']) ? $invoiceData['customer_email'] : (isset($invoiceData['customerEmail']) ? $invoiceData['customerEmail'] : ''),
+            'customer_address' => isset($invoiceData['customer_address']) ? $invoiceData['customer_address'] : (isset($invoiceData['customerAddress']) ? $invoiceData['customerAddress'] : ''),
+            'customer_gstin' => isset($invoiceData['customer_gstin']) ? $invoiceData['customer_gstin'] : (isset($invoiceData['customerGSTIN']) ? $invoiceData['customerGSTIN'] : ''),
+            'pet_id' => isset($invoiceData['pet_id']) ? $invoiceData['pet_id'] : (isset($invoiceData['petId']) ? $invoiceData['petId'] : null),
+            'pet_name' => isset($invoiceData['pet_name']) ? $invoiceData['pet_name'] : (isset($invoiceData['petName']) ? $invoiceData['petName'] : null),
+            'place_of_supply' => isset($invoiceData['place_of_supply']) ? $invoiceData['place_of_supply'] : (isset($invoiceData['placeOfSupply']) ? $invoiceData['placeOfSupply'] : '27-Maharashtra'),
+            'is_inter_state' => !empty($invoiceData['is_inter_state']) || !empty($invoiceData['isInterState']) ? 1 : 0,
+            'sub_total' => (float)(isset($invoiceData['sub_total']) ? $invoiceData['sub_total'] : (isset($invoiceData['subTotal']) ? $invoiceData['subTotal'] : 0)),
+            'total_discount' => (float)(isset($invoiceData['total_discount']) ? $invoiceData['total_discount'] : (isset($invoiceData['totalDiscount']) ? $invoiceData['totalDiscount'] : 0)),
+            'taxable_amount' => (float)(isset($invoiceData['taxable_amount']) ? $invoiceData['taxable_amount'] : (isset($invoiceData['taxableAmount']) ? $invoiceData['taxableAmount'] : 0)),
+            'cgst_total' => (float)(isset($invoiceData['cgst_total']) ? $invoiceData['cgst_total'] : (isset($invoiceData['cgstTotal']) ? $invoiceData['cgstTotal'] : 0)),
+            'sgst_total' => (float)(isset($invoiceData['sgst_total']) ? $invoiceData['sgst_total'] : (isset($invoiceData['sgstTotal']) ? $invoiceData['sgstTotal'] : 0)),
+            'igst_total' => (float)(isset($invoiceData['igst_total']) ? $invoiceData['igst_total'] : (isset($invoiceData['igstTotal']) ? $invoiceData['igstTotal'] : 0)),
+            'total_gst' => (float)(isset($invoiceData['total_gst']) ? $invoiceData['total_gst'] : (isset($invoiceData['totalGst']) ? $invoiceData['totalGst'] : 0)),
+            'round_off' => (float)(isset($invoiceData['round_off']) ? $invoiceData['round_off'] : (isset($invoiceData['roundOff']) ? $invoiceData['roundOff'] : 0)),
+            'grand_total' => $grandTotal,
+            'paid_amount' => $totalPaid,
+            'balance_due' => $balanceDue,
+            'payment_status' => $paymentStatus,
+            'payment_mode' => isset($invoiceData['payment_mode']) ? $invoiceData['payment_mode'] : (isset($invoiceData['paymentMode']) ? $invoiceData['paymentMode'] : 'UPI'),
+            'notes' => isset($invoiceData['notes']) ? $invoiceData['notes'] : '',
+            'created_by_role' => isset($invoiceData['created_by_role']) ? $invoiceData['created_by_role'] : (isset($invoiceData['createdByRole']) ? $invoiceData['createdByRole'] : 'ADMIN'),
+            'created_by_name' => isset($invoiceData['created_by_name']) ? $invoiceData['created_by_name'] : (isset($invoiceData['createdByName']) ? $invoiceData['createdByName'] : 'Staff'),
+            'is_cancelled' => 0,
+            'created_at' => date('Y-m-d H:i:s'),
+            'updated_at' => date('Y-m-d H:i:s')
+        ];
 
-        $invStmt->execute([
-            ':id' => $uuid,
-            ':internal_invoice_id' => $internalId,
-            ':invoice_number' => $invoiceNumber,
-            ':financial_year' => isset($invoiceData['financial_year']) ? $invoiceData['financial_year'] : (isset($invoiceData['financialYear']) ? $invoiceData['financialYear'] : '2026-27'),
-            ':invoice_date' => isset($invoiceData['invoice_date']) ? $invoiceData['invoice_date'] : (isset($invoiceData['invoiceDate']) ? $invoiceData['invoiceDate'] : date('d/m/Y')),
-            ':due_date' => isset($invoiceData['due_date']) ? $invoiceData['due_date'] : (isset($invoiceData['dueDate']) ? $invoiceData['dueDate'] : null),
-            ':customer_id' => isset($invoiceData['customer_id']) ? $invoiceData['customer_id'] : (isset($invoiceData['customerId']) ? $invoiceData['customerId'] : 'CUST-001'),
-            ':customer_name' => isset($invoiceData['customer_name']) ? $invoiceData['customer_name'] : (isset($invoiceData['customerName']) ? $invoiceData['customerName'] : 'Customer'),
-            ':customer_phone' => isset($invoiceData['customer_phone']) ? $invoiceData['customer_phone'] : (isset($invoiceData['customerPhone']) ? $invoiceData['customerPhone'] : ''),
-            ':customer_email' => isset($invoiceData['customer_email']) ? $invoiceData['customer_email'] : (isset($invoiceData['customerEmail']) ? $invoiceData['customerEmail'] : ''),
-            ':customer_address' => isset($invoiceData['customer_address']) ? $invoiceData['customer_address'] : (isset($invoiceData['customerAddress']) ? $invoiceData['customerAddress'] : ''),
-            ':customer_gstin' => isset($invoiceData['customer_gstin']) ? $invoiceData['customer_gstin'] : (isset($invoiceData['customerGSTIN']) ? $invoiceData['customerGSTIN'] : ''),
-            ':pet_id' => isset($invoiceData['pet_id']) ? $invoiceData['pet_id'] : (isset($invoiceData['petId']) ? $invoiceData['petId'] : null),
-            ':pet_name' => isset($invoiceData['pet_name']) ? $invoiceData['pet_name'] : (isset($invoiceData['petName']) ? $invoiceData['petName'] : null),
-            ':place_of_supply' => isset($invoiceData['place_of_supply']) ? $invoiceData['place_of_supply'] : (isset($invoiceData['placeOfSupply']) ? $invoiceData['placeOfSupply'] : '27-Maharashtra'),
-            ':is_inter_state' => !empty($invoiceData['is_inter_state']) || !empty($invoiceData['isInterState']) ? 1 : 0,
-            ':sub_total' => (float)(isset($invoiceData['sub_total']) ? $invoiceData['sub_total'] : (isset($invoiceData['subTotal']) ? $invoiceData['subTotal'] : 0)),
-            ':total_discount' => (float)(isset($invoiceData['total_discount']) ? $invoiceData['total_discount'] : (isset($invoiceData['totalDiscount']) ? $invoiceData['totalDiscount'] : 0)),
-            ':taxable_amount' => (float)(isset($invoiceData['taxable_amount']) ? $invoiceData['taxable_amount'] : (isset($invoiceData['taxableAmount']) ? $invoiceData['taxableAmount'] : 0)),
-            ':cgst_total' => (float)(isset($invoiceData['cgst_total']) ? $invoiceData['cgst_total'] : (isset($invoiceData['cgstTotal']) ? $invoiceData['cgstTotal'] : 0)),
-            ':sgst_total' => (float)(isset($invoiceData['sgst_total']) ? $invoiceData['sgst_total'] : (isset($invoiceData['sgstTotal']) ? $invoiceData['sgstTotal'] : 0)),
-            ':igst_total' => (float)(isset($invoiceData['igst_total']) ? $invoiceData['igst_total'] : (isset($invoiceData['igstTotal']) ? $invoiceData['igstTotal'] : 0)),
-            ':total_gst' => (float)(isset($invoiceData['total_gst']) ? $invoiceData['total_gst'] : (isset($invoiceData['totalGst']) ? $invoiceData['totalGst'] : 0)),
-            ':round_off' => (float)(isset($invoiceData['round_off']) ? $invoiceData['round_off'] : (isset($invoiceData['roundOff']) ? $invoiceData['roundOff'] : 0)),
-            ':grand_total' => $grandTotal,
-            ':paid_amount' => $totalPaid,
-            ':balance_due' => $balanceDue,
-            ':payment_status' => $paymentStatus,
-            ':payment_mode' => isset($invoiceData['payment_mode']) ? $invoiceData['payment_mode'] : (isset($invoiceData['paymentMode']) ? $invoiceData['paymentMode'] : 'UPI'),
-            ':notes' => isset($invoiceData['notes']) ? $invoiceData['notes'] : '',
-            ':created_by_role' => isset($invoiceData['created_by_role']) ? $invoiceData['created_by_role'] : (isset($invoiceData['createdByRole']) ? $invoiceData['createdByRole'] : 'ADMIN'),
-            ':created_by_name' => isset($invoiceData['created_by_name']) ? $invoiceData['created_by_name'] : (isset($invoiceData['createdByName']) ? $invoiceData['createdByName'] : 'Staff')
-        ]);
+        dynamicInsert($pdo, 'invoices', $invRecord);
 
-        // Insert line items
+        // Insert line items dynamically
         if (!empty($itemsData) && is_array($itemsData)) {
-            $itemStmt = $pdo->prepare("
-                INSERT INTO invoice_items (
-                    id, line_item_id, internal_invoice_id, invoice_number, catalog_item_id,
-                    item_type, item_name, hsn_sac, price, quantity, discount_percent, discount_amount,
-                    taxable_value, gst_rate, cgst_amount, sgst_amount, igst_amount, item_total,
-                    created_at, updated_at
-                ) VALUES (
-                    :id, :line_item_id, :internal_invoice_id, :invoice_number, :catalog_item_id,
-                    :item_type, :item_name, :hsn_sac, :price, :quantity, :discount_percent, :discount_amount,
-                    :taxable_value, :gst_rate, :cgst_amount, :sgst_amount, :igst_amount, :item_total,
-                    NOW(), NOW()
-                )
-            ");
-
             $idx = 1;
             foreach ($itemsData as $item) {
                 $lineId = isset($item['id']) && strlen($item['id']) > 3 ? $item['id'] : "ITEM-{$internalId}-{$idx}";
-                $itemStmt->execute([
-                    ':id' => generateUuidV4(),
-                    ':line_item_id' => $lineId,
-                    ':internal_invoice_id' => $internalId,
-                    ':invoice_number' => $invoiceNumber,
-                    ':catalog_item_id' => isset($item['catalog_item_id']) ? $item['catalog_item_id'] : (isset($item['catalogItemId']) ? $item['catalogItemId'] : null),
-                    ':item_type' => isset($item['item_type']) ? $item['item_type'] : (isset($item['type']) ? $item['type'] : 'SERVICE'),
-                    ':item_name' => isset($item['item_name']) ? $item['item_name'] : (isset($item['name']) ? $item['name'] : 'Service'),
-                    ':hsn_sac' => isset($item['hsn_sac']) ? $item['hsn_sac'] : (isset($item['hsnSac']) ? $item['hsnSac'] : '999799'),
-                    ':price' => (float)(isset($item['price']) ? $item['price'] : 0),
-                    ':quantity' => (float)(isset($item['quantity']) ? $item['quantity'] : (isset($item['qty']) ? $item['qty'] : 1)),
-                    ':discount_percent' => (float)(isset($item['discount_percent']) ? $item['discount_percent'] : (isset($item['discount']) ? $item['discount'] : 0)),
-                    ':discount_amount' => (float)(isset($item['discount_amount']) ? $item['discount_amount'] : (isset($item['discountAmount']) ? $item['discountAmount'] : 0)),
-                    ':taxable_value' => (float)(isset($item['taxable_value']) ? $item['taxable_value'] : (isset($item['taxableValue']) ? $item['taxableValue'] : 0)),
-                    ':gst_rate' => (float)(isset($item['gst_rate']) ? $item['gst_rate'] : (isset($item['gstRate']) ? $item['gstRate'] : 18)),
-                    ':cgst_amount' => (float)(isset($item['cgst_amount']) ? $item['cgst_amount'] : (isset($item['cgstAmount']) ? $item['cgstAmount'] : 0)),
-                    ':sgst_amount' => (float)(isset($item['sgst_amount']) ? $item['sgst_amount'] : (isset($item['sgstAmount']) ? $item['sgstAmount'] : 0)),
-                    ':igst_amount' => (float)(isset($item['igst_amount']) ? $item['igst_amount'] : (isset($item['igstAmount']) ? $item['igstAmount'] : 0)),
-                    ':item_total' => (float)(isset($item['item_total']) ? $item['item_total'] : (isset($item['total']) ? $item['total'] : 0))
-                ]);
+                $itemRecord = [
+                    'id' => generateUuidV4(),
+                    'line_item_id' => $lineId,
+                    'internal_invoice_id' => $internalId,
+                    'invoice_number' => $invoiceNumber,
+                    'catalog_item_id' => isset($item['catalog_item_id']) ? $item['catalog_item_id'] : (isset($item['catalogItemId']) ? $item['catalogItemId'] : null),
+                    'item_type' => isset($item['item_type']) ? $item['item_type'] : (isset($item['type']) ? $item['type'] : 'SERVICE'),
+                    'item_name' => isset($item['item_name']) ? $item['item_name'] : (isset($item['name']) ? $item['name'] : 'Service'),
+                    'hsn_sac' => isset($item['hsn_sac']) ? $item['hsn_sac'] : (isset($item['hsnSac']) ? $item['hsnSac'] : '999799'),
+                    'price' => (float)(isset($item['price']) ? $item['price'] : 0),
+                    'quantity' => (float)(isset($item['quantity']) ? $item['quantity'] : (isset($item['qty']) ? $item['qty'] : 1)),
+                    'discount_percent' => (float)(isset($item['discount_percent']) ? $item['discount_percent'] : (isset($item['discount']) ? $item['discount'] : 0)),
+                    'discount_amount' => (float)(isset($item['discount_amount']) ? $item['discount_amount'] : (isset($item['discountAmount']) ? $item['discountAmount'] : 0)),
+                    'taxable_value' => (float)(isset($item['taxable_value']) ? $item['taxable_value'] : (isset($item['taxableValue']) ? $item['taxableValue'] : 0)),
+                    'gst_rate' => (float)(isset($item['gst_rate']) ? $item['gst_rate'] : (isset($item['gstRate']) ? $item['gstRate'] : 18)),
+                    'cgst_amount' => (float)(isset($item['cgst_amount']) ? $item['cgst_amount'] : (isset($item['cgstAmount']) ? $item['cgstAmount'] : 0)),
+                    'sgst_amount' => (float)(isset($item['sgst_amount']) ? $item['sgst_amount'] : (isset($item['sgstAmount']) ? $item['sgstAmount'] : 0)),
+                    'igst_amount' => (float)(isset($item['igst_amount']) ? $item['igst_amount'] : (isset($item['igstAmount']) ? $item['igstAmount'] : 0)),
+                    'item_total' => (float)(isset($item['item_total']) ? $item['item_total'] : (isset($item['total']) ? $item['total'] : 0)),
+                    'created_at' => date('Y-m-d H:i:s'),
+                    'updated_at' => date('Y-m-d H:i:s')
+                ];
+                dynamicInsert($pdo, 'invoice_items', $itemRecord);
                 $idx++;
             }
         }
 
-        // Insert payments
+        // Insert payments dynamically
         if (!empty($validPayments)) {
-            $payStmt = $pdo->prepare("
-                INSERT INTO payments (
-                    id, payment_id, internal_invoice_id, invoice_number, customer_id, customer_name,
-                    amount, payment_date, payment_mode, transaction_ref, notes, received_by,
-                    created_at, updated_at
-                ) VALUES (
-                    :id, :payment_id, :internal_invoice_id, :invoice_number, :customer_id, :customer_name,
-                    :amount, :payment_date, :payment_mode, :transaction_ref, :notes, :received_by,
-                    NOW(), NOW()
-                )
-            ");
-
             $pidx = 1;
             foreach ($validPayments as $pay) {
                 $payId = isset($pay['id']) && strlen($pay['id']) > 3 ? $pay['id'] : "PAY-{$internalId}-{$pidx}";
-                $payStmt->execute([
-                    ':id' => generateUuidV4(),
-                    ':payment_id' => $payId,
-                    ':internal_invoice_id' => $internalId,
-                    ':invoice_number' => $invoiceNumber,
-                    ':customer_id' => isset($invoiceData['customer_id']) ? $invoiceData['customer_id'] : (isset($invoiceData['customerId']) ? $invoiceData['customerId'] : 'CUST-001'),
-                    ':customer_name' => isset($invoiceData['customer_name']) ? $invoiceData['customer_name'] : (isset($invoiceData['customerName']) ? $invoiceData['customerName'] : 'Customer'),
-                    ':amount' => (float)$pay['amount'],
-                    ':payment_date' => isset($pay['payment_date']) ? $pay['payment_date'] : (isset($pay['paymentDate']) ? $pay['paymentDate'] : date('d/m/Y')),
-                    ':payment_mode' => isset($pay['payment_mode']) ? $pay['payment_mode'] : (isset($pay['paymentMode']) ? $pay['paymentMode'] : 'UPI'),
-                    ':transaction_ref' => isset($pay['transaction_ref']) ? $pay['transaction_ref'] : (isset($pay['transactionRef']) ? $pay['transactionRef'] : null),
-                    ':notes' => isset($pay['notes']) ? $pay['notes'] : null,
-                    ':received_by' => isset($invoiceData['created_by_name']) ? $invoiceData['created_by_name'] : (isset($invoiceData['createdByName']) ? $invoiceData['createdByName'] : 'Staff')
-                ]);
+                $payRecord = [
+                    'id' => generateUuidV4(),
+                    'payment_id' => $payId,
+                    'internal_invoice_id' => $internalId,
+                    'invoice_number' => $invoiceNumber,
+                    'customer_id' => isset($invoiceData['customer_id']) ? $invoiceData['customer_id'] : (isset($invoiceData['customerId']) ? $invoiceData['customerId'] : 'CUST-001'),
+                    'customer_name' => isset($invoiceData['customer_name']) ? $invoiceData['customer_name'] : (isset($invoiceData['customerName']) ? $invoiceData['customerName'] : 'Customer'),
+                    'amount' => (float)$pay['amount'],
+                    'payment_date' => isset($pay['payment_date']) ? $pay['payment_date'] : (isset($pay['paymentDate']) ? $pay['paymentDate'] : date('d/m/Y')),
+                    'payment_mode' => isset($pay['payment_mode']) ? $pay['payment_mode'] : (isset($pay['paymentMode']) ? $pay['paymentMode'] : 'UPI'),
+                    'transaction_ref' => isset($pay['transaction_ref']) ? $pay['transaction_ref'] : (isset($pay['transactionRef']) ? $pay['transactionRef'] : null),
+                    'notes' => isset($pay['notes']) ? $pay['notes'] : null,
+                    'received_by' => isset($invoiceData['created_by_name']) ? $invoiceData['created_by_name'] : (isset($invoiceData['createdByName']) ? $invoiceData['createdByName'] : 'Staff'),
+                    'created_at' => date('Y-m-d H:i:s'),
+                    'updated_at' => date('Y-m-d H:i:s')
+                ];
+                dynamicInsert($pdo, 'payments', $payRecord);
                 $pidx++;
             }
         }
@@ -332,124 +297,79 @@ if ($method === 'PUT') {
         $paymentStatus = $totalPaid >= $grandTotal ? 'PAID' : ($totalPaid > 0 ? 'PARTIAL' : 'UNPAID');
         $invoiceNumber = isset($invoiceData['invoice_number']) ? trim($invoiceData['invoice_number']) : (isset($invoiceData['invoiceNumber']) ? trim($invoiceData['invoiceNumber']) : '');
 
-        // Update invoices table
-        $updStmt = $pdo->prepare("
-            UPDATE invoices SET
-                customer_id = :customer_id,
-                customer_name = :customer_name,
-                customer_phone = :customer_phone,
-                customer_email = :customer_email,
-                customer_address = :customer_address,
-                customer_gstin = :customer_gstin,
-                pet_id = :pet_id,
-                pet_name = :pet_name,
-                place_of_supply = :place_of_supply,
-                is_inter_state = :is_inter_state,
-                sub_total = :sub_total,
-                total_discount = :total_discount,
-                taxable_amount = :taxable_amount,
-                cgst_total = :cgst_total,
-                sgst_total = :sgst_total,
-                igst_total = :igst_total,
-                total_gst = :total_gst,
-                round_off = :round_off,
-                grand_total = :grand_total,
-                paid_amount = :paid_amount,
-                balance_due = :balance_due,
-                payment_status = :payment_status,
-                notes = :notes,
-                updated_at = NOW()
-            WHERE internal_invoice_id = :int_id
-        ");
+        // Update invoices table dynamically
+        $updInvoiceRecord = [
+            'customer_id' => isset($invoiceData['customer_id']) ? $invoiceData['customer_id'] : (isset($invoiceData['customerId']) ? $invoiceData['customerId'] : 'CUST-001'),
+            'customer_name' => isset($invoiceData['customer_name']) ? $invoiceData['customer_name'] : (isset($invoiceData['customerName']) ? $invoiceData['customerName'] : 'Customer'),
+            'customer_phone' => isset($invoiceData['customer_phone']) ? $invoiceData['customer_phone'] : (isset($invoiceData['customerPhone']) ? $invoiceData['customerPhone'] : ''),
+            'customer_email' => isset($invoiceData['customer_email']) ? $invoiceData['customer_email'] : (isset($invoiceData['customerEmail']) ? $invoiceData['customerEmail'] : ''),
+            'customer_address' => isset($invoiceData['customer_address']) ? $invoiceData['customer_address'] : (isset($invoiceData['customerAddress']) ? $invoiceData['customerAddress'] : ''),
+            'customer_gstin' => isset($invoiceData['customer_gstin']) ? $invoiceData['customer_gstin'] : (isset($invoiceData['customerGSTIN']) ? $invoiceData['customerGSTIN'] : ''),
+            'pet_id' => isset($invoiceData['pet_id']) ? $invoiceData['pet_id'] : (isset($invoiceData['petId']) ? $invoiceData['petId'] : null),
+            'pet_name' => isset($invoiceData['pet_name']) ? $invoiceData['pet_name'] : (isset($invoiceData['petName']) ? $invoiceData['petName'] : null),
+            'place_of_supply' => isset($invoiceData['place_of_supply']) ? $invoiceData['place_of_supply'] : (isset($invoiceData['placeOfSupply']) ? $invoiceData['placeOfSupply'] : '27-Maharashtra'),
+            'is_inter_state' => !empty($invoiceData['is_inter_state']) || !empty($invoiceData['isInterState']) ? 1 : 0,
+            'sub_total' => (float)(isset($invoiceData['sub_total']) ? $invoiceData['sub_total'] : (isset($invoiceData['subTotal']) ? $invoiceData['subTotal'] : 0)),
+            'total_discount' => (float)(isset($invoiceData['total_discount']) ? $invoiceData['total_discount'] : (isset($invoiceData['totalDiscount']) ? $invoiceData['totalDiscount'] : 0)),
+            'taxable_amount' => (float)(isset($invoiceData['taxable_amount']) ? $invoiceData['taxable_amount'] : (isset($invoiceData['taxableAmount']) ? $invoiceData['taxableAmount'] : 0)),
+            'cgst_total' => (float)(isset($invoiceData['cgst_total']) ? $invoiceData['cgst_total'] : (isset($invoiceData['cgstTotal']) ? $invoiceData['cgstTotal'] : 0)),
+            'sgst_total' => (float)(isset($invoiceData['sgst_total']) ? $invoiceData['sgst_total'] : (isset($invoiceData['sgstTotal']) ? $invoiceData['sgstTotal'] : 0)),
+            'igst_total' => (float)(isset($invoiceData['igst_total']) ? $invoiceData['igst_total'] : (isset($invoiceData['igstTotal']) ? $invoiceData['igstTotal'] : 0)),
+            'total_gst' => (float)(isset($invoiceData['total_gst']) ? $invoiceData['total_gst'] : (isset($invoiceData['totalGst']) ? $invoiceData['totalGst'] : 0)),
+            'round_off' => (float)(isset($invoiceData['round_off']) ? $invoiceData['round_off'] : (isset($invoiceData['roundOff']) ? $invoiceData['roundOff'] : 0)),
+            'grand_total' => $grandTotal,
+            'paid_amount' => $totalPaid,
+            'balance_due' => $balanceDue,
+            'payment_status' => $paymentStatus,
+            'notes' => isset($invoiceData['notes']) ? $invoiceData['notes'] : '',
+            'updated_at' => date('Y-m-d H:i:s')
+        ];
 
-        $updStmt->execute([
-            ':customer_id' => isset($invoiceData['customer_id']) ? $invoiceData['customer_id'] : (isset($invoiceData['customerId']) ? $invoiceData['customerId'] : 'CUST-001'),
-            ':customer_name' => isset($invoiceData['customer_name']) ? $invoiceData['customer_name'] : (isset($invoiceData['customerName']) ? $invoiceData['customerName'] : 'Customer'),
-            ':customer_phone' => isset($invoiceData['customer_phone']) ? $invoiceData['customer_phone'] : (isset($invoiceData['customerPhone']) ? $invoiceData['customerPhone'] : ''),
-            ':customer_email' => isset($invoiceData['customer_email']) ? $invoiceData['customer_email'] : (isset($invoiceData['customerEmail']) ? $invoiceData['customerEmail'] : ''),
-            ':customer_address' => isset($invoiceData['customer_address']) ? $invoiceData['customer_address'] : (isset($invoiceData['customerAddress']) ? $invoiceData['customerAddress'] : ''),
-            ':customer_gstin' => isset($invoiceData['customer_gstin']) ? $invoiceData['customer_gstin'] : (isset($invoiceData['customerGSTIN']) ? $invoiceData['customerGSTIN'] : ''),
-            ':pet_id' => isset($invoiceData['pet_id']) ? $invoiceData['pet_id'] : (isset($invoiceData['petId']) ? $invoiceData['petId'] : null),
-            ':pet_name' => isset($invoiceData['pet_name']) ? $invoiceData['pet_name'] : (isset($invoiceData['petName']) ? $invoiceData['petName'] : null),
-            ':place_of_supply' => isset($invoiceData['place_of_supply']) ? $invoiceData['place_of_supply'] : (isset($invoiceData['placeOfSupply']) ? $invoiceData['placeOfSupply'] : '27-Maharashtra'),
-            ':is_inter_state' => !empty($invoiceData['is_inter_state']) || !empty($invoiceData['isInterState']) ? 1 : 0,
-            ':sub_total' => (float)(isset($invoiceData['sub_total']) ? $invoiceData['sub_total'] : (isset($invoiceData['subTotal']) ? $invoiceData['subTotal'] : 0)),
-            ':total_discount' => (float)(isset($invoiceData['total_discount']) ? $invoiceData['total_discount'] : (isset($invoiceData['totalDiscount']) ? $invoiceData['totalDiscount'] : 0)),
-            ':taxable_amount' => (float)(isset($invoiceData['taxable_amount']) ? $invoiceData['taxable_amount'] : (isset($invoiceData['taxableAmount']) ? $invoiceData['taxableAmount'] : 0)),
-            ':cgst_total' => (float)(isset($invoiceData['cgst_total']) ? $invoiceData['cgst_total'] : (isset($invoiceData['cgstTotal']) ? $invoiceData['cgstTotal'] : 0)),
-            ':sgst_total' => (float)(isset($invoiceData['sgst_total']) ? $invoiceData['sgst_total'] : (isset($invoiceData['sgstTotal']) ? $invoiceData['sgstTotal'] : 0)),
-            ':igst_total' => (float)(isset($invoiceData['igst_total']) ? $invoiceData['igst_total'] : (isset($invoiceData['igstTotal']) ? $invoiceData['igstTotal'] : 0)),
-            ':total_gst' => (float)(isset($invoiceData['total_gst']) ? $invoiceData['total_gst'] : (isset($invoiceData['totalGst']) ? $invoiceData['totalGst'] : 0)),
-            ':round_off' => (float)(isset($invoiceData['round_off']) ? $invoiceData['round_off'] : (isset($invoiceData['roundOff']) ? $invoiceData['roundOff'] : 0)),
-            ':grand_total' => $grandTotal,
-            ':paid_amount' => $totalPaid,
-            ':balance_due' => $balanceDue,
-            ':payment_status' => $paymentStatus,
-            ':notes' => isset($invoiceData['notes']) ? $invoiceData['notes'] : '',
-            ':int_id' => $internalId
-        ]);
+        dynamicUpdate($pdo, 'invoices', $updInvoiceRecord, ['internal_invoice_id' => $internalId]);
 
-        // Replace items
+        // Replace items dynamically
         if (!empty($itemsData)) {
             $delStmt = $pdo->prepare("DELETE FROM invoice_items WHERE internal_invoice_id = :int_id");
             $delStmt->execute([':int_id' => $internalId]);
 
-            $itemStmt = $pdo->prepare("
-                INSERT INTO invoice_items (
-                    id, line_item_id, internal_invoice_id, invoice_number, catalog_item_id,
-                    item_type, item_name, hsn_sac, price, quantity, discount_percent, discount_amount,
-                    taxable_value, gst_rate, cgst_amount, sgst_amount, igst_amount, item_total,
-                    created_at, updated_at
-                ) VALUES (
-                    :id, :line_item_id, :internal_invoice_id, :invoice_number, :catalog_item_id,
-                    :item_type, :item_name, :hsn_sac, :price, :quantity, :discount_percent, :discount_amount,
-                    :taxable_value, :gst_rate, :cgst_amount, :sgst_amount, :igst_amount, :item_total,
-                    NOW(), NOW()
-                )
-            ");
-
             $idx = 1;
             foreach ($itemsData as $item) {
                 $lineId = isset($item['id']) && strlen($item['id']) > 3 ? $item['id'] : "ITEM-{$internalId}-{$idx}";
-                $itemStmt->execute([
-                    ':id' => generateUuidV4(),
-                    ':line_item_id' => $lineId,
-                    ':internal_invoice_id' => $internalId,
-                    ':invoice_number' => $invoiceNumber,
-                    ':catalog_item_id' => isset($item['catalog_item_id']) ? $item['catalog_item_id'] : (isset($item['catalogItemId']) ? $item['catalogItemId'] : null),
-                    ':item_type' => isset($item['item_type']) ? $item['item_type'] : (isset($item['type']) ? $item['type'] : 'SERVICE'),
-                    ':item_name' => isset($item['item_name']) ? $item['item_name'] : (isset($item['name']) ? $item['name'] : 'Service'),
-                    ':hsn_sac' => isset($item['hsn_sac']) ? $item['hsn_sac'] : (isset($item['hsnSac']) ? $item['hsnSac'] : '999799'),
-                    ':price' => (float)(isset($item['price']) ? $item['price'] : 0),
-                    ':quantity' => (float)(isset($item['quantity']) ? $item['quantity'] : (isset($item['qty']) ? $item['qty'] : 1)),
-                    ':discount_percent' => (float)(isset($item['discount_percent']) ? $item['discount_percent'] : (isset($item['discount']) ? $item['discount'] : 0)),
-                    ':discount_amount' => (float)(isset($item['discount_amount']) ? $item['discount_amount'] : (isset($item['discountAmount']) ? $item['discountAmount'] : 0)),
-                    ':taxable_value' => (float)(isset($item['taxable_value']) ? $item['taxable_value'] : (isset($item['taxableValue']) ? $item['taxableValue'] : 0)),
-                    ':gst_rate' => (float)(isset($item['gst_rate']) ? $item['gst_rate'] : (isset($item['gstRate']) ? $item['gstRate'] : 18)),
-                    ':cgst_amount' => (float)(isset($item['cgst_amount']) ? $item['cgst_amount'] : (isset($item['cgstAmount']) ? $item['cgstAmount'] : 0)),
-                    ':sgst_amount' => (float)(isset($item['sgst_amount']) ? $item['sgst_amount'] : (isset($item['sgstAmount']) ? $item['sgstAmount'] : 0)),
-                    ':igst_amount' => (float)(isset($item['igst_amount']) ? $item['igst_amount'] : (isset($item['igstAmount']) ? $item['igstAmount'] : 0)),
-                    ':item_total' => (float)(isset($item['item_total']) ? $item['item_total'] : (isset($item['total']) ? $item['total'] : 0))
-                ]);
+                $itemRecord = [
+                    'id' => generateUuidV4(),
+                    'line_item_id' => $lineId,
+                    'internal_invoice_id' => $internalId,
+                    'invoice_number' => $invoiceNumber,
+                    'catalog_item_id' => isset($item['catalog_item_id']) ? $item['catalog_item_id'] : (isset($item['catalogItemId']) ? $item['catalogItemId'] : null),
+                    'item_type' => isset($item['item_type']) ? $item['item_type'] : (isset($item['type']) ? $item['type'] : 'SERVICE'),
+                    'item_name' => isset($item['item_name']) ? $item['item_name'] : (isset($item['name']) ? $item['name'] : 'Service'),
+                    'hsn_sac' => isset($item['hsn_sac']) ? $item['hsn_sac'] : (isset($item['hsnSac']) ? $item['hsnSac'] : '999799'),
+                    'price' => (float)(isset($item['price']) ? $item['price'] : 0),
+                    'quantity' => (float)(isset($item['quantity']) ? $item['quantity'] : (isset($item['qty']) ? $item['qty'] : 1)),
+                    'discount_percent' => (float)(isset($item['discount_percent']) ? $item['discount_percent'] : (isset($item['discount']) ? $item['discount'] : 0)),
+                    'discount_amount' => (float)(isset($item['discount_amount']) ? $item['discount_amount'] : (isset($item['discountAmount']) ? $item['discountAmount'] : 0)),
+                    'taxable_value' => (float)(isset($item['taxable_value']) ? $item['taxable_value'] : (isset($item['taxableValue']) ? $item['taxableValue'] : 0)),
+                    'gst_rate' => (float)(isset($item['gst_rate']) ? $item['gst_rate'] : (isset($item['gstRate']) ? $item['gstRate'] : 18)),
+                    'cgst_amount' => (float)(isset($item['cgst_amount']) ? $item['cgst_amount'] : (isset($item['cgstAmount']) ? $item['cgstAmount'] : 0)),
+                    'sgst_amount' => (float)(isset($item['sgst_amount']) ? $item['sgst_amount'] : (isset($item['sgstAmount']) ? $item['sgstAmount'] : 0)),
+                    'igst_amount' => (float)(isset($item['igst_amount']) ? $item['igst_amount'] : (isset($item['igstAmount']) ? $item['igstAmount'] : 0)),
+                    'item_total' => (float)(isset($item['item_total']) ? $item['item_total'] : (isset($item['total']) ? $item['total'] : 0)),
+                    'created_at' => date('Y-m-d H:i:s'),
+                    'updated_at' => date('Y-m-d H:i:s')
+                ];
+                dynamicInsert($pdo, 'invoice_items', $itemRecord);
                 $idx++;
             }
         }
 
         // Update payments snapshot reference
-        $updPay = $pdo->prepare("
-            UPDATE payments SET 
-                customer_id = :cust_id, 
-                customer_name = :cust_name, 
-                invoice_number = :inv_num,
-                updated_at = NOW()
-            WHERE internal_invoice_id = :int_id
-        ");
-        $updPay->execute([
-            ':cust_id' => isset($invoiceData['customer_id']) ? $invoiceData['customer_id'] : (isset($invoiceData['customerId']) ? $invoiceData['customerId'] : 'CUST-001'),
-            ':cust_name' => isset($invoiceData['customer_name']) ? $invoiceData['customer_name'] : (isset($invoiceData['customerName']) ? $invoiceData['customerName'] : 'Customer'),
-            ':inv_num' => $invoiceNumber,
-            ':int_id' => $internalId
-        ]);
+        $updPayRecord = [
+            'customer_id' => isset($invoiceData['customer_id']) ? $invoiceData['customer_id'] : (isset($invoiceData['customerId']) ? $invoiceData['customerId'] : 'CUST-001'),
+            'customer_name' => isset($invoiceData['customer_name']) ? $invoiceData['customer_name'] : (isset($invoiceData['customerName']) ? $invoiceData['customerName'] : 'Customer'),
+            'invoice_number' => $invoiceNumber,
+            'updated_at' => date('Y-m-d H:i:s')
+        ];
+        dynamicUpdate($pdo, 'payments', $updPayRecord, ['internal_invoice_id' => $internalId]);
 
         $pdo->commit();
 

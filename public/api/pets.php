@@ -42,37 +42,31 @@ if ($method === 'POST') {
     }
 
     try {
-        $stmt = $pdo->prepare("
-            INSERT INTO pets (
-                id, pet_id, customer_id, name, species, breed, age, gender, weight, microchip_number, notes, created_at, updated_at
-            ) VALUES (
-                :id, :pet_id, :customer_id, :name, :species, :breed, :age, :gender, :weight, :microchip_number, :notes, NOW(), NOW()
-            ) ON DUPLICATE KEY UPDATE
-                customer_id = VALUES(customer_id),
-                name = VALUES(name),
-                species = VALUES(species),
-                breed = VALUES(breed),
-                age = VALUES(age),
-                gender = VALUES(gender),
-                weight = VALUES(weight),
-                microchip_number = VALUES(microchip_number),
-                notes = VALUES(notes),
-                updated_at = NOW()
-        ");
+        $chk = $pdo->prepare("SELECT id, pet_id FROM pets WHERE pet_id = :pid OR id = :pid2 LIMIT 1");
+        $chk->execute([':pid' => $petId, ':pid2' => $petId]);
+        $existing = $chk->fetch();
 
-        $stmt->execute([
-            ':id' => isset($p['id']) && strlen($p['id']) > 30 ? $p['id'] : generateUuidV4(),
-            ':pet_id' => $petId,
-            ':customer_id' => $customerId,
-            ':name' => $name,
-            ':species' => isset($p['species']) ? $p['species'] : 'Dog',
-            ':breed' => isset($p['breed']) ? $p['breed'] : null,
-            ':age' => isset($p['age']) ? $p['age'] : null,
-            ':gender' => isset($p['gender']) ? $p['gender'] : 'Unknown',
-            ':weight' => isset($p['weight']) ? (float)$p['weight'] : null,
-            ':microchip_number' => isset($p['microchip_number']) ? $p['microchip_number'] : null,
-            ':notes' => isset($p['notes']) ? $p['notes'] : null
-        ]);
+        $petRecord = [
+            'customer_id' => $customerId,
+            'name' => $name,
+            'species' => isset($p['species']) ? $p['species'] : 'Dog',
+            'breed' => isset($p['breed']) ? $p['breed'] : null,
+            'age' => isset($p['age']) ? $p['age'] : null,
+            'gender' => isset($p['gender']) ? $p['gender'] : 'Unknown',
+            'weight' => isset($p['weight']) ? (float)$p['weight'] : null,
+            'microchip_number' => isset($p['microchip_number']) ? $p['microchip_number'] : null,
+            'notes' => isset($p['notes']) ? $p['notes'] : null,
+            'updated_at' => date('Y-m-d H:i:s')
+        ];
+
+        if ($existing) {
+            dynamicUpdate($pdo, 'pets', $petRecord, ['pet_id' => $existing['pet_id']]);
+        } else {
+            $petRecord['id'] = isset($p['id']) && strlen($p['id']) > 30 ? $p['id'] : generateUuidV4();
+            $petRecord['pet_id'] = $petId;
+            $petRecord['created_at'] = date('Y-m-d H:i:s');
+            dynamicInsert($pdo, 'pets', $petRecord);
+        }
 
         sendJsonResponse([
             'success' => true,

@@ -116,3 +116,85 @@ function generateUuidV4() {
     $data[8] = chr(ord($data[8]) & 0x3f | 0x80); // set bits 6-7 to 10
     return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
 }
+
+/**
+ * Retrieves all column names for a given table
+ */
+function getTableColumns(PDO $pdo, $table) {
+    static $cache = [];
+    if (!isset($cache[$table])) {
+        try {
+            $stmt = $pdo->query("SHOW COLUMNS FROM `{$table}`");
+            $cache[$table] = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        } catch (Exception $e) {
+            $cache[$table] = [];
+        }
+    }
+    return $cache[$table];
+}
+
+/**
+ * Filters an associative data array to only include keys that match actual table columns
+ */
+function filterDataForTable(PDO $pdo, $table, array $data) {
+    $columns = getTableColumns($pdo, $table);
+    if (empty($columns)) {
+        return $data;
+    }
+    $filtered = [];
+    foreach ($data as $key => $val) {
+        if (in_array($key, $columns, true)) {
+            $filtered[$key] = $val;
+        }
+    }
+    return $filtered;
+}
+
+/**
+ * Dynamically builds and executes an INSERT query for existing columns
+ */
+function dynamicInsert(PDO $pdo, $table, array $data) {
+    $filtered = filterDataForTable($pdo, $table, $data);
+    if (empty($filtered)) {
+        throw new Exception("No valid columns to insert into {$table}");
+    }
+    $cols = array_keys($filtered);
+    $colList = implode('`, `', $cols);
+    $paramList = ':' . implode(', :', $cols);
+    $sql = "INSERT INTO `{$table}` (`{$colList}`) VALUES ({$paramList})";
+    $stmt = $pdo->prepare($sql);
+    $params = [];
+    foreach ($filtered as $k => $v) {
+        $params[':' . $k] = $v;
+    }
+    $stmt->execute($params);
+    return $stmt;
+}
+
+/**
+ * Dynamically builds and executes an UPDATE query for existing columns
+ */
+function dynamicUpdate(PDO $pdo, $table, array $data, array $where) {
+    $filtered = filterDataForTable($pdo, $table, $data);
+    if (empty($filtered)) {
+        return null;
+    }
+    $setParts = [];
+    $params = [];
+    foreach ($filtered as $k => $v) {
+        $setParts[] = "`{$k}` = :set_{$k}";
+        $params[':set_' . $k] = $v;
+    }
+    $whereParts = [];
+    foreach ($where as $wk => $wv) {
+        $whereParts[] = "`{$wk}` = :whr_{$wk}";
+        $params[':whr_' . $wk] = $wv;
+    }
+    $setSql = implode(', ', $setParts);
+    $whereSql = implode(' AND ', $whereParts);
+    $sql = "UPDATE `{$table}` SET {$setSql} WHERE {$whereSql}";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    return $stmt;
+}
+
