@@ -22,6 +22,7 @@ interface TopBarProps {
   onOpenMobileDrawer?: () => void;
   unreadAlertsCount: number;
   syncStatus?: DatabaseSyncStatus;
+  dbEngine?: 'mysql' | 'supabase';
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -36,7 +37,8 @@ export const TopBar: React.FC<TopBarProps> = ({
   onOpenNotificationCenter,
   onOpenMobileDrawer,
   unreadAlertsCount,
-  syncStatus = 'connected'
+  syncStatus = 'connected',
+  dbEngine = 'mysql'
 }) => {
   return (
     <header className="no-print h-14 bg-white/95 dark:bg-[#1a1a1a]/95 border-b border-slate-200 dark:border-zinc-800 backdrop-blur-md px-3 sm:px-4 flex items-center justify-between sticky top-0 z-30 shadow-xs">
@@ -76,7 +78,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           <span>FY: <strong>2026-27</strong></span>
         </div>
 
-        {/* Supabase Connection Status Badge */}
+        {/* Database Connection Status Badge */}
         <div className={`hidden lg:flex items-center space-x-1.5 text-xs px-2.5 py-1 rounded-md font-semibold border ${
           syncStatus === 'connected' ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60' :
           syncStatus === 'syncing' ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800/60' :
@@ -88,9 +90,9 @@ export const TopBar: React.FC<TopBarProps> = ({
             'bg-red-500'
           }`} />
           <span>
-            {syncStatus === 'connected' && '🟢 Supabase DB Connected'}
-            {syncStatus === 'syncing' && '🟡 Connecting to Supabase...'}
-            {syncStatus === 'offline' && '🔴 Offline — Supabase Unavailable'}
+            {syncStatus === 'connected' && (dbEngine === 'mysql' ? '🟢 MySQL DB Connected (jainnaga_the_house_of_pawz)' : '🟢 Supabase DB Connected')}
+            {syncStatus === 'syncing' && '🟡 Connecting to Database...'}
+            {syncStatus === 'offline' && '🔴 Database Offline'}
           </span>
         </div>
       </div>

@@ -51,6 +51,7 @@ import { fetchPetsFromSupabase, createPetInSupabase, updatePetInSupabase, delete
 import { fetchInvoicesFromSupabase, createInvoiceInSupabase, updateInvoiceInSupabase, cancelInvoiceInSupabase, deleteInvoiceFromSupabase, fetchNextInvoiceNumberFromDB } from './lib/invoiceService';
 import { executeLiveProductionImport } from './lib/migrationService';
 import { fetchPaymentsFromSupabase, recordInvoicePaymentInSupabase, updateInvoicePaymentInSupabase, deleteInvoicePaymentInSupabase } from './lib/paymentService';
+import { checkMysqlHealth } from './lib/mysqlApi';
 import { fetchCompanySettingsFromSupabase, updateCompanySettingsInSupabase } from './lib/settingsService';
 import { fetchUsersFromSupabase, updateUserPermissionInSupabase, updateUserPermissionsBatchInSupabase, updateUserRoleInSupabase } from './lib/userService';
 import { fetchAuditLogsFromSupabase, logAuditEventToSupabase } from './lib/auditService';
@@ -171,14 +172,27 @@ export default function App() {
   const [showGlobalSearch, setShowGlobalSearch] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showMobileDrawer, setShowMobileDrawer] = useState(false);
+  const [dbEngine, setDbEngine] = useState<'mysql' | 'supabase'>('mysql');
   const [communicationHistory, setCommunicationHistory] = useState<CommunicationRecord[]>(() => 
     loadStoredData('hop_communications_v2', [])
   );
 
-  // ─── SUPABASE INITIAL DATA LOAD ────────────────────────
+  // ─── INITIAL DATA LOAD (MySQL / Supabase) ───────────────
   const loadProductionDataFromSupabase = async () => {
     setSyncStatus('syncing');
     try {
+      // 0. Detect Database Engine (MySQL vs Supabase)
+      try {
+        const health = await checkMysqlHealth();
+        if (health && health.success && health.status === 'connected') {
+          setDbEngine('mysql');
+        } else {
+          setDbEngine('supabase');
+        }
+      } catch (_) {
+        setDbEngine('supabase');
+      }
+
       // 1. Check Auth Session
       const activeUser = await fetchActiveSessionUser();
       if (activeUser) {
@@ -1340,6 +1354,7 @@ export default function App() {
         onOpenMobileDrawer={() => setShowMobileDrawer(true)}
         unreadAlertsCount={invoices.filter(i => !i.isCancelled && i.balanceDue > 0).length}
         syncStatus={syncStatus}
+        dbEngine={dbEngine}
       />
 
       {/* Main Body Layout with Sidebar */}

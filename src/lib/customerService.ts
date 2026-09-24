@@ -1,16 +1,20 @@
-// ============================================================
-// customerService.ts — Customer Master Supabase Service
-// Project: The House of Pawz – Billing Pro
-// ============================================================
-
 import { supabase } from './supabase';
 import { Customer } from '../types';
-
 import { STORAGE_KEYS, loadStoredData } from './storage';
 import { PROD_CUSTOMERS } from './productionData';
+import { fetchCustomersFromMySQL, saveCustomerToMySQL } from './mysqlApi';
 
 export async function fetchCustomersFromSupabase(): Promise<Customer[]> {
   try {
+    // 1. Primary: Try MySQL
+    try {
+      const mysqlCusts = await fetchCustomersFromMySQL();
+      if (mysqlCusts && mysqlCusts.length > 0) {
+        return mysqlCusts;
+      }
+    } catch (_) {}
+
+    // 2. Fallback: Supabase
     let data: any[] | null = null;
     const { data: rpcCusts } = await supabase.rpc('get_all_customers' as any);
     if (rpcCusts && rpcCusts.length > 0) {
@@ -49,6 +53,14 @@ export async function fetchCustomersFromSupabase(): Promise<Customer[]> {
 export async function createCustomerInSupabase(customer: Omit<Customer, 'id' | 'createdAt'> & { id?: string }): Promise<{ customer: Customer | null; error?: string }> {
   try {
     const nextId = customer.id || `CUST-${Date.now().toString().slice(-4)}`;
+    
+    // 1. Primary: Save to MySQL
+    try {
+      await saveCustomerToMySQL({ ...customer, id: nextId } as Customer);
+      return { customer: { ...customer, id: nextId, createdAt: new Date().toISOString() } as Customer };
+    } catch (_) {}
+
+    // 2. Fallback: Save to Supabase
     const payload = {
       customer_id: nextId,
       full_name: customer.name,

@@ -1,16 +1,20 @@
-// ============================================================
-// petService.ts — Pet Master Supabase Service
-// Project: The House of Pawz – Billing Pro
-// ============================================================
-
 import { supabase } from './supabase';
 import { Pet } from '../types';
-
 import { STORAGE_KEYS, loadStoredData } from './storage';
 import { PROD_PETS } from './productionData';
+import { fetchPetsFromMySQL, savePetToMySQL } from './mysqlApi';
 
 export async function fetchPetsFromSupabase(): Promise<Pet[]> {
   try {
+    // 1. Primary: Try MySQL
+    try {
+      const mysqlPets = await fetchPetsFromMySQL();
+      if (mysqlPets && mysqlPets.length > 0) {
+        return mysqlPets;
+      }
+    } catch (_) {}
+
+    // 2. Fallback: Supabase
     let data: any[] | null = null;
     const { data: rpcPets } = await supabase.rpc('get_all_pets' as any);
     if (rpcPets && rpcPets.length > 0) {
@@ -55,6 +59,14 @@ export async function fetchPetsFromSupabase(): Promise<Pet[]> {
 export async function createPetInSupabase(pet: Omit<Pet, 'id'> & { id?: string }): Promise<{ pet: Pet | null; error?: string }> {
   try {
     const nextId = pet.id || `PET-${Date.now().toString().slice(-4)}`;
+    
+    // 1. Primary: Save to MySQL
+    try {
+      await savePetToMySQL({ ...pet, id: nextId } as Pet);
+      return { pet: { ...pet, id: nextId } as Pet };
+    } catch (_) {}
+
+    // 2. Fallback: Save to Supabase
     const payload = {
       pet_id: nextId,
       customer_id: pet.customerId,

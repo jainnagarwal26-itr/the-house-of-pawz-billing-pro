@@ -5,6 +5,12 @@
 
 import { supabase } from './supabase';
 import { Invoice, InvoiceItem } from '../types';
+import { 
+  fetchInvoicesFromMySQL, 
+  createInvoiceInMySQL, 
+  updateInvoiceInMySQL, 
+  fetchNextInvoiceNumberFromMySQL 
+} from './mysqlApi';
 
 /**
  * Fetches the next invoice number from the Supabase sequence RPC.
@@ -21,7 +27,19 @@ export async function fetchNextInvoiceNumberFromDB(
   financialYear?: string,
   invoiceDate?: string
 ): Promise<string> {
-  // Convert DD/MM/YYYY to YYYY-MM-DD if needed
+  // 1. Try MySQL first
+  try {
+    let monthStr: string | undefined;
+    if (invoiceDate && invoiceDate.includes('/')) {
+      monthStr = invoiceDate.split('/')[1];
+    }
+    const nextNum = await fetchNextInvoiceNumberFromMySQL(financialYear, monthStr);
+    if (nextNum && nextNum.startsWith('HOP/')) {
+      return nextNum;
+    }
+  } catch (_) {}
+
+  // 2. Supabase Fallback
   let sqlDate: string = new Date().toISOString().slice(0, 10);
   if (invoiceDate && invoiceDate.includes('/')) {
     const parts = invoiceDate.split('/');
@@ -172,6 +190,18 @@ export function compareInvoicesDesc(a: Invoice, b: Invoice): number {
 
 export async function fetchInvoicesFromSupabase(): Promise<Invoice[]> {
   try {
+    // 1. Primary: Try MySQL first
+    try {
+      const mysqlInvoices = await fetchInvoicesFromMySQL();
+      if (mysqlInvoices && mysqlInvoices.length > 0) {
+        mysqlInvoices.sort(compareInvoicesDesc);
+        return mysqlInvoices;
+      }
+    } catch (mysqlErr) {
+      console.warn('[invoiceService] MySQL fetch failed, trying Supabase:', mysqlErr);
+    }
+
+    // 2. Fallback: Supabase
     let invs: any[] | null = null;
     const { data: rpcInvs } = await supabase.rpc('get_all_invoices' as any);
     if (rpcInvs && rpcInvs.length > 0) {
@@ -276,6 +306,20 @@ export async function fetchInvoicesFromSupabase(): Promise<Invoice[]> {
 
 export async function createInvoiceInSupabase(inv: Omit<Invoice, 'id' | 'createdAt'> & { id?: string }): Promise<{ invoice: Invoice | null; error?: string }> {
   try {
+    // 1. Primary: Save to MySQL
+    try {
+      const mysqlInv = await createInvoiceInMySQL(inv as Invoice);
+      if (mysqlInv) {
+        return { invoice: mysqlInv };
+      }
+    } catch (mysqlErr: any) {
+      console.warn('[invoiceService] MySQL create failed, trying Supabase fallback:', mysqlErr);
+      if (mysqlErr?.message && !mysqlErr.message.includes('fetch')) {
+        return { invoice: null, error: `MySQL Error: ${mysqlErr.message}` };
+      }
+    }
+
+    // 2. Fallback: Save to Supabase
     const internalId = inv.id || `INV-${Date.now()}`;
     const invoicePayload = {
       internal_invoice_id: internalId,
@@ -378,6 +422,18 @@ export async function updateInvoiceInSupabase(inv: Invoice): Promise<{ invoice: 
       return { invoice: null, error: 'Cannot update invoice: missing internal invoice ID' };
     }
 
+    // 1. Primary: Update in MySQL
+    try {
+      await updateInvoiceInMySQL(inv);
+      return { invoice: inv };
+    } catch (mysqlErr: any) {
+      console.warn('[invoiceService] MySQL update failed, trying Supabase fallback:', mysqlErr);
+      if (mysqlErr?.message && !mysqlErr.message.includes('fetch')) {
+        return { invoice: null, error: `MySQL Error: ${mysqlErr.message}` };
+      }
+    }
+
+    // 2. Fallback: Update in Supabase
     const invoicePayload = {
       internal_invoice_id: internalId,
       invoice_number: inv.invoiceNumber,
