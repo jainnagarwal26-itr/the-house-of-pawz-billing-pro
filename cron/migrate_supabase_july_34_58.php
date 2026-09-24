@@ -42,15 +42,51 @@ if ($showHelp) {
     echo "              WITHOUT writing or committing any changes.\n";
     echo "  --help, -h  Show this help screen.\n\n";
     echo "Scope:\n";
-    echo "  Source: Supabase (Invoices HOP/26-27/000034 to HOP/26-27/000058)\n";
-    echo "  Target: MySQL (jainnaga_the_house_of_pawz)\n";
+    echo "  Source: Supabase Production (Invoices HOP/26-27/000034 to HOP/26-27/000058)\n";
+    echo "  Target: MySQL Database (jainnaga_the_house_of_pawz)\n";
     echo "  Historical 000001-000033: Fully protected (zero modifications)\n";
     echo "====================================================================\n";
     exit(0);
 }
 
 // ------------------------------------------------------------------------------
-// 3. LOGGING & LOCK FILE MANAGEMENT
+// 3. EXACT DECIMAL ARITHMETIC & FORMATTING HELPERS (Zero Floats for Money)
+// ------------------------------------------------------------------------------
+function toDecimalStr($val, $scale = 2) {
+    if ($val === null || $val === '') {
+        return '0.' . str_repeat('0', $scale);
+    }
+    $clean = trim((string)$val);
+    $clean = str_replace([',', ' '], '', $clean);
+    if (!is_numeric($clean)) {
+        return '0.' . str_repeat('0', $scale);
+    }
+    if (function_exists('bcadd')) {
+        return bcadd($clean, '0', $scale);
+    }
+    return number_format((float)$clean, $scale, '.', '');
+}
+
+function decimalAddStr($a, $b, $scale = 2) {
+    $aDec = toDecimalStr($a, $scale);
+    $bDec = toDecimalStr($b, $scale);
+    if (function_exists('bcadd')) {
+        return bcadd($aDec, $bDec, $scale);
+    }
+    return number_format((float)$aDec + (float)$bDec, $scale, '.', '');
+}
+
+function decimalCompareStr($a, $b, $scale = 2) {
+    $aDec = toDecimalStr($a, $scale);
+    $bDec = toDecimalStr($b, $scale);
+    if (function_exists('bccomp')) {
+        return bccomp($aDec, $bDec, $scale) === 0;
+    }
+    return $aDec === $bDec;
+}
+
+// ------------------------------------------------------------------------------
+// 4. LOGGING & LOCK FILE MANAGEMENT
 // ------------------------------------------------------------------------------
 $baseDirs = [
     '/home/jainnaga/the-house-of-pawz/logs',
@@ -86,7 +122,7 @@ function logMsg($message, $level = 'INFO') {
     $timestamp = date('Y-m-d H:i:s');
     $formatted = "[{$timestamp}] [{$level}] {$message}";
     
-    // Echo to CLI
+    // Echo to CLI with ANSI color codes
     $prefix = '';
     if ($level === 'ERROR' || $level === 'CRITICAL') {
         $prefix = "\033[31m"; // Red
@@ -111,7 +147,6 @@ if (file_exists($lockFile)) {
     $lockPid = trim($lockData);
     $fileAge = time() - filemtime($lockFile);
     
-    // If lock is younger than 15 minutes and process is alive, abort
     if ($fileAge < 900) {
         logMsg("ABORT: Migration lock file exists ({$lockFile}) created {$fileAge}s ago. Another process (PID: {$lockPid}) may be active.", 'ERROR');
         exit(1);
@@ -137,7 +172,7 @@ logMsg("Log file: {$logFile}");
 logMsg("====================================================================");
 
 // ------------------------------------------------------------------------------
-// 4. LOAD & SANITIZE ENVIRONMENT CONFIGURATION
+// 5. LOAD & SANITIZE ENVIRONMENT CONFIGURATION (Strict Credential Checks)
 // ------------------------------------------------------------------------------
 function loadEnvCredentials() {
     $possibleEnvPaths = [
@@ -173,12 +208,14 @@ function loadEnvCredentials() {
 
 $env = loadEnvCredentials();
 
-// Supabase Credentials
+// Supabase Credentials: ONLY Service-Role / Secret Key Allowed. ANON KEY IS STRICTLY FORBIDDEN!
 $supabaseUrl = getenv('SUPABASE_URL') ?: ($env['SUPABASE_URL'] ?? (getenv('VITE_SUPABASE_URL') ?: ($env['VITE_SUPABASE_URL'] ?? '')));
-$supabaseKey = getenv('SUPABASE_SECRET_KEY') ?: ($env['SUPABASE_SECRET_KEY'] ?? (getenv('SUPABASE_SERVICE_ROLE_KEY') ?: ($env['SUPABASE_SERVICE_ROLE_KEY'] ?? (getenv('VITE_SUPABASE_SERVICE_ROLE_KEY') ?: ($env['VITE_SUPABASE_SERVICE_ROLE_KEY'] ?? (getenv('VITE_SUPABASE_ANON_KEY') ?: ($env['VITE_SUPABASE_ANON_KEY'] ?? '')))))));
+$supabaseKey = getenv('SUPABASE_SECRET_KEY') ?: ($env['SUPABASE_SECRET_KEY'] ?? (getenv('SUPABASE_SERVICE_ROLE_KEY') ?: ($env['SUPABASE_SERVICE_ROLE_KEY'] ?? (getenv('VITE_SUPABASE_SERVICE_ROLE_KEY') ?: ($env['VITE_SUPABASE_SERVICE_ROLE_KEY'] ?? '')))));
 
 if (empty($supabaseUrl) || empty($supabaseKey)) {
-    logMsg("CRITICAL ERROR: Supabase credentials missing from .env (SUPABASE_URL / SUPABASE_SECRET_KEY).", 'ERROR');
+    logMsg("CRITICAL ERROR: Supabase service-role credentials missing from .env.", 'CRITICAL');
+    logMsg("Required variables: SUPABASE_URL and SUPABASE_SECRET_KEY (or SUPABASE_SERVICE_ROLE_KEY).", 'ERROR');
+    logMsg("Note: Public anon keys (VITE_SUPABASE_ANON_KEY) are strictly forbidden for database migration.", 'ERROR');
     exit(1);
 }
 
@@ -192,11 +229,11 @@ $dbName = getenv('MYSQL_DATABASE') ?: ($env['MYSQL_DATABASE'] ?? (getenv('DB_NAM
 $dbUser = getenv('MYSQL_USER') ?: ($env['MYSQL_USER'] ?? (getenv('DB_USER') ?: ($env['DB_USER'] ?? 'jainnaga_the_house_of_pawz')));
 $dbPass = getenv('MYSQL_PASSWORD') ?: ($env['MYSQL_PASSWORD'] ?? (getenv('DB_PASS') ?: ($env['DB_PASS'] ?? '')));
 
-logMsg("Supabase Source: " . parse_url($supabaseUrl, PHP_URL_HOST));
+logMsg("Supabase Source Host: " . parse_url($supabaseUrl, PHP_URL_HOST));
 logMsg("MySQL Target Database: {$dbName} @ {$dbHost}:{$dbPort} (User: {$dbUser})");
 
 // ------------------------------------------------------------------------------
-// 5. SUPABASE REST API CLIENT HELPER (cURL)
+// 6. SUPABASE REST API CLIENT HELPER (cURL)
 // ------------------------------------------------------------------------------
 function fetchSupabaseRest($url, $key, $table, array $params = []) {
     $queryString = http_build_query($params);
@@ -237,7 +274,7 @@ function fetchSupabaseRest($url, $key, $table, array $params = []) {
 }
 
 // ------------------------------------------------------------------------------
-// 6. DEFINE EXACT 25 INVOICE SCOPE (HOP/26-27/000034 -> HOP/26-27/000058)
+// 7. DEFINE EXACT 25 INVOICE SCOPE (HOP/26-27/000034 -> HOP/26-27/000058)
 // ------------------------------------------------------------------------------
 $targetInvoiceNumbers = [];
 for ($i = 34; $i <= 58; $i++) {
@@ -250,7 +287,7 @@ $expectedLast = 'HOP/26-27/000058';
 logMsg("Configured target invoice range: {$expectedFirst} -> {$expectedLast} (Count: {$expectedCount})");
 
 // ------------------------------------------------------------------------------
-// 7. FETCH & VALIDATE SOURCE DATA FROM SUPABASE
+// 8. FETCH & VALIDATE SOURCE DATA FROM SUPABASE
 // ------------------------------------------------------------------------------
 logMsg("Fetching source invoice records from Supabase production...");
 
@@ -283,7 +320,7 @@ try {
         exit(1);
     }
     
-    // Verify every sequence member is present
+    // Verify every single sequence member is present
     $receivedMap = [];
     foreach ($sourceInvoices as $inv) {
         $receivedMap[$inv['invoice_number']] = $inv;
@@ -344,7 +381,7 @@ try {
 }
 
 // ------------------------------------------------------------------------------
-// 8. CONNECT TO MYSQL & PRE-FLIGHT SAFETY CHECKS
+// 9. CONNECT TO MYSQL & INSPECT PRODUCTION SCHEMA
 // ------------------------------------------------------------------------------
 logMsg("Connecting to MySQL production database...");
 try {
@@ -360,13 +397,23 @@ try {
     exit(1);
 }
 
-// Dynamic Schema Introspection Helpers
-function getTableCols(PDO $pdo, $table) {
+// Schema Column Details Introspection
+function getTableColumnMeta(PDO $pdo, $table) {
     static $cache = [];
     if (!isset($cache[$table])) {
         try {
             $stmt = $pdo->query("SHOW COLUMNS FROM `{$table}`");
-            $cache[$table] = $stmt->fetchAll(PDO::FETCH_COLUMN);
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $cols = [];
+            foreach ($rows as $r) {
+                $cols[$r['Field']] = [
+                    'type' => strtolower($r['Type']),
+                    'null' => strtoupper($r['Null']) === 'YES',
+                    'key'  => $r['Key'],
+                    'extra' => strtolower($r['Extra'])
+                ];
+            }
+            $cache[$table] = $cols;
         } catch (Exception $e) {
             $cache[$table] = [];
         }
@@ -374,20 +421,25 @@ function getTableCols(PDO $pdo, $table) {
     return $cache[$table];
 }
 
-function filterCols(PDO $pdo, $table, array $data) {
-    $cols = getTableCols($pdo, $table);
-    if (empty($cols)) return $data;
+function buildInsertDataForTable(PDO $pdo, $table, array $data) {
+    $meta = getTableColumnMeta($pdo, $table);
+    if (empty($meta)) return $data;
+    
     $filtered = [];
     foreach ($data as $k => $v) {
-        if (in_array($k, $cols, true)) {
+        if (isset($meta[$k])) {
+            // If column is auto-increment integer, omit it so MySQL assigns ID automatically
+            if (strpos($meta[$k]['extra'], 'auto_increment') !== false && ($v === null || !is_numeric($v))) {
+                continue;
+            }
             $filtered[$k] = $v;
         }
     }
     return $filtered;
 }
 
-function execDynamicInsert(PDO $pdo, $table, array $data) {
-    $filtered = filterCols($pdo, $table, $data);
+function execInsert(PDO $pdo, $table, array $data) {
+    $filtered = buildInsertDataForTable($pdo, $table, $data);
     if (empty($filtered)) {
         throw new Exception("No valid columns to insert into table {$table}");
     }
@@ -404,11 +456,11 @@ function execDynamicInsert(PDO $pdo, $table, array $data) {
 }
 
 // ------------------------------------------------------------------------------
-// 9. TARGET DATABASE CONFLICT & SAFETY VERIFICATION
+// 10. TARGET DATABASE CONFLICT & HISTORICAL PROTECTION BASELINE
 // ------------------------------------------------------------------------------
 logMsg("Performing target database safety checks...");
 
-// 1. Verify that NONE of the target invoices (000034–000058) already exist in MySQL
+// 1. Strict Target Conflict Check: NONE of 000034–000058 must exist
 $placeholders = implode(',', array_fill(0, count($targetInvoiceNumbers), '?'));
 $conflictStmt = $pdo->prepare("SELECT invoice_number FROM invoices WHERE invoice_number IN ({$placeholders})");
 $conflictStmt->execute($targetInvoiceNumbers);
@@ -424,42 +476,49 @@ if (!empty($existingConflicts)) {
 }
 logMsg("Target Conflict Check PASSED: Zero target invoices exist in MySQL.", 'SUCCESS');
 
-// 2. Verify historical invoices (000001–000033)
-$histStmt = $pdo->query("SELECT COUNT(*) FROM invoices WHERE invoice_number LIKE 'HOP/26-27/%' AND invoice_number < 'HOP/26-27/000034'");
-$histCount = (int)$histStmt->fetchColumn();
-logMsg("Historical records check: {$histCount} existing historical invoices (000001–000033) confirmed safe in MySQL.");
+// 2. Baseline Historical Snapshot: Capture invoices 000001–000033
+$histQuery = "
+    SELECT internal_invoice_id, invoice_number, grand_total, paid_amount, balance_due, customer_id, invoice_date 
+    FROM invoices 
+    WHERE invoice_number LIKE 'HOP/26-27/%' AND invoice_number <= 'HOP/26-27/000033'
+    ORDER BY invoice_number ASC
+";
+$histStmt = $pdo->query($histQuery);
+$historicalBaseline = $histStmt->fetchAll(PDO::FETCH_ASSOC);
+$histCountBaseline = count($historicalBaseline);
+logMsg("Historical records baseline: {$histCountBaseline} historical invoices (000001–000033) captured for integrity protection.");
 
-// Compute summary financial totals from Supabase source
-$totalGrandTotal = 0.0;
-$totalPaidAmount = 0.0;
-$totalBalanceDue = 0.0;
-$totalTaxable = 0.0;
-$totalGst = 0.0;
+// Compute exact DECIMAL totals from Supabase source
+$totalGrandTotal = '0.00';
+$totalPaidAmount = '0.00';
+$totalBalanceDue = '0.00';
+$totalTaxable = '0.00';
+$totalGst = '0.00';
 
 foreach ($sourceInvoices as $inv) {
-    $totalGrandTotal += (float)($inv['grand_total'] ?? 0);
-    $totalPaidAmount += (float)($inv['paid_amount'] ?? 0);
-    $totalBalanceDue += (float)($inv['balance_due'] ?? 0);
-    $totalTaxable += (float)($inv['taxable_amount'] ?? 0);
-    $totalGst += (float)($inv['total_gst'] ?? 0);
+    $totalGrandTotal = decimalAddStr($totalGrandTotal, $inv['grand_total'] ?? 0);
+    $totalPaidAmount = decimalAddStr($totalPaidAmount, $inv['paid_amount'] ?? 0);
+    $totalBalanceDue = decimalAddStr($totalBalanceDue, $inv['balance_due'] ?? 0);
+    $totalTaxable    = decimalAddStr($totalTaxable, $inv['taxable_amount'] ?? 0);
+    $totalGst        = decimalAddStr($totalGst, $inv['total_gst'] ?? 0);
 }
 
 logMsg("--------------------------------------------------------------------");
-logMsg("MIGRATION DATASET SUMMARY:");
+logMsg("MIGRATION DATASET EXACT DECIMAL AUDIT:");
 logMsg("Invoices to Migrate:    " . count($sourceInvoices) . " (HOP/26-27/000034 to HOP/26-27/000058)");
 logMsg("Line Items to Migrate:  " . count($sourceItems));
 logMsg("Payments to Migrate:    " . count($sourcePayments));
 logMsg("Customers Referenced:  " . count($sourceCustomers));
 logMsg("Pets Referenced:        " . count($sourcePets));
-logMsg(sprintf("Total Taxable Value:    ₹%s", number_format($totalTaxable, 2)));
-logMsg(sprintf("Total GST Amount:       ₹%s", number_format($totalGst, 2)));
-logMsg(sprintf("Total Grand Total:      ₹%s", number_format($totalGrandTotal, 2)));
-logMsg(sprintf("Total Paid Amount:      ₹%s", number_format($totalPaidAmount, 2)));
-logMsg(sprintf("Total Balance Due:      ₹%s", number_format($totalBalanceDue, 2)));
+logMsg("Total Taxable Value:    ₹{$totalTaxable}");
+logMsg("Total GST Amount:       ₹{$totalGst}");
+logMsg("Total Grand Total:      ₹{$totalGrandTotal}");
+logMsg("Total Paid Amount:      ₹{$totalPaidAmount}");
+logMsg("Total Balance Due:      ₹{$totalBalanceDue}");
 logMsg("--------------------------------------------------------------------");
 
 // ------------------------------------------------------------------------------
-// 10. DRY-RUN MODE EXIT
+// 11. DRY-RUN MODE EXIT
 // ------------------------------------------------------------------------------
 if ($isDryRun) {
     logMsg("====================================================================", 'SUCCESS');
@@ -472,31 +531,39 @@ if ($isDryRun) {
 }
 
 // ------------------------------------------------------------------------------
-// 11. REAL MIGRATION: ATOMIC TRANSACTION EXECUTION
+// 12. REAL MIGRATION: ATOMIC TRANSACTION WITH IN-TRANSACTION VERIFICATION
 // ------------------------------------------------------------------------------
 logMsg("Beginning ATOMIC MySQL Transaction...");
 
 try {
     $pdo->beginTransaction();
 
-    // 1. Migrate Customers
-    logMsg("Migrating " . count($sourceCustomers) . " customer profiles...");
-    $custCheckStmt = $pdo->prepare("SELECT id, customer_id FROM customers WHERE customer_id = :cid OR phone = :phone LIMIT 1");
-    $custCols = getTableCols($pdo, 'customers');
+    // --------------------------------------------------------------------------
+    // A. Explicit Customer ID Mapping & Insertion
+    // --------------------------------------------------------------------------
+    logMsg("Processing " . count($sourceCustomers) . " customer profiles with explicit mapping...");
+    $customerMapping = []; // Supabase customer_id -> MySQL customer reference
+    
+    $custFindStmt = $pdo->prepare("SELECT id, customer_id, full_name, phone FROM customers WHERE customer_id = :cid OR phone = :phone LIMIT 1");
+    $custMeta = getTableColumnMeta($pdo, 'customers');
     
     $custInserted = 0;
-    $custExisting = 0;
+    $custReused = 0;
+    
     foreach ($sourceCustomers as $c) {
-        $cid = $c['customer_id'];
+        $sbCustId = $c['customer_id'];
         $phone = $c['phone'] ?? '';
         
-        $custCheckStmt->execute([':cid' => $cid, ':phone' => $phone]);
-        $existingCust = $custCheckStmt->fetch();
+        $custFindStmt->execute([':cid' => $sbCustId, ':phone' => $phone]);
+        $existingCust = $custFindStmt->fetch();
         
-        if (!$existingCust) {
+        if ($existingCust) {
+            $customerMapping[$sbCustId] = $existingCust['customer_id'];
+            $custReused++;
+        } else {
             $custData = [
-                'id' => $c['id'] ?? $cid,
-                'customer_id' => $cid,
+                'id' => $c['id'] ?? $sbCustId,
+                'customer_id' => $sbCustId,
                 'name' => $c['full_name'] ?? ($c['name'] ?? 'Customer'),
                 'full_name' => $c['full_name'] ?? ($c['name'] ?? 'Customer'),
                 'phone' => $phone,
@@ -506,34 +573,43 @@ try {
                 'state' => $c['state_code'] ?? ($c['state'] ?? '27-Maharashtra'),
                 'state_code' => $c['state_code'] ?? ($c['state'] ?? '27-Maharashtra'),
                 'emergency_contact' => $c['emergency_contact'] ?? null,
-                'outstanding_balance' => (float)($c['outstanding_balance'] ?? 0),
-                'advance_balance' => (float)($c['advance_balance'] ?? 0),
+                'outstanding_balance' => toDecimalStr($c['outstanding_balance'] ?? 0),
+                'advance_balance' => toDecimalStr($c['advance_balance'] ?? 0),
                 'created_at' => $c['created_at'] ?? date('Y-m-d H:i:s'),
                 'updated_at' => $c['updated_at'] ?? date('Y-m-d H:i:s')
             ];
-            execDynamicInsert($pdo, 'customers', $custData);
+            execInsert($pdo, 'customers', $custData);
+            $customerMapping[$sbCustId] = $sbCustId;
             $custInserted++;
-        } else {
-            $custExisting++;
         }
     }
-    logMsg("Customers migration: {$custInserted} inserted, {$custExisting} already existing.");
+    logMsg("Customer mapping complete: {$custInserted} inserted, {$custReused} existing reused.");
 
-    // 2. Migrate Pets
-    logMsg("Migrating " . count($sourcePets) . " pet profiles...");
-    $petCheckStmt = $pdo->prepare("SELECT id, pet_id FROM pets WHERE pet_id = :pid LIMIT 1");
+    // --------------------------------------------------------------------------
+    // B. Explicit Pet ID Mapping & Insertion
+    // --------------------------------------------------------------------------
+    logMsg("Processing " . count($sourcePets) . " pet profiles with explicit mapping...");
+    $petMapping = []; // Supabase pet_id -> MySQL pet reference
+    
+    $petFindStmt = $pdo->prepare("SELECT id, pet_id, customer_id, pet_name FROM pets WHERE pet_id = :pid LIMIT 1");
     $petInserted = 0;
-    $petExisting = 0;
+    $petReused = 0;
+    
     foreach ($sourcePets as $p) {
-        $pid = $p['pet_id'];
-        $petCheckStmt->execute([':pid' => $pid]);
-        $existingPet = $petCheckStmt->fetch();
+        $sbPetId = $p['pet_id'];
+        $mappedCustId = $customerMapping[$p['customer_id']] ?? $p['customer_id'];
         
-        if (!$existingPet) {
+        $petFindStmt->execute([':pid' => $sbPetId]);
+        $existingPet = $petFindStmt->fetch();
+        
+        if ($existingPet) {
+            $petMapping[$sbPetId] = $existingPet['pet_id'];
+            $petReused++;
+        } else {
             $petData = [
-                'id' => $p['id'] ?? $pid,
-                'pet_id' => $pid,
-                'customer_id' => $p['customer_id'],
+                'id' => $p['id'] ?? $sbPetId,
+                'pet_id' => $sbPetId,
+                'customer_id' => $mappedCustId,
                 'customer_name' => $p['customer_name'] ?? null,
                 'name' => $p['pet_name'] ?? ($p['name'] ?? 'Pet'),
                 'pet_name' => $p['pet_name'] ?? ($p['name'] ?? 'Pet'),
@@ -541,7 +617,7 @@ try {
                 'breed' => $p['breed'] ?? 'Standard',
                 'age' => $p['age'] ?? '2 Years',
                 'gender' => $p['gender'] ?? 'Male',
-                'weight' => isset($p['weight']) ? (float)$p['weight'] : null,
+                'weight' => isset($p['weight']) ? toDecimalStr($p['weight']) : null,
                 'vaccination_status' => $p['vaccination_status'] ?? 'Up to Date',
                 'medical_notes' => $p['medical_notes'] ?? null,
                 'feeding_preferences' => $p['feeding_preferences'] ?? null,
@@ -555,18 +631,22 @@ try {
                 'created_at' => $p['created_at'] ?? date('Y-m-d H:i:s'),
                 'updated_at' => $p['updated_at'] ?? date('Y-m-d H:i:s')
             ];
-            execDynamicInsert($pdo, 'pets', $petData);
+            execInsert($pdo, 'pets', $petData);
+            $petMapping[$sbPetId] = $sbPetId;
             $petInserted++;
-        } else {
-            $petExisting++;
         }
     }
-    logMsg("Pets migration: {$petInserted} inserted, {$petExisting} already existing.");
+    logMsg("Pet mapping complete: {$petInserted} inserted, {$petReused} existing reused.");
 
-    // 3. Migrate Invoices (Strictly the 25 target invoices)
-    logMsg("Migrating 25 invoice headers...");
+    // --------------------------------------------------------------------------
+    // C. Migrate Invoices (Strictly the 25 target invoices with exact DECIMALs)
+    // --------------------------------------------------------------------------
+    logMsg("Migrating 25 invoice headers with exact DECIMAL precision...");
     $invInserted = 0;
     foreach ($sourceInvoices as $inv) {
+        $mappedCustId = $customerMapping[$inv['customer_id']] ?? $inv['customer_id'];
+        $mappedPetId = !empty($inv['pet_id']) ? ($petMapping[$inv['pet_id']] ?? $inv['pet_id']) : null;
+        
         $invData = [
             'id' => $inv['id'] ?? $inv['internal_invoice_id'],
             'internal_invoice_id' => $inv['internal_invoice_id'],
@@ -574,27 +654,27 @@ try {
             'financial_year' => $inv['financial_year'] ?? '2026-27',
             'invoice_date' => $inv['invoice_date'],
             'due_date' => $inv['due_date'] ?? $inv['invoice_date'],
-            'customer_id' => $inv['customer_id'],
+            'customer_id' => $mappedCustId,
             'customer_name' => $inv['customer_name'],
             'customer_phone' => $inv['customer_phone'] ?? null,
             'customer_email' => $inv['customer_email'] ?? null,
             'customer_address' => $inv['customer_address'] ?? null,
             'customer_gstin' => $inv['customer_gstin'] ?? null,
-            'pet_id' => $inv['pet_id'] ?? null,
+            'pet_id' => $mappedPetId,
             'pet_name' => $inv['pet_name'] ?? null,
             'place_of_supply' => $inv['place_of_supply'] ?? '27-Maharashtra',
             'is_inter_state' => !empty($inv['is_inter_state']) ? 1 : 0,
-            'sub_total' => (float)$inv['sub_total'],
-            'total_discount' => (float)($inv['total_discount'] ?? 0),
-            'taxable_amount' => (float)$inv['taxable_amount'],
-            'cgst_total' => (float)($inv['cgst_total'] ?? 0),
-            'sgst_total' => (float)($inv['sgst_total'] ?? 0),
-            'igst_total' => (float)($inv['igst_total'] ?? 0),
-            'total_gst' => (float)($inv['total_gst'] ?? 0),
-            'round_off' => (float)($inv['round_off'] ?? 0),
-            'grand_total' => (float)$inv['grand_total'],
-            'paid_amount' => (float)($inv['paid_amount'] ?? 0),
-            'balance_due' => (float)($inv['balance_due'] ?? 0),
+            'sub_total' => toDecimalStr($inv['sub_total']),
+            'total_discount' => toDecimalStr($inv['total_discount'] ?? 0),
+            'taxable_amount' => toDecimalStr($inv['taxable_amount']),
+            'cgst_total' => toDecimalStr($inv['cgst_total'] ?? 0),
+            'sgst_total' => toDecimalStr($inv['sgst_total'] ?? 0),
+            'igst_total' => toDecimalStr($inv['igst_total'] ?? 0),
+            'total_gst' => toDecimalStr($inv['total_gst'] ?? 0),
+            'round_off' => toDecimalStr($inv['round_off'] ?? 0),
+            'grand_total' => toDecimalStr($inv['grand_total']),
+            'paid_amount' => toDecimalStr($inv['paid_amount'] ?? 0),
+            'balance_due' => toDecimalStr($inv['balance_due'] ?? 0),
             'payment_status' => $inv['payment_status'] ?? 'PAID',
             'payment_mode' => $inv['payment_mode'] ?? 'Online',
             'notes' => $inv['notes'] ?? null,
@@ -605,13 +685,15 @@ try {
             'created_at' => $inv['created_at'] ?? date('Y-m-d H:i:s'),
             'updated_at' => $inv['updated_at'] ?? date('Y-m-d H:i:s')
         ];
-        execDynamicInsert($pdo, 'invoices', $invData);
+        execInsert($pdo, 'invoices', $invData);
         $invInserted++;
     }
     logMsg("Invoices migration: {$invInserted}/25 inserted successfully.");
 
-    // 4. Migrate Invoice Items
-    logMsg("Migrating " . count($sourceItems) . " line items...");
+    // --------------------------------------------------------------------------
+    // D. Migrate Invoice Line Items (Exact DECIMAL values)
+    // --------------------------------------------------------------------------
+    logMsg("Migrating " . count($sourceItems) . " line items with exact DECIMAL values...");
     $itemsInserted = 0;
     foreach ($sourceItems as $item) {
         $itemData = [
@@ -623,36 +705,40 @@ try {
             'item_type' => $item['item_type'] ?? 'SERVICE',
             'item_name' => $item['item_name'],
             'hsn_sac' => $item['hsn_sac'] ?? '999799',
-            'price' => (float)$item['price'],
-            'quantity' => (float)($item['quantity'] ?? 1),
-            'discount_percent' => (float)($item['discount_percent'] ?? 0),
-            'discount_amount' => (float)($item['discount_amount'] ?? 0),
-            'taxable_value' => (float)$item['taxable_value'],
-            'gst_rate' => (float)($item['gst_rate'] ?? 18),
-            'cgst_amount' => (float)($item['cgst_amount'] ?? 0),
-            'sgst_amount' => (float)($item['sgst_amount'] ?? 0),
-            'igst_amount' => (float)($item['igst_amount'] ?? 0),
-            'item_total' => (float)$item['item_total'],
+            'price' => toDecimalStr($item['price']),
+            'quantity' => toDecimalStr($item['quantity'] ?? 1),
+            'discount_percent' => toDecimalStr($item['discount_percent'] ?? 0),
+            'discount_amount' => toDecimalStr($item['discount_amount'] ?? 0),
+            'taxable_value' => toDecimalStr($item['taxable_value']),
+            'gst_rate' => toDecimalStr($item['gst_rate'] ?? 18),
+            'cgst_amount' => toDecimalStr($item['cgst_amount'] ?? 0),
+            'sgst_amount' => toDecimalStr($item['sgst_amount'] ?? 0),
+            'igst_amount' => toDecimalStr($item['igst_amount'] ?? 0),
+            'item_total' => toDecimalStr($item['item_total']),
             'created_at' => $item['created_at'] ?? date('Y-m-d H:i:s'),
             'updated_at' => $item['updated_at'] ?? date('Y-m-d H:i:s')
         ];
-        execDynamicInsert($pdo, 'invoice_items', $itemData);
+        execInsert($pdo, 'invoice_items', $itemData);
         $itemsInserted++;
     }
     logMsg("Line items migration: {$itemsInserted}/" . count($sourceItems) . " inserted successfully.");
 
-    // 5. Migrate Payments
-    logMsg("Migrating " . count($sourcePayments) . " payment records...");
+    // --------------------------------------------------------------------------
+    // E. Migrate Payments (Exact DECIMAL values & mapped customer IDs)
+    // --------------------------------------------------------------------------
+    logMsg("Migrating " . count($sourcePayments) . " payment records with exact DECIMAL values...");
     $paymentsInserted = 0;
     foreach ($sourcePayments as $pay) {
+        $mappedCustId = $customerMapping[$pay['customer_id']] ?? $pay['customer_id'];
+        
         $payData = [
             'id' => $pay['id'] ?? $pay['payment_id'],
             'payment_id' => $pay['payment_id'],
             'internal_invoice_id' => $pay['internal_invoice_id'],
             'invoice_number' => $pay['invoice_number'],
-            'customer_id' => $pay['customer_id'],
+            'customer_id' => $mappedCustId,
             'customer_name' => $pay['customer_name'],
-            'amount' => (float)$pay['amount'],
+            'amount' => toDecimalStr($pay['amount']),
             'payment_date' => $pay['payment_date'],
             'payment_mode' => $pay['payment_mode'] ?? 'Online',
             'transaction_ref' => $pay['transaction_ref'] ?? null,
@@ -661,12 +747,89 @@ try {
             'created_at' => $pay['created_at'] ?? date('Y-m-d H:i:s'),
             'updated_at' => $pay['updated_at'] ?? date('Y-m-d H:i:s')
         ];
-        execDynamicInsert($pdo, 'payments', $payData);
+        execInsert($pdo, 'payments', $payData);
         $paymentsInserted++;
     }
     logMsg("Payments migration: {$paymentsInserted}/" . count($sourcePayments) . " inserted successfully.");
 
-    // Commit Transaction
+    // --------------------------------------------------------------------------
+    // F. IN-TRANSACTION PRE-COMMIT VERIFICATION (Strict Gatekeeper)
+    // --------------------------------------------------------------------------
+    logMsg("Executing IN-TRANSACTION pre-commit integrity verifications...");
+
+    // 1. Verify exact 25 invoices inserted in transaction
+    $chkInvStmt = $pdo->prepare("SELECT COUNT(*), SUM(grand_total), SUM(paid_amount), SUM(balance_due), SUM(taxable_amount), SUM(total_gst) FROM invoices WHERE invoice_number BETWEEN ? AND ?");
+    $chkInvStmt->execute([$expectedFirst, $expectedLast]);
+    $chkInvRow = $chkInvStmt->fetch(PDO::FETCH_NUM);
+    
+    $txInvCount = (int)$chkInvRow[0];
+    $txGrandTotal = toDecimalStr($chkInvRow[1]);
+    $txPaidAmount = toDecimalStr($chkInvRow[2]);
+    $txBalanceDue = toDecimalStr($chkInvRow[3]);
+    $txTaxable    = toDecimalStr($chkInvRow[4]);
+    $txTotalGst   = toDecimalStr($chkInvRow[5]);
+
+    if ($txInvCount !== 25) {
+        throw new Exception("PRE-COMMIT ERROR: In-transaction invoice count is {$txInvCount}, expected exactly 25.");
+    }
+
+    // 2. Verify exact monetary equality (DECIMAL comparison)
+    if (!decimalCompareStr($txGrandTotal, $totalGrandTotal)) {
+        throw new Exception("PRE-COMMIT ERROR: Grand total mismatch. Target: {$txGrandTotal}, Source: {$totalGrandTotal}");
+    }
+    if (!decimalCompareStr($txPaidAmount, $totalPaidAmount)) {
+        throw new Exception("PRE-COMMIT ERROR: Paid amount mismatch. Target: {$txPaidAmount}, Source: {$totalPaidAmount}");
+    }
+    if (!decimalCompareStr($txBalanceDue, $totalBalanceDue)) {
+        throw new Exception("PRE-COMMIT ERROR: Balance due mismatch. Target: {$txBalanceDue}, Source: {$totalBalanceDue}");
+    }
+    if (!decimalCompareStr($txTaxable, $totalTaxable)) {
+        throw new Exception("PRE-COMMIT ERROR: Taxable amount mismatch. Target: {$txTaxable}, Source: {$totalTaxable}");
+    }
+    if (!decimalCompareStr($txTotalGst, $totalGst)) {
+        throw new Exception("PRE-COMMIT ERROR: Total GST mismatch. Target: {$txTotalGst}, Source: {$totalGst}");
+    }
+
+    // 3. Verify Line Items Count
+    $chkItemStmt = $pdo->prepare("SELECT COUNT(*) FROM invoice_items WHERE invoice_number BETWEEN ? AND ?");
+    $chkItemStmt->execute([$expectedFirst, $expectedLast]);
+    $txItemCount = (int)$chkItemStmt->fetchColumn();
+    if ($txItemCount !== count($sourceItems)) {
+        throw new Exception("PRE-COMMIT ERROR: In-transaction line items count is {$txItemCount}, expected " . count($sourceItems));
+    }
+
+    // 4. Verify Payments Count
+    $chkPayStmt = $pdo->prepare("SELECT COUNT(*), SUM(amount) FROM payments WHERE invoice_number BETWEEN ? AND ?");
+    $chkPayStmt->execute([$expectedFirst, $expectedLast]);
+    $chkPayRow = $chkPayStmt->fetch(PDO::FETCH_NUM);
+    $txPayCount = (int)$chkPayRow[0];
+    $txPaySum = toDecimalStr($chkPayRow[1]);
+    
+    if ($txPayCount !== count($sourcePayments)) {
+        throw new Exception("PRE-COMMIT ERROR: In-transaction payments count is {$txPayCount}, expected " . count($sourcePayments));
+    }
+
+    // 5. Verify Historical 000001–000033 Integrity
+    $histCheckStmt = $pdo->query($histQuery);
+    $historicalAfter = $histCheckStmt->fetchAll(PDO::FETCH_ASSOC);
+    if (count($historicalAfter) !== $histCountBaseline) {
+        throw new Exception("CRITICAL INTEGRITY ERROR: Historical invoice count altered from {$histCountBaseline} to " . count($historicalAfter));
+    }
+    for ($h = 0; $h < $histCountBaseline; $h++) {
+        $b = $historicalBaseline[$h];
+        $a = $historicalAfter[$h];
+        if ($b['invoice_number'] !== $a['invoice_number'] || 
+            !decimalCompareStr($b['grand_total'], $a['grand_total']) ||
+            !decimalCompareStr($b['paid_amount'], $a['paid_amount']) ||
+            !decimalCompareStr($b['balance_due'], $a['balance_due'])) {
+            throw new Exception("CRITICAL INTEGRITY ERROR: Historical invoice {$b['invoice_number']} was modified during migration!");
+        }
+    }
+    logMsg("In-transaction integrity checks PASSED: All pre-commit validations are 100% verified.", 'SUCCESS');
+
+    // --------------------------------------------------------------------------
+    // G. COMMIT TRANSACTION
+    // --------------------------------------------------------------------------
     $pdo->commit();
     logMsg("====================================================================", 'SUCCESS');
     logMsg("TRANSACTION COMMITTED: All 25 July invoices successfully written to MySQL!", 'SUCCESS');
@@ -682,59 +845,54 @@ try {
 }
 
 // ------------------------------------------------------------------------------
-// 12. POST-COMMIT VERIFICATION
+// 13. POST-COMMIT FINAL AUDIT REPORT (Read-Only)
 // ------------------------------------------------------------------------------
-logMsg("Running post-migration verification checks in MySQL...");
+logMsg("Generating post-migration final verification audit report...");
 
 try {
-    // 1. Verify Invoice Count
     $vInvStmt = $pdo->prepare("SELECT COUNT(*), SUM(grand_total), SUM(paid_amount), SUM(balance_due) FROM invoices WHERE invoice_number BETWEEN ? AND ?");
     $vInvStmt->execute([$expectedFirst, $expectedLast]);
     $vInvRow = $vInvStmt->fetch(PDO::FETCH_NUM);
-    $migratedInvCount = (int)$vInvRow[0];
-    $migratedGrandTotal = (float)$vInvRow[1];
-    $migratedPaid = (float)$vInvRow[2];
-    $migratedBal = (float)$vInvRow[3];
+    $finalInvCount = (int)$vInvRow[0];
+    $finalGrandTotal = toDecimalStr($vInvRow[1]);
+    $finalPaid = toDecimalStr($vInvRow[2]);
+    $finalBal = toDecimalStr($vInvRow[3]);
 
-    // 2. Verify Line Items Count
-    $vItemStmt = $pdo->prepare("SELECT COUNT(*), SUM(item_total) FROM invoice_items WHERE invoice_number BETWEEN ? AND ?");
+    $vItemStmt = $pdo->prepare("SELECT COUNT(*) FROM invoice_items WHERE invoice_number BETWEEN ? AND ?");
     $vItemStmt->execute([$expectedFirst, $expectedLast]);
-    $vItemRow = $vItemStmt->fetch(PDO::FETCH_NUM);
-    $migratedItemCount = (int)$vItemRow[0];
+    $finalItemCount = (int)$vItemStmt->fetchColumn();
 
-    // 3. Verify Payments Count
     $vPayStmt = $pdo->prepare("SELECT COUNT(*), SUM(amount) FROM payments WHERE invoice_number BETWEEN ? AND ?");
     $vPayStmt->execute([$expectedFirst, $expectedLast]);
     $vPayRow = $vPayStmt->fetch(PDO::FETCH_NUM);
-    $migratedPayCount = (int)$vPayRow[0];
-    $migratedPaySum = (float)$vPayRow[1];
+    $finalPayCount = (int)$vPayRow[0];
+    $finalPaySum = toDecimalStr($vPayRow[1]);
 
-    // 4. Verify Individual Invoices Present
     $vListStmt = $pdo->prepare("SELECT invoice_number FROM invoices WHERE invoice_number BETWEEN ? AND ? ORDER BY invoice_number ASC");
     $vListStmt->execute([$expectedFirst, $expectedLast]);
-    $migratedNumbers = $vListStmt->fetchAll(PDO::FETCH_COLUMN);
+    $finalNumbers = $vListStmt->fetchAll(PDO::FETCH_COLUMN);
 
-    $missingInTarget = array_diff($targetInvoiceNumbers, $migratedNumbers);
+    $missingInTarget = array_diff($targetInvoiceNumbers, $finalNumbers);
 
-    $statusInvCount = ($migratedInvCount === 25 && empty($missingInTarget)) ? 'PASS' : 'FAIL';
-    $statusItems = ($migratedItemCount === count($sourceItems)) ? 'PASS' : 'FAIL';
-    $statusPayments = ($migratedPayCount === count($sourcePayments)) ? 'PASS' : 'FAIL';
-    $statusAmount = (abs($migratedGrandTotal - $totalGrandTotal) < 0.01) ? 'PASS' : 'FAIL';
+    $statusInvCount = ($finalInvCount === 25 && empty($missingInTarget)) ? 'PASS' : 'FAIL';
+    $statusItems = ($finalItemCount === count($sourceItems)) ? 'PASS' : 'FAIL';
+    $statusPayments = ($finalPayCount === count($sourcePayments)) ? 'PASS' : 'FAIL';
+    $statusAmount = decimalCompareStr($finalGrandTotal, $totalGrandTotal) ? 'PASS' : 'FAIL';
 
     logMsg("--------------------------------------------------------------------");
     logMsg("FINAL VERIFICATION AUDIT REPORT:");
-    logMsg(sprintf("Invoices:       %d/%d [%s]", $migratedInvCount, 25, $statusInvCount));
-    logMsg(sprintf("Invoice Items:  %d/%d [%s]", $migratedItemCount, count($sourceItems), $statusItems));
-    logMsg(sprintf("Payments:       %d/%d [%s]", $migratedPayCount, count($sourcePayments), $statusPayments));
-    logMsg(sprintf("Grand Total:    ₹%s (Source: ₹%s) [%s]", number_format($migratedGrandTotal, 2), number_format($totalGrandTotal, 2), $statusAmount));
-    logMsg(sprintf("Total Paid:     ₹%s (Source: ₹%s)", number_format($migratedPaid, 2), number_format($totalPaidAmount, 2)));
-    logMsg(sprintf("Total Balance:  ₹%s (Source: ₹%s)", number_format($migratedBal, 2), number_format($totalBalanceDue, 2)));
+    logMsg(sprintf("Invoices:       %d/%d [%s]", $finalInvCount, 25, $statusInvCount));
+    logMsg(sprintf("Invoice Items:  %d/%d [%s]", $finalItemCount, count($sourceItems), $statusItems));
+    logMsg(sprintf("Payments:       %d/%d [%s]", $finalPayCount, count($sourcePayments), $statusPayments));
+    logMsg("Grand Total:    ₹{$finalGrandTotal} (Source: ₹{$totalGrandTotal}) [{$statusAmount}]");
+    logMsg("Total Paid:     ₹{$finalPaid} (Source: ₹{$totalPaidAmount})");
+    logMsg("Total Balance:  ₹{$finalBal} (Source: ₹{$totalBalanceDue})");
     logMsg("--------------------------------------------------------------------");
 
     if ($statusInvCount === 'PASS' && $statusItems === 'PASS' && $statusPayments === 'PASS' && $statusAmount === 'PASS') {
         logMsg("ALL VERIFICATION CHECKS PASSED PERFECTLY! Migration is 100% Complete and Verified.", 'SUCCESS');
     } else {
-        logMsg("WARNING: Some verification counts showed discrepancies. Review log details.", 'WARN');
+        logMsg("WARNING: Verification counts showed discrepancies. Review log details.", 'WARN');
     }
 
 } catch (Exception $e) {
