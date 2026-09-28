@@ -334,7 +334,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
         })));
       }
     }
-  }, [invoice, payments]);
+  }, [invoice?.id, invoice?.invoiceNumber]);
 
   const [showAddEntry, setShowAddEntry] = useState(false);
   const [newPayDate, setNewPayDate] = useState(todayStr);
@@ -569,6 +569,24 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
     // Lock — prevent double-submit
     setIsSubmitting(true);
     try {
+      // If user opened the Add Payment row and entered an amount, but clicked "Update GST Invoice" directly without clicking "+ Add Entry", auto-capture it
+      let finalPaymentEntries = [...paymentEntries];
+      if (showAddEntry && Number(newPayAmount) > 0) {
+        finalPaymentEntries.push({
+          id: `PAY-${Date.now()}`,
+          amount: Number(newPayAmount),
+          paymentDate: newPayDate || todayStr,
+          paymentMode: newPayMode,
+          transactionRef: newPayRef.trim() || undefined,
+          notes: newPayNotes.trim() || undefined
+        });
+      }
+
+      const calculatedPaid = finalPaymentEntries.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+      const calculatedBalance = Math.max(0, grandTotal - calculatedPaid);
+      const calculatedStatus: PaymentStatus = calculatedPaid >= grandTotal ? 'PAID' : calculatedPaid > 0 ? 'PARTIAL' : 'UNPAID';
+      const calculatedMode: PaymentMode = finalPaymentEntries[0]?.paymentMode || paymentMode || 'UPI';
+
       const savedInvoice: Invoice = {
         id: invoice?.id || `INV-${Date.now().toString().slice(-10)}`,
         invoiceNumber: cleanNum,
@@ -594,15 +612,15 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
         totalGst,
         roundOff,
         grandTotal,
-        paidAmount: totalPaid,
-        balanceDue,
-        paymentStatus,
-        paymentMode,
+        paidAmount: calculatedPaid,
+        balanceDue: calculatedBalance,
+        paymentStatus: calculatedStatus,
+        paymentMode: calculatedMode,
         notes,
         createdByRole: (currentUser?.role || userRole || 'USER') as UserRole,
         createdByName: userName,
         createdAt: invoice?.createdAt || new Date().toISOString(),
-        initialPayments: paymentEntries.filter(p => Number(p.amount) > 0)
+        initialPayments: finalPaymentEntries.filter(p => Number(p.amount) > 0)
       };
 
       await onSaveInvoice(savedInvoice);
