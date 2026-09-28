@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, Plus, Trash2, QrCode, Search, Calculator, 
   CheckCircle2, AlertCircle, ShieldAlert, Sparkles, Loader2, CreditCard
