@@ -10,6 +10,45 @@ $method = $_SERVER['REQUEST_METHOD'];
 $pdo = getDbConnection();
 
 // ------------------------------------------------------------
+// Helper to fetch complete invoice with items and payments
+// ------------------------------------------------------------
+function fetchCompleteInvoice(PDO $pdo, $internalId) {
+    $stmt = $pdo->prepare("SELECT * FROM invoices WHERE internal_invoice_id = :int_id OR id = :int_id2 OR invoice_number = :int_id3 LIMIT 1");
+    $stmt->execute([':int_id' => $internalId, ':int_id2' => $internalId, ':int_id3' => $internalId]);
+    $invoice = $stmt->fetch();
+    if (!$invoice) return null;
+
+    $realIntId = $invoice['internal_invoice_id'];
+    $invNum = $invoice['invoice_number'];
+
+    $itemStmt = $pdo->prepare("SELECT * FROM invoice_items WHERE internal_invoice_id = :int_id OR invoice_number = :inv_num ORDER BY id ASC");
+    $itemStmt->execute([':int_id' => $realIntId, ':inv_num' => $invNum]);
+    $items = $itemStmt->fetchAll();
+
+    $payStmt = $pdo->prepare("SELECT * FROM payments WHERE internal_invoice_id = :int_id OR invoice_number = :inv_num ORDER BY payment_date ASC, created_at ASC");
+    $payStmt->execute([':int_id' => $realIntId, ':inv_num' => $invNum]);
+    $payments = $payStmt->fetchAll();
+
+    $invoice['items'] = $items;
+    $invoice['payments'] = $payments;
+    $invoice['is_inter_state'] = (bool)$invoice['is_inter_state'];
+    $invoice['is_cancelled'] = (bool)$invoice['is_cancelled'];
+    $invoice['sub_total'] = (float)$invoice['sub_total'];
+    $invoice['total_discount'] = (float)$invoice['total_discount'];
+    $invoice['taxable_amount'] = (float)$invoice['taxable_amount'];
+    $invoice['cgst_total'] = (float)$invoice['cgst_total'];
+    $invoice['sgst_total'] = (float)$invoice['sgst_total'];
+    $invoice['igst_total'] = (float)$invoice['igst_total'];
+    $invoice['total_gst'] = (float)$invoice['total_gst'];
+    $invoice['round_off'] = (float)$invoice['round_off'];
+    $invoice['grand_total'] = (float)$invoice['grand_total'];
+    $invoice['paid_amount'] = (float)$invoice['paid_amount'];
+    $invoice['balance_due'] = (float)$invoice['balance_due'];
+
+    return $invoice;
+}
+
+// ------------------------------------------------------------
 // 1. GET: Fetch All Invoices or Single Invoice
 // ------------------------------------------------------------
 if ($method === 'GET') {
@@ -17,68 +56,79 @@ if ($method === 'GET') {
         $invId = isset($_GET['id']) ? trim($_GET['id']) : null;
 
         if ($invId) {
-            $stmt = $pdo->prepare("SELECT * FROM invoices WHERE id = :id OR internal_invoice_id = :int_id OR invoice_number = :inv_num");
-            $stmt->execute([':id' => $invId, ':int_id' => $invId, ':inv_num' => $invId]);
-            $invoice = $stmt->fetch();
+            $invoice = fetchCompleteInvoice($pdo, $invId);
             if (!$invoice) {
                 sendJsonResponse(['success' => false, 'error' => 'Invoice not found'], 404);
             }
-            $invoices = [$invoice];
+            sendJsonResponse([
+                'success' => true,
+                'data' => $invoice
+            ]);
         } else {
             $stmt = $pdo->query("SELECT * FROM invoices ORDER BY created_at DESC");
             $invoices = $stmt->fetchAll();
-        }
 
-        // Fetch all items and group by internal_invoice_id
-        $itemsStmt = $pdo->query("SELECT * FROM invoice_items ORDER BY id ASC");
-        $allItems = $itemsStmt->fetchAll();
-        $itemsMap = [];
-        foreach ($allItems as $item) {
-            $intId = $item['internal_invoice_id'];
-            if (!isset($itemsMap[$intId])) {
-                $itemsMap[$intId] = [];
+            // Fetch all items and group
+            $itemsStmt = $pdo->query("SELECT * FROM invoice_items ORDER BY id ASC");
+            $allItems = $itemsStmt->fetchAll();
+            $itemsMap = [];
+            foreach ($allItems as $item) {
+                $intId = $item['internal_invoice_id'];
+                $invNum = $item['invoice_number'];
+                if ($intId) {
+                    if (!isset($itemsMap[$intId])) $itemsMap[$intId] = [];
+                    $itemsMap[$intId][] = $item;
+                }
+                if ($invNum && $invNum !== $intId) {
+                    if (!isset($itemsMap[$invNum])) $itemsMap[$invNum] = [];
+                    $itemsMap[$invNum][] = $item;
+                }
             }
-            $itemsMap[$intId][] = $item;
-        }
 
-        // Fetch all payments and group by internal_invoice_id
-        $paymentsStmt = $pdo->query("SELECT * FROM payments ORDER BY payment_date ASC, created_at ASC");
-        $allPayments = $paymentsStmt->fetchAll();
-        $paymentsMap = [];
-        foreach ($allPayments as $p) {
-            $intId = $p['internal_invoice_id'];
-            if (!isset($paymentsMap[$intId])) {
-                $paymentsMap[$intId] = [];
+            // Fetch all payments and group
+            $paymentsStmt = $pdo->query("SELECT * FROM payments ORDER BY payment_date ASC, created_at ASC");
+            $allPayments = $paymentsStmt->fetchAll();
+            $paymentsMap = [];
+            foreach ($allPayments as $p) {
+                $intId = $p['internal_invoice_id'];
+                $invNum = $p['invoice_number'];
+                if ($intId) {
+                    if (!isset($paymentsMap[$intId])) $paymentsMap[$intId] = [];
+                    $paymentsMap[$intId][] = $p;
+                }
+                if ($invNum && $invNum !== $intId) {
+                    if (!isset($paymentsMap[$invNum])) $paymentsMap[$invNum] = [];
+                    $paymentsMap[$invNum][] = $p;
+                }
             }
-            $paymentsMap[$intId][] = $p;
-        }
 
-        // Merge items and payments into invoices
-        foreach ($invoices as &$inv) {
-            $intId = $inv['internal_invoice_id'];
-            $inv['items'] = isset($itemsMap[$intId]) ? $itemsMap[$intId] : [];
-            $inv['payments'] = isset($paymentsMap[$intId]) ? $paymentsMap[$intId] : [];
-            // Format boolean / numeric
-            $inv['is_inter_state'] = (bool)$inv['is_inter_state'];
-            $inv['is_cancelled'] = (bool)$inv['is_cancelled'];
-            $inv['sub_total'] = (float)$inv['sub_total'];
-            $inv['total_discount'] = (float)$inv['total_discount'];
-            $inv['taxable_amount'] = (float)$inv['taxable_amount'];
-            $inv['cgst_total'] = (float)$inv['cgst_total'];
-            $inv['sgst_total'] = (float)$inv['sgst_total'];
-            $inv['igst_total'] = (float)$inv['igst_total'];
-            $inv['total_gst'] = (float)$inv['total_gst'];
-            $inv['round_off'] = (float)$inv['round_off'];
-            $inv['grand_total'] = (float)$inv['grand_total'];
-            $inv['paid_amount'] = (float)$inv['paid_amount'];
-            $inv['balance_due'] = (float)$inv['balance_due'];
-        }
+            // Merge items and payments into invoices
+            foreach ($invoices as &$inv) {
+                $intId = $inv['internal_invoice_id'];
+                $invNum = $inv['invoice_number'];
+                $inv['items'] = isset($itemsMap[$intId]) ? $itemsMap[$intId] : (isset($itemsMap[$invNum]) ? $itemsMap[$invNum] : []);
+                $inv['payments'] = isset($paymentsMap[$intId]) ? $paymentsMap[$intId] : (isset($paymentsMap[$invNum]) ? $paymentsMap[$invNum] : []);
+                $inv['is_inter_state'] = (bool)$inv['is_inter_state'];
+                $inv['is_cancelled'] = (bool)$inv['is_cancelled'];
+                $inv['sub_total'] = (float)$inv['sub_total'];
+                $inv['total_discount'] = (float)$inv['total_discount'];
+                $inv['taxable_amount'] = (float)$inv['taxable_amount'];
+                $inv['cgst_total'] = (float)$inv['cgst_total'];
+                $inv['sgst_total'] = (float)$inv['sgst_total'];
+                $inv['igst_total'] = (float)$inv['igst_total'];
+                $inv['total_gst'] = (float)$inv['total_gst'];
+                $inv['round_off'] = (float)$inv['round_off'];
+                $inv['grand_total'] = (float)$inv['grand_total'];
+                $inv['paid_amount'] = (float)$inv['paid_amount'];
+                $inv['balance_due'] = (float)$inv['balance_due'];
+            }
 
-        sendJsonResponse([
-            'success' => true,
-            'count' => count($invoices),
-            'data' => $invId ? $invoices[0] : $invoices
-        ]);
+            sendJsonResponse([
+                'success' => true,
+                'count' => count($invoices),
+                'data' => $invoices
+            ]);
+        }
     } catch (Exception $e) {
         sendJsonResponse(['success' => false, 'error' => $e->getMessage()], 500);
     }
@@ -127,30 +177,102 @@ if ($method === 'POST') {
         $grandTotal = (float)(isset($invoiceData['grand_total']) ? $invoiceData['grand_total'] : (isset($invoiceData['grandTotal']) ? $invoiceData['grandTotal'] : 0));
         
         // Calculate initial payments
-        $totalPaid = 0.0;
         $validPayments = [];
         if (!empty($paymentsData) && is_array($paymentsData)) {
             foreach ($paymentsData as $p) {
                 $amt = (float)(isset($p['amount']) ? $p['amount'] : 0);
                 if ($amt > 0) {
-                    $totalPaid += $amt;
                     $validPayments[] = $p;
                 }
             }
         } elseif (isset($invoiceData['paid_amount']) && (float)$invoiceData['paid_amount'] > 0) {
-            $totalPaid = (float)$invoiceData['paid_amount'];
             $validPayments[] = [
-                'amount' => $totalPaid,
+                'id' => "PAY-{$internalId}-1",
+                'amount' => (float)$invoiceData['paid_amount'],
                 'payment_date' => isset($invoiceData['invoice_date']) ? $invoiceData['invoice_date'] : date('d/m/Y'),
                 'payment_mode' => isset($invoiceData['payment_mode']) ? $invoiceData['payment_mode'] : 'UPI',
-                'notes' => 'Initial payment upon invoice creation'
+                'notes' => 'Recorded upon invoice creation'
             ];
+        }
+
+        $totalPaid = 0.0;
+        foreach ($validPayments as $vp) {
+            $totalPaid += (float)$vp['amount'];
         }
 
         $balanceDue = max(0.0, round($grandTotal - $totalPaid, 2));
         $paymentStatus = $totalPaid >= $grandTotal ? 'PAID' : ($totalPaid > 0 ? 'PARTIAL' : 'UNPAID');
 
-        // Insert into invoices table dynamically
+        // Customer Sync: Ensure customer exists in customers table
+        $custId = isset($invoiceData['customer_id']) ? $invoiceData['customer_id'] : (isset($invoiceData['customerId']) ? $invoiceData['customerId'] : 'CUST-001');
+        $custName = isset($invoiceData['customer_name']) ? trim($invoiceData['customer_name']) : (isset($invoiceData['customerName']) ? trim($invoiceData['customerName']) : 'Customer');
+        $custPhone = isset($invoiceData['customer_phone']) ? trim($invoiceData['customer_phone']) : (isset($invoiceData['customerPhone']) ? trim($invoiceData['customerPhone']) : '');
+        $custEmail = isset($invoiceData['customer_email']) && trim($invoiceData['customer_email']) !== '' ? trim($invoiceData['customer_email']) : (isset($invoiceData['customerEmail']) && trim($invoiceData['customerEmail']) !== '' ? trim($invoiceData['customerEmail']) : null);
+        $custAddress = isset($invoiceData['customer_address']) ? $invoiceData['customer_address'] : (isset($invoiceData['customerAddress']) ? $invoiceData['customerAddress'] : '');
+        $custGstin = isset($invoiceData['customer_gstin']) ? $invoiceData['customer_gstin'] : (isset($invoiceData['customerGSTIN']) ? $invoiceData['customerGSTIN'] : '');
+
+        $chkCust = $pdo->prepare("SELECT id, customer_id, email FROM customers WHERE customer_id = :cid OR id = :cid2 LIMIT 1");
+        $chkCust->execute([':cid' => $custId, ':cid2' => $custId]);
+        $existingCust = $chkCust->fetch();
+
+        if ($existingCust) {
+            $custUpd = [
+                'full_name' => $custName,
+                'phone' => $custPhone,
+                'address' => $custAddress,
+                'gstin' => $custGstin,
+                'updated_at' => date('Y-m-d H:i:s')
+            ];
+            if ($custEmail !== null) {
+                $custUpd['email'] = $custEmail;
+            }
+            dynamicUpdate($pdo, 'customers', $custUpd, ['customer_id' => $existingCust['customer_id']]);
+        } else {
+            $newCustRec = [
+                'id' => generateUuidV4(),
+                'customer_id' => $custId,
+                'full_name' => $custName,
+                'phone' => $custPhone,
+                'email' => $custEmail,
+                'address' => $custAddress,
+                'gstin' => $custGstin,
+                'state_code' => isset($invoiceData['place_of_supply']) ? $invoiceData['place_of_supply'] : '27-Maharashtra',
+                'outstanding_balance' => 0.00,
+                'advance_balance' => 0.00,
+                'created_at' => date('Y-m-d H:i:s'),
+                'updated_at' => date('Y-m-d H:i:s')
+            ];
+            dynamicInsert($pdo, 'customers', $newCustRec);
+        }
+
+        // Pet Sync: Ensure pet exists in pets table
+        $petId = isset($invoiceData['pet_id']) ? $invoiceData['pet_id'] : (isset($invoiceData['petId']) ? $invoiceData['petId'] : null);
+        $petName = isset($invoiceData['pet_name']) ? trim($invoiceData['pet_name']) : (isset($invoiceData['petName']) ? trim($invoiceData['petName']) : null);
+        if ($petId && $petName) {
+            $chkPet = $pdo->prepare("SELECT id, pet_id FROM pets WHERE pet_id = :pid OR id = :pid2 LIMIT 1");
+            $chkPet->execute([':pid' => $petId, ':pid2' => $petId]);
+            $existingPet = $chkPet->fetch();
+
+            if ($existingPet) {
+                dynamicUpdate($pdo, 'pets', [
+                    'pet_name' => $petName,
+                    'customer_name' => $custName,
+                    'updated_at' => date('Y-m-d H:i:s')
+                ], ['pet_id' => $existingPet['pet_id']]);
+            } else {
+                dynamicInsert($pdo, 'pets', [
+                    'id' => generateUuidV4(),
+                    'pet_id' => $petId,
+                    'customer_id' => $custId,
+                    'customer_name' => $custName,
+                    'pet_name' => $petName,
+                    'created_at' => date('Y-m-d H:i:s'),
+                    'updated_at' => date('Y-m-d H:i:s')
+                ]);
+            }
+        }
+
+        // Insert into invoices table
         $invRecord = [
             'id' => $uuid,
             'internal_invoice_id' => $internalId,
@@ -158,14 +280,14 @@ if ($method === 'POST') {
             'financial_year' => isset($invoiceData['financial_year']) ? $invoiceData['financial_year'] : (isset($invoiceData['financialYear']) ? $invoiceData['financialYear'] : '2026-27'),
             'invoice_date' => isset($invoiceData['invoice_date']) ? $invoiceData['invoice_date'] : (isset($invoiceData['invoiceDate']) ? $invoiceData['invoiceDate'] : date('d/m/Y')),
             'due_date' => isset($invoiceData['due_date']) ? $invoiceData['due_date'] : (isset($invoiceData['dueDate']) ? $invoiceData['dueDate'] : null),
-            'customer_id' => isset($invoiceData['customer_id']) ? $invoiceData['customer_id'] : (isset($invoiceData['customerId']) ? $invoiceData['customerId'] : 'CUST-001'),
-            'customer_name' => isset($invoiceData['customer_name']) ? $invoiceData['customer_name'] : (isset($invoiceData['customerName']) ? $invoiceData['customerName'] : 'Customer'),
-            'customer_phone' => isset($invoiceData['customer_phone']) ? $invoiceData['customer_phone'] : (isset($invoiceData['customerPhone']) ? $invoiceData['customerPhone'] : ''),
-            'customer_email' => isset($invoiceData['customer_email']) ? $invoiceData['customer_email'] : (isset($invoiceData['customerEmail']) ? $invoiceData['customerEmail'] : ''),
-            'customer_address' => isset($invoiceData['customer_address']) ? $invoiceData['customer_address'] : (isset($invoiceData['customerAddress']) ? $invoiceData['customerAddress'] : ''),
-            'customer_gstin' => isset($invoiceData['customer_gstin']) ? $invoiceData['customer_gstin'] : (isset($invoiceData['customerGSTIN']) ? $invoiceData['customerGSTIN'] : ''),
-            'pet_id' => isset($invoiceData['pet_id']) ? $invoiceData['pet_id'] : (isset($invoiceData['petId']) ? $invoiceData['petId'] : null),
-            'pet_name' => isset($invoiceData['pet_name']) ? $invoiceData['pet_name'] : (isset($invoiceData['petName']) ? $invoiceData['petName'] : null),
+            'customer_id' => $custId,
+            'customer_name' => $custName,
+            'customer_phone' => $custPhone,
+            'customer_email' => $custEmail !== null ? $custEmail : '',
+            'customer_address' => $custAddress,
+            'customer_gstin' => $custGstin,
+            'pet_id' => $petId,
+            'pet_name' => $petName,
             'place_of_supply' => isset($invoiceData['place_of_supply']) ? $invoiceData['place_of_supply'] : (isset($invoiceData['placeOfSupply']) ? $invoiceData['placeOfSupply'] : '27-Maharashtra'),
             'is_inter_state' => !empty($invoiceData['is_inter_state']) || !empty($invoiceData['isInterState']) ? 1 : 0,
             'sub_total' => (float)(isset($invoiceData['sub_total']) ? $invoiceData['sub_total'] : (isset($invoiceData['subTotal']) ? $invoiceData['subTotal'] : 0)),
@@ -191,7 +313,7 @@ if ($method === 'POST') {
 
         dynamicInsert($pdo, 'invoices', $invRecord);
 
-        // Insert line items dynamically
+        // Insert line items
         if (!empty($itemsData) && is_array($itemsData)) {
             $idx = 1;
             foreach ($itemsData as $item) {
@@ -223,7 +345,7 @@ if ($method === 'POST') {
             }
         }
 
-        // Insert payments dynamically
+        // Insert payments
         if (!empty($validPayments)) {
             $pidx = 1;
             foreach ($validPayments as $pay) {
@@ -233,8 +355,8 @@ if ($method === 'POST') {
                     'payment_id' => $payId,
                     'internal_invoice_id' => $internalId,
                     'invoice_number' => $invoiceNumber,
-                    'customer_id' => isset($invoiceData['customer_id']) ? $invoiceData['customer_id'] : (isset($invoiceData['customerId']) ? $invoiceData['customerId'] : 'CUST-001'),
-                    'customer_name' => isset($invoiceData['customer_name']) ? $invoiceData['customer_name'] : (isset($invoiceData['customerName']) ? $invoiceData['customerName'] : 'Customer'),
+                    'customer_id' => $custId,
+                    'customer_name' => $custName,
                     'amount' => (float)$pay['amount'],
                     'payment_date' => isset($pay['payment_date']) ? $pay['payment_date'] : (isset($pay['paymentDate']) ? $pay['paymentDate'] : date('d/m/Y')),
                     'payment_mode' => isset($pay['payment_mode']) ? $pay['payment_mode'] : (isset($pay['paymentMode']) ? $pay['paymentMode'] : 'UPI'),
@@ -251,10 +373,12 @@ if ($method === 'POST') {
 
         $pdo->commit();
 
+        $savedFull = fetchCompleteInvoice($pdo, $internalId);
+
         sendJsonResponse([
             'success' => true,
             'message' => 'Invoice successfully saved to MySQL',
-            'data' => [
+            'data' => $savedFull ? $savedFull : [
                 'id' => $internalId,
                 'internal_invoice_id' => $internalId,
                 'invoice_number' => $invoiceNumber,
@@ -271,12 +395,12 @@ if ($method === 'POST') {
 }
 
 // ------------------------------------------------------------
-// 3. PUT: Update Existing Invoice
+// 3. PUT: Update Existing Invoice (Complete Transactional Flow)
 // ------------------------------------------------------------
 if ($method === 'PUT') {
     $input = getJsonInput();
     $invoiceData = isset($input['invoice']) ? $input['invoice'] : $input;
-    $itemsData = isset($input['items']) ? $input['items'] : (isset($invoiceData['items']) ? $invoiceData['items'] : []);
+    $itemsData = isset($input['items']) ? $input['items'] : (isset($invoiceData['items']) ? $invoiceData['items'] : null);
     $paymentsData = isset($input['payments']) ? $input['payments'] : (isset($invoiceData['payments']) ? $invoiceData['payments'] : (isset($invoiceData['initialPayments']) ? $invoiceData['initialPayments'] : null));
 
     $internalId = isset($invoiceData['internal_invoice_id']) ? $invoiceData['internal_invoice_id'] : (isset($invoiceData['id']) ? $invoiceData['id'] : null);
@@ -298,16 +422,98 @@ if ($method === 'PUT') {
         ]);
         $existingInvoice = $invStmt->fetch();
 
-        if ($existingInvoice) {
-            $internalId = $existingInvoice['internal_invoice_id'];
-            if (empty($invoiceNumber)) {
-                $invoiceNumber = $existingInvoice['invoice_number'];
+        if (!$existingInvoice) {
+            $pdo->rollBack();
+            sendJsonResponse(['success' => false, 'error' => "Invoice not found in database for ID: {$internalId} / {$invoiceNumber}"], 404);
+        }
+
+        $internalId = $existingInvoice['internal_invoice_id'];
+        if (empty($invoiceNumber)) {
+            $invoiceNumber = $existingInvoice['invoice_number'];
+        }
+
+        $grandTotal = (float)(isset($invoiceData['grand_total']) ? $invoiceData['grand_total'] : (isset($invoiceData['grandTotal']) ? $invoiceData['grandTotal'] : $existingInvoice['grand_total']));
+
+        // 2. Customer Update: Update customer master record safely
+        $custId = isset($invoiceData['customer_id']) ? $invoiceData['customer_id'] : (isset($invoiceData['customerId']) ? $invoiceData['customerId'] : $existingInvoice['customer_id']);
+        $custName = isset($invoiceData['customer_name']) ? trim($invoiceData['customer_name']) : (isset($invoiceData['customerName']) ? trim($invoiceData['customerName']) : $existingInvoice['customer_name']);
+        $custPhone = isset($invoiceData['customer_phone']) ? trim($invoiceData['customer_phone']) : (isset($invoiceData['customerPhone']) ? trim($invoiceData['customerPhone']) : $existingInvoice['customer_phone']);
+        $custAddress = isset($invoiceData['customer_address']) ? $invoiceData['customer_address'] : (isset($invoiceData['customerAddress']) ? $invoiceData['customerAddress'] : $existingInvoice['customer_address']);
+        $custGstin = isset($invoiceData['customer_gstin']) ? $invoiceData['customer_gstin'] : (isset($invoiceData['customerGSTIN']) ? $invoiceData['customerGSTIN'] : $existingInvoice['customer_gstin']);
+        
+        // Email safety: Only update if explicitly provided non-empty, never auto-generate dummy emails
+        $custEmail = null;
+        if (isset($invoiceData['customer_email']) && trim($invoiceData['customer_email']) !== '') {
+            $custEmail = trim($invoiceData['customer_email']);
+        } elseif (isset($invoiceData['customerEmail']) && trim($invoiceData['customerEmail']) !== '') {
+            $custEmail = trim($invoiceData['customerEmail']);
+        }
+
+        if (!empty($custId)) {
+            $chkCust = $pdo->prepare("SELECT id, customer_id, email FROM customers WHERE customer_id = :cid OR id = :cid2 LIMIT 1");
+            $chkCust->execute([':cid' => $custId, ':cid2' => $custId]);
+            $existingCust = $chkCust->fetch();
+
+            if ($existingCust) {
+                $updCust = [
+                    'full_name' => $custName,
+                    'phone' => $custPhone,
+                    'address' => $custAddress,
+                    'gstin' => $custGstin,
+                    'updated_at' => date('Y-m-d H:i:s')
+                ];
+                if ($custEmail !== null) {
+                    $updCust['email'] = $custEmail;
+                }
+                dynamicUpdate($pdo, 'customers', $updCust, ['customer_id' => $existingCust['customer_id']]);
+            } else {
+                $newCustRec = [
+                    'id' => generateUuidV4(),
+                    'customer_id' => $custId,
+                    'full_name' => $custName,
+                    'phone' => $custPhone,
+                    'email' => $custEmail,
+                    'address' => $custAddress,
+                    'gstin' => $custGstin,
+                    'state_code' => isset($invoiceData['place_of_supply']) ? $invoiceData['place_of_supply'] : '27-Maharashtra',
+                    'outstanding_balance' => 0.00,
+                    'advance_balance' => 0.00,
+                    'created_at' => date('Y-m-d H:i:s'),
+                    'updated_at' => date('Y-m-d H:i:s')
+                ];
+                dynamicInsert($pdo, 'customers', $newCustRec);
             }
         }
 
-        $grandTotal = (float)(isset($invoiceData['grand_total']) ? $invoiceData['grand_total'] : (isset($invoiceData['grandTotal']) ? $invoiceData['grandTotal'] : (isset($existingInvoice['grand_total']) ? $existingInvoice['grand_total'] : 0)));
+        // 3. Pet Update: Update pet record safely
+        $petId = isset($invoiceData['pet_id']) ? $invoiceData['pet_id'] : (isset($invoiceData['petId']) ? $invoiceData['petId'] : $existingInvoice['pet_id']);
+        $petName = isset($invoiceData['pet_name']) ? trim($invoiceData['pet_name']) : (isset($invoiceData['petName']) ? trim($invoiceData['petName']) : $existingInvoice['pet_name']);
 
-        // 2. Sync Payments if provided in payload
+        if (!empty($petId) && !empty($petName)) {
+            $chkPet = $pdo->prepare("SELECT id, pet_id FROM pets WHERE pet_id = :pid OR id = :pid2 LIMIT 1");
+            $chkPet->execute([':pid' => $petId, ':pid2' => $petId]);
+            $existingPet = $chkPet->fetch();
+
+            if ($existingPet) {
+                dynamicUpdate($pdo, 'pets', [
+                    'pet_name' => $petName,
+                    'customer_name' => $custName,
+                    'updated_at' => date('Y-m-d H:i:s')
+                ], ['pet_id' => $existingPet['pet_id']]);
+            } elseif (!empty($custId)) {
+                dynamicInsert($pdo, 'pets', [
+                    'id' => generateUuidV4(),
+                    'pet_id' => $petId,
+                    'customer_id' => $custId,
+                    'customer_name' => $custName,
+                    'pet_name' => $petName,
+                    'created_at' => date('Y-m-d H:i:s'),
+                    'updated_at' => date('Y-m-d H:i:s')
+                ]);
+            }
+        }
+
+        // 4. Payments Synchronization
         if ($paymentsData !== null && is_array($paymentsData)) {
             $delPayStmt = $pdo->prepare("DELETE FROM payments WHERE internal_invoice_id = :int_id OR invoice_number = :inv_num");
             $delPayStmt->execute([':int_id' => $internalId, ':inv_num' => $invoiceNumber]);
@@ -325,8 +531,8 @@ if ($method === 'PUT') {
                         'payment_id' => $payId,
                         'internal_invoice_id' => $internalId,
                         'invoice_number' => $invoiceNumber,
-                        'customer_id' => isset($invoiceData['customer_id']) ? $invoiceData['customer_id'] : (isset($invoiceData['customerId']) ? $invoiceData['customerId'] : (isset($existingInvoice['customer_id']) ? $existingInvoice['customer_id'] : 'CUST-001')),
-                        'customer_name' => isset($invoiceData['customer_name']) ? $invoiceData['customer_name'] : (isset($invoiceData['customerName']) ? $invoiceData['customerName'] : (isset($existingInvoice['customer_name']) ? $existingInvoice['customer_name'] : 'Customer')),
+                        'customer_id' => $custId,
+                        'customer_name' => $custName,
                         'amount' => (float)$pay['amount'],
                         'payment_date' => isset($pay['payment_date']) ? $pay['payment_date'] : (isset($pay['paymentDate']) ? $pay['paymentDate'] : date('d/m/Y')),
                         'payment_mode' => isset($pay['payment_mode']) ? $pay['payment_mode'] : (isset($pay['paymentMode']) ? $pay['paymentMode'] : 'UPI'),
@@ -342,12 +548,12 @@ if ($method === 'PUT') {
             }
         }
 
-        // 3. Recalculate total paid from payments table
+        // 5. Authoritative recalculation from payments table
         $paySumStmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) FROM payments WHERE internal_invoice_id = :int_id OR invoice_number = :inv_num");
         $paySumStmt->execute([':int_id' => $internalId, ':inv_num' => $invoiceNumber]);
         $totalPaid = (float)$paySumStmt->fetchColumn();
 
-        // If no rows in payments table but paid_amount was provided explicitly in payload, auto-create a payment record
+        // Fallback: If payments table has 0 rows but paid_amount > 0 was explicitly sent in payload, auto-create a payment record
         if ($totalPaid == 0.0) {
             $explicitPaid = 0.0;
             if (isset($invoiceData['paid_amount']) && (float)$invoiceData['paid_amount'] > 0) {
@@ -364,8 +570,8 @@ if ($method === 'PUT') {
                     'payment_id' => "PAY-{$internalId}-1",
                     'internal_invoice_id' => $internalId,
                     'invoice_number' => $invoiceNumber,
-                    'customer_id' => isset($invoiceData['customer_id']) ? $invoiceData['customer_id'] : (isset($invoiceData['customerId']) ? $invoiceData['customerId'] : (isset($existingInvoice['customer_id']) ? $existingInvoice['customer_id'] : 'CUST-001')),
-                    'customer_name' => isset($invoiceData['customer_name']) ? $invoiceData['customer_name'] : (isset($invoiceData['customerName']) ? $invoiceData['customerName'] : (isset($existingInvoice['customer_name']) ? $existingInvoice['customer_name'] : 'Customer')),
+                    'customer_id' => $custId,
+                    'customer_name' => $custName,
                     'amount' => $explicitPaid,
                     'payment_date' => $payDate,
                     'payment_mode' => $payMode,
@@ -381,49 +587,44 @@ if ($method === 'PUT') {
 
         $balanceDue = max(0.0, round($grandTotal - $totalPaid, 2));
         $paymentStatus = $totalPaid >= $grandTotal ? 'PAID' : ($totalPaid > 0 ? 'PARTIAL' : 'UNPAID');
+        $paymentMode = isset($invoiceData['payment_mode']) ? $invoiceData['payment_mode'] : (isset($invoiceData['paymentMode']) ? $invoiceData['paymentMode'] : $existingInvoice['payment_mode']);
 
-        // 4. Update invoices table dynamically
+        // 6. Update invoices table
         $updInvoiceRecord = [
             'invoice_number' => $invoiceNumber,
-            'invoice_date' => isset($invoiceData['invoice_date']) ? $invoiceData['invoice_date'] : (isset($invoiceData['invoiceDate']) ? $invoiceData['invoiceDate'] : null),
-            'due_date' => isset($invoiceData['due_date']) ? $invoiceData['due_date'] : (isset($invoiceData['dueDate']) ? $invoiceData['dueDate'] : null),
-            'customer_id' => isset($invoiceData['customer_id']) ? $invoiceData['customer_id'] : (isset($invoiceData['customerId']) ? $invoiceData['customerId'] : null),
-            'customer_name' => isset($invoiceData['customer_name']) ? $invoiceData['customer_name'] : (isset($invoiceData['customerName']) ? $invoiceData['customerName'] : null),
-            'customer_phone' => isset($invoiceData['customer_phone']) ? $invoiceData['customer_phone'] : (isset($invoiceData['customerPhone']) ? $invoiceData['customerPhone'] : ''),
-            'customer_email' => isset($invoiceData['customer_email']) ? $invoiceData['customer_email'] : (isset($invoiceData['customerEmail']) ? $invoiceData['customerEmail'] : ''),
-            'customer_address' => isset($invoiceData['customer_address']) ? $invoiceData['customer_address'] : (isset($invoiceData['customerAddress']) ? $invoiceData['customerAddress'] : ''),
-            'customer_gstin' => isset($invoiceData['customer_gstin']) ? $invoiceData['customer_gstin'] : (isset($invoiceData['customerGSTIN']) ? $invoiceData['customerGSTIN'] : ''),
-            'pet_id' => isset($invoiceData['pet_id']) ? $invoiceData['pet_id'] : (isset($invoiceData['petId']) ? $invoiceData['petId'] : null),
-            'pet_name' => isset($invoiceData['pet_name']) ? $invoiceData['pet_name'] : (isset($invoiceData['petName']) ? $invoiceData['petName'] : null),
-            'place_of_supply' => isset($invoiceData['place_of_supply']) ? $invoiceData['place_of_supply'] : (isset($invoiceData['placeOfSupply']) ? $invoiceData['placeOfSupply'] : '27-Maharashtra'),
-            'is_inter_state' => !empty($invoiceData['is_inter_state']) || !empty($invoiceData['isInterState']) ? 1 : 0,
-            'sub_total' => (float)(isset($invoiceData['sub_total']) ? $invoiceData['sub_total'] : (isset($invoiceData['subTotal']) ? $invoiceData['subTotal'] : 0)),
-            'total_discount' => (float)(isset($invoiceData['total_discount']) ? $invoiceData['total_discount'] : (isset($invoiceData['totalDiscount']) ? $invoiceData['totalDiscount'] : 0)),
-            'taxable_amount' => (float)(isset($invoiceData['taxable_amount']) ? $invoiceData['taxable_amount'] : (isset($invoiceData['taxableAmount']) ? $invoiceData['taxableAmount'] : 0)),
-            'cgst_total' => (float)(isset($invoiceData['cgst_total']) ? $invoiceData['cgst_total'] : (isset($invoiceData['cgstTotal']) ? $invoiceData['cgstTotal'] : 0)),
-            'sgst_total' => (float)(isset($invoiceData['sgst_total']) ? $invoiceData['sgst_total'] : (isset($invoiceData['sgstTotal']) ? $invoiceData['sgstTotal'] : 0)),
-            'igst_total' => (float)(isset($invoiceData['igst_total']) ? $invoiceData['igst_total'] : (isset($invoiceData['igstTotal']) ? $invoiceData['igstTotal'] : 0)),
-            'total_gst' => (float)(isset($invoiceData['total_gst']) ? $invoiceData['total_gst'] : (isset($invoiceData['totalGst']) ? $invoiceData['totalGst'] : 0)),
-            'round_off' => (float)(isset($invoiceData['round_off']) ? $invoiceData['round_off'] : (isset($invoiceData['roundOff']) ? $invoiceData['roundOff'] : 0)),
+            'invoice_date' => isset($invoiceData['invoice_date']) ? $invoiceData['invoice_date'] : (isset($invoiceData['invoiceDate']) ? $invoiceData['invoiceDate'] : $existingInvoice['invoice_date']),
+            'due_date' => isset($invoiceData['due_date']) ? $invoiceData['due_date'] : (isset($invoiceData['dueDate']) ? $invoiceData['dueDate'] : $existingInvoice['due_date']),
+            'customer_id' => $custId,
+            'customer_name' => $custName,
+            'customer_phone' => $custPhone,
+            'customer_email' => $custEmail !== null ? $custEmail : $existingInvoice['customer_email'],
+            'customer_address' => $custAddress,
+            'customer_gstin' => $custGstin,
+            'pet_id' => $petId,
+            'pet_name' => $petName,
+            'place_of_supply' => isset($invoiceData['place_of_supply']) ? $invoiceData['place_of_supply'] : (isset($invoiceData['placeOfSupply']) ? $invoiceData['placeOfSupply'] : $existingInvoice['place_of_supply']),
+            'is_inter_state' => isset($invoiceData['is_inter_state']) || isset($invoiceData['isInterState']) ? (!empty($invoiceData['is_inter_state']) || !empty($invoiceData['isInterState']) ? 1 : 0) : $existingInvoice['is_inter_state'],
+            'sub_total' => (float)(isset($invoiceData['sub_total']) ? $invoiceData['sub_total'] : (isset($invoiceData['subTotal']) ? $invoiceData['subTotal'] : $existingInvoice['sub_total'])),
+            'total_discount' => (float)(isset($invoiceData['total_discount']) ? $invoiceData['total_discount'] : (isset($invoiceData['totalDiscount']) ? $invoiceData['totalDiscount'] : $existingInvoice['total_discount'])),
+            'taxable_amount' => (float)(isset($invoiceData['taxable_amount']) ? $invoiceData['taxable_amount'] : (isset($invoiceData['taxableAmount']) ? $invoiceData['taxableAmount'] : $existingInvoice['taxable_amount'])),
+            'cgst_total' => (float)(isset($invoiceData['cgst_total']) ? $invoiceData['cgst_total'] : (isset($invoiceData['cgstTotal']) ? $invoiceData['cgstTotal'] : $existingInvoice['cgst_total'])),
+            'sgst_total' => (float)(isset($invoiceData['sgst_total']) ? $invoiceData['sgst_total'] : (isset($invoiceData['sgstTotal']) ? $invoiceData['sgstTotal'] : $existingInvoice['sgst_total'])),
+            'igst_total' => (float)(isset($invoiceData['igst_total']) ? $invoiceData['igst_total'] : (isset($invoiceData['igstTotal']) ? $invoiceData['igstTotal'] : $existingInvoice['igst_total'])),
+            'total_gst' => (float)(isset($invoiceData['total_gst']) ? $invoiceData['total_gst'] : (isset($invoiceData['totalGst']) ? $invoiceData['totalGst'] : $existingInvoice['total_gst'])),
+            'round_off' => (float)(isset($invoiceData['round_off']) ? $invoiceData['round_off'] : (isset($invoiceData['roundOff']) ? $invoiceData['roundOff'] : $existingInvoice['round_off'])),
             'grand_total' => $grandTotal,
             'paid_amount' => $totalPaid,
             'balance_due' => $balanceDue,
             'payment_status' => $paymentStatus,
-            'payment_mode' => isset($invoiceData['payment_mode']) ? $invoiceData['payment_mode'] : (isset($invoiceData['paymentMode']) ? $invoiceData['paymentMode'] : 'UPI'),
-            'notes' => isset($invoiceData['notes']) ? $invoiceData['notes'] : '',
+            'payment_mode' => $paymentMode,
+            'notes' => isset($invoiceData['notes']) ? $invoiceData['notes'] : $existingInvoice['notes'],
             'updated_at' => date('Y-m-d H:i:s')
         ];
 
-        if ($updInvoiceRecord['invoice_date'] === null) unset($updInvoiceRecord['invoice_date']);
-        if ($updInvoiceRecord['due_date'] === null) unset($updInvoiceRecord['due_date']);
-        if ($updInvoiceRecord['customer_id'] === null) unset($updInvoiceRecord['customer_id']);
-        if ($updInvoiceRecord['customer_name'] === null) unset($updInvoiceRecord['customer_name']);
-        if (empty($updInvoiceRecord['invoice_number'])) unset($updInvoiceRecord['invoice_number']);
-
         dynamicUpdate($pdo, 'invoices', $updInvoiceRecord, ['internal_invoice_id' => $internalId]);
 
-        // 5. Replace items dynamically
-        if (!empty($itemsData)) {
+        // 7. Update items dynamically if supplied
+        if ($itemsData !== null && is_array($itemsData)) {
             $delStmt = $pdo->prepare("DELETE FROM invoice_items WHERE internal_invoice_id = :int_id OR invoice_number = :inv_num");
             $delStmt->execute([':int_id' => $internalId, ':inv_num' => $invoiceNumber]);
 
@@ -462,21 +663,14 @@ if ($method === 'PUT') {
             }
         }
 
-        // 6. Update payments customer snapshot
-        $updPayRecord = [
-            'customer_id' => isset($invoiceData['customer_id']) ? $invoiceData['customer_id'] : (isset($invoiceData['customerId']) ? $invoiceData['customerId'] : (isset($existingInvoice['customer_id']) ? $existingInvoice['customer_id'] : 'CUST-001')),
-            'customer_name' => isset($invoiceData['customer_name']) ? $invoiceData['customer_name'] : (isset($invoiceData['customerName']) ? $invoiceData['customerName'] : (isset($existingInvoice['customer_name']) ? $existingInvoice['customer_name'] : 'Customer')),
-            'invoice_number' => $invoiceNumber,
-            'updated_at' => date('Y-m-d H:i:s')
-        ];
-        dynamicUpdate($pdo, 'payments', $updPayRecord, ['internal_invoice_id' => $internalId]);
-
         $pdo->commit();
+
+        $updatedFull = fetchCompleteInvoice($pdo, $internalId);
 
         sendJsonResponse([
             'success' => true,
             'message' => 'Invoice successfully updated in MySQL',
-            'data' => [
+            'data' => $updatedFull ? $updatedFull : [
                 'id' => $internalId,
                 'internal_invoice_id' => $internalId,
                 'invoice_number' => $invoiceNumber,

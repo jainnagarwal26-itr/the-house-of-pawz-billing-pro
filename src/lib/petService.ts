@@ -126,6 +126,12 @@ export async function createPetInSupabase(pet: Omit<Pet, 'id'> & { id?: string }
 
 export async function updatePetInSupabase(id: string, updates: Partial<Pet>): Promise<{ success: boolean; error?: string }> {
   try {
+    // 1. Primary: Save to MySQL
+    try {
+      await savePetToMySQL({ ...updates, id } as any);
+    } catch (_) {}
+
+    // 2. Fallback: Save to Supabase
     const payload: any = {};
     if (updates.name !== undefined) payload.pet_name = updates.name;
     if (updates.customerId !== undefined) payload.customer_id = updates.customerId;

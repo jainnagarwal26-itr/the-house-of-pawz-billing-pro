@@ -107,6 +107,12 @@ export async function createCustomerInSupabase(customer: Omit<Customer, 'id' | '
 
 export async function updateCustomerInSupabase(id: string, updates: Partial<Customer>): Promise<{ success: boolean; error?: string }> {
   try {
+    // 1. Primary: Save to MySQL
+    try {
+      await saveCustomerToMySQL({ ...updates, id } as any);
+    } catch (_) {}
+
+    // 2. Fallback: Save to Supabase
     const payload: any = {};
     if (updates.name !== undefined) payload.full_name = updates.name;
     if (updates.phone !== undefined) payload.phone = updates.phone;

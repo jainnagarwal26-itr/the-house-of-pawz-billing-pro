@@ -332,7 +332,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       id: `cust-${Date.now()}`,
       name: newCustName,
       phone: newCustPhone,
-      email: `${newCustName.toLowerCase().replace(/\s+/g, '')}@gmail.com`,
+      email: '',
       address: 'Pune, Maharashtra',
       stateCode: '27-Maharashtra',
       emergencyContact: newCustPhone,

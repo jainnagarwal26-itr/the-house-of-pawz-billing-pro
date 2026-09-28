@@ -97,7 +97,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
       id: `CUST-${Date.now().toString().slice(-4)}`,
       name: newCustName.trim(),
       phone: newCustPhone.trim(),
-      email: newCustEmail.trim() || `${newCustName.trim().toLowerCase().replace(/\s+/g, '.')}@example.com`,
+      email: newCustEmail.trim() || undefined,
       address: newCustAddress.trim() || 'Mumbai, Maharashtra',
       gstin: newCustGSTIN.trim() || undefined,
       stateCode: settings.stateCode || '27-Maharashtra',
@@ -347,27 +347,31 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
   // Quick Catalog Picker State
   const [catalogSearch, setCatalogSearch] = useState<string>('');
 
-  // Auto handle Customer selection update
+  // Auto handle Customer selection update (only when selectedCustomerId changes)
+  const prevCustomerIdRef = useRef<string>(invoice ? (invoice.customerId || '') : '');
   useEffect(() => {
-    const found = customers.find(c => c.id === selectedCustomerId);
-    if (found) {
-      setCustomerName(found.name);
-      setCustomerPhone(found.phone);
-      setCustomerEmail(found.email);
-      setCustomerAddress(found.address);
-      setCustomerGSTIN(found.gstin || '');
+    if (!invoice || prevCustomerIdRef.current !== selectedCustomerId) {
+      prevCustomerIdRef.current = selectedCustomerId;
+      const found = customers.find(c => c.id === selectedCustomerId);
+      if (found) {
+        setCustomerName(found.name);
+        setCustomerPhone(found.phone);
+        setCustomerEmail(found.email || '');
+        setCustomerAddress(found.address || '');
+        setCustomerGSTIN(found.gstin || '');
 
-      // Auto update linked pet
-      const linkedPets = pets.filter(p => p.customerId === found.id);
-      if (linkedPets.length > 0) {
-        setSelectedPetId(linkedPets[0].id);
-        setPetName(linkedPets[0].name);
-      } else {
-        setSelectedPetId('');
-        setPetName('');
+        // Auto update linked pet
+        const linkedPets = pets.filter(p => p.customerId === found.id);
+        if (linkedPets.length > 0) {
+          setSelectedPetId(linkedPets[0].id);
+          setPetName(linkedPets[0].name);
+        } else {
+          setSelectedPetId('');
+          setPetName('');
+        }
       }
     }
-  }, [selectedCustomerId, customers, pets]);
+  }, [selectedCustomerId, customers, pets, invoice]);
 
   // Recalculate item taxes
   const calculateItem = (
