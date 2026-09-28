@@ -277,6 +277,7 @@ if ($method === 'PUT') {
     $input = getJsonInput();
     $invoiceData = isset($input['invoice']) ? $input['invoice'] : $input;
     $itemsData = isset($input['items']) ? $input['items'] : (isset($invoiceData['items']) ? $invoiceData['items'] : []);
+    $paymentsData = isset($input['payments']) ? $input['payments'] : (isset($invoiceData['payments']) ? $invoiceData['payments'] : (isset($invoiceData['initialPayments']) ? $invoiceData['initialPayments'] : null));
 
     $internalId = isset($invoiceData['internal_invoice_id']) ? $invoiceData['internal_invoice_id'] : (isset($invoiceData['id']) ? $invoiceData['id'] : null);
     if (!$internalId) {
@@ -286,19 +287,64 @@ if ($method === 'PUT') {
     try {
         $pdo->beginTransaction();
 
+        $invoiceNumber = isset($invoiceData['invoice_number']) ? trim($invoiceData['invoice_number']) : (isset($invoiceData['invoiceNumber']) ? trim($invoiceData['invoiceNumber']) : '');
         $grandTotal = (float)(isset($invoiceData['grand_total']) ? $invoiceData['grand_total'] : (isset($invoiceData['grandTotal']) ? $invoiceData['grandTotal'] : 0));
-        
+
+        // Sync / Replace payments if provided in payload
+        if ($paymentsData !== null && is_array($paymentsData)) {
+            $delPayStmt = $pdo->prepare("DELETE FROM payments WHERE internal_invoice_id = :int_id");
+            $delPayStmt->execute([':int_id' => $internalId]);
+
+            $validPayments = array_filter($paymentsData, function($p) {
+                return isset($p['amount']) && (float)$p['amount'] > 0;
+            });
+
+            if (!empty($validPayments)) {
+                $pidx = 1;
+                foreach ($validPayments as $pay) {
+                    $payId = isset($pay['id']) && strlen($pay['id']) > 3 && strpos($pay['id'], 'PAY-INIT-') !== 0 && strpos($pay['id'], 'PAY-FULL-') !== 0 ? $pay['id'] : "PAY-{$internalId}-{$pidx}";
+                    $payRecord = [
+                        'id' => generateUuidV4(),
+                        'payment_id' => $payId,
+                        'internal_invoice_id' => $internalId,
+                        'invoice_number' => $invoiceNumber,
+                        'customer_id' => isset($invoiceData['customer_id']) ? $invoiceData['customer_id'] : (isset($invoiceData['customerId']) ? $invoiceData['customerId'] : 'CUST-001'),
+                        'customer_name' => isset($invoiceData['customer_name']) ? $invoiceData['customer_name'] : (isset($invoiceData['customerName']) ? $invoiceData['customerName'] : 'Customer'),
+                        'amount' => (float)$pay['amount'],
+                        'payment_date' => isset($pay['payment_date']) ? $pay['payment_date'] : (isset($pay['paymentDate']) ? $pay['paymentDate'] : date('d/m/Y')),
+                        'payment_mode' => isset($pay['payment_mode']) ? $pay['payment_mode'] : (isset($pay['paymentMode']) ? $pay['paymentMode'] : 'UPI'),
+                        'transaction_ref' => isset($pay['transaction_ref']) ? $pay['transaction_ref'] : (isset($pay['transactionRef']) ? $pay['transactionRef'] : null),
+                        'notes' => isset($pay['notes']) ? $pay['notes'] : null,
+                        'received_by' => isset($invoiceData['created_by_name']) ? $invoiceData['created_by_name'] : (isset($invoiceData['createdByName']) ? $invoiceData['createdByName'] : 'Staff'),
+                        'created_at' => date('Y-m-d H:i:s'),
+                        'updated_at' => date('Y-m-d H:i:s')
+                    ];
+                    dynamicInsert($pdo, 'payments', $payRecord);
+                    $pidx++;
+                }
+            }
+        }
+
         // Recalculate total paid from existing payments table
         $paySumStmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) FROM payments WHERE internal_invoice_id = :int_id");
         $paySumStmt->execute([':int_id' => $internalId]);
         $totalPaid = (float)$paySumStmt->fetchColumn();
 
+        // Fallback to paid_amount in payload if payments table has 0 but paid_amount was explicitly sent
+        if ($totalPaid == 0.0 && isset($invoiceData['paid_amount']) && (float)$invoiceData['paid_amount'] > 0) {
+            $totalPaid = (float)$invoiceData['paid_amount'];
+        } elseif ($totalPaid == 0.0 && isset($invoiceData['paidAmount']) && (float)$invoiceData['paidAmount'] > 0) {
+            $totalPaid = (float)$invoiceData['paidAmount'];
+        }
+
         $balanceDue = max(0.0, round($grandTotal - $totalPaid, 2));
         $paymentStatus = $totalPaid >= $grandTotal ? 'PAID' : ($totalPaid > 0 ? 'PARTIAL' : 'UNPAID');
-        $invoiceNumber = isset($invoiceData['invoice_number']) ? trim($invoiceData['invoice_number']) : (isset($invoiceData['invoiceNumber']) ? trim($invoiceData['invoiceNumber']) : '');
 
         // Update invoices table dynamically
         $updInvoiceRecord = [
+            'invoice_number' => $invoiceNumber,
+            'invoice_date' => isset($invoiceData['invoice_date']) ? $invoiceData['invoice_date'] : (isset($invoiceData['invoiceDate']) ? $invoiceData['invoiceDate'] : null),
+            'due_date' => isset($invoiceData['due_date']) ? $invoiceData['due_date'] : (isset($invoiceData['dueDate']) ? $invoiceData['dueDate'] : null),
             'customer_id' => isset($invoiceData['customer_id']) ? $invoiceData['customer_id'] : (isset($invoiceData['customerId']) ? $invoiceData['customerId'] : 'CUST-001'),
             'customer_name' => isset($invoiceData['customer_name']) ? $invoiceData['customer_name'] : (isset($invoiceData['customerName']) ? $invoiceData['customerName'] : 'Customer'),
             'customer_phone' => isset($invoiceData['customer_phone']) ? $invoiceData['customer_phone'] : (isset($invoiceData['customerPhone']) ? $invoiceData['customerPhone'] : ''),
@@ -321,9 +367,14 @@ if ($method === 'PUT') {
             'paid_amount' => $totalPaid,
             'balance_due' => $balanceDue,
             'payment_status' => $paymentStatus,
+            'payment_mode' => isset($invoiceData['payment_mode']) ? $invoiceData['payment_mode'] : (isset($invoiceData['paymentMode']) ? $invoiceData['paymentMode'] : 'UPI'),
             'notes' => isset($invoiceData['notes']) ? $invoiceData['notes'] : '',
             'updated_at' => date('Y-m-d H:i:s')
         ];
+
+        if ($updInvoiceRecord['invoice_date'] === null) unset($updInvoiceRecord['invoice_date']);
+        if ($updInvoiceRecord['due_date'] === null) unset($updInvoiceRecord['due_date']);
+        if (empty($updInvoiceRecord['invoice_number'])) unset($updInvoiceRecord['invoice_number']);
 
         dynamicUpdate($pdo, 'invoices', $updInvoiceRecord, ['internal_invoice_id' => $internalId]);
 
@@ -354,6 +405,11 @@ if ($method === 'PUT') {
                     'sgst_amount' => (float)(isset($item['sgst_amount']) ? $item['sgst_amount'] : (isset($item['sgstAmount']) ? $item['sgstAmount'] : 0)),
                     'igst_amount' => (float)(isset($item['igst_amount']) ? $item['igst_amount'] : (isset($item['igstAmount']) ? $item['igstAmount'] : 0)),
                     'item_total' => (float)(isset($item['item_total']) ? $item['item_total'] : (isset($item['total']) ? $item['total'] : 0)),
+                    'service_date' => isset($item['service_date']) ? $item['service_date'] : (isset($item['serviceDate']) ? $item['serviceDate'] : null),
+                    'service_start_date' => isset($item['service_start_date']) ? $item['service_start_date'] : (isset($item['serviceStartDate']) ? $item['serviceStartDate'] : null),
+                    'service_end_date' => isset($item['service_end_date']) ? $item['service_end_date'] : (isset($item['serviceEndDate']) ? $item['serviceEndDate'] : null),
+                    'duration' => isset($item['duration']) ? (float)$item['duration'] : null,
+                    'unit' => isset($item['unit']) ? $item['unit'] : null,
                     'created_at' => date('Y-m-d H:i:s'),
                     'updated_at' => date('Y-m-d H:i:s')
                 ];
@@ -375,7 +431,16 @@ if ($method === 'PUT') {
 
         sendJsonResponse([
             'success' => true,
-            'message' => 'Invoice successfully updated in MySQL'
+            'message' => 'Invoice successfully updated in MySQL',
+            'data' => [
+                'id' => $internalId,
+                'internal_invoice_id' => $internalId,
+                'invoice_number' => $invoiceNumber,
+                'grand_total' => $grandTotal,
+                'paid_amount' => $totalPaid,
+                'balance_due' => $balanceDue,
+                'payment_status' => $paymentStatus
+            ]
         ]);
     } catch (Exception $e) {
         $pdo->rollBack();

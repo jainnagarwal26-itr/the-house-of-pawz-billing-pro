@@ -602,7 +602,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
         createdByRole: (currentUser?.role || userRole || 'USER') as UserRole,
         createdByName: userName,
         createdAt: invoice?.createdAt || new Date().toISOString(),
-        initialPayments: !invoice ? paymentEntries.filter(p => Number(p.amount) > 0) : undefined
+        initialPayments: paymentEntries.filter(p => Number(p.amount) > 0)
       };
 
       await onSaveInvoice(savedInvoice);

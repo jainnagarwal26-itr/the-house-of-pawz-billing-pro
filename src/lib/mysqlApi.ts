@@ -175,9 +175,15 @@ export async function createInvoiceInMySQL(inv: Invoice): Promise<Invoice> {
       cgst_amount: it.cgstAmount,
       sgst_amount: it.sgstAmount,
       igst_amount: it.igstAmount,
-      item_total: it.total
+      item_total: it.total,
+      service_date: it.serviceDate,
+      service_start_date: it.serviceStartDate,
+      service_end_date: it.serviceEndDate,
+      duration: it.duration,
+      unit: it.unit
     })),
     payments: inv.initialPayments ? inv.initialPayments.map(p => ({
+      id: p.id,
       amount: p.amount,
       payment_date: p.paymentDate,
       payment_mode: p.paymentMode,
@@ -203,6 +209,8 @@ export async function updateInvoiceInMySQL(inv: Invoice): Promise<void> {
       id: inv.id,
       internal_invoice_id: (inv as any).internalInvoiceId || inv.id,
       invoice_number: inv.invoiceNumber,
+      invoice_date: inv.invoiceDate,
+      due_date: inv.dueDate,
       customer_id: inv.customerId,
       customer_name: inv.customerName,
       customer_phone: inv.customerPhone,
@@ -222,6 +230,10 @@ export async function updateInvoiceInMySQL(inv: Invoice): Promise<void> {
       total_gst: inv.totalGst,
       round_off: inv.roundOff,
       grand_total: inv.grandTotal,
+      paid_amount: inv.paidAmount,
+      balance_due: inv.balanceDue,
+      payment_status: inv.paymentStatus,
+      payment_mode: inv.paymentMode,
       notes: inv.notes
     },
     items: (inv.items || []).map(it => ({
@@ -238,8 +250,21 @@ export async function updateInvoiceInMySQL(inv: Invoice): Promise<void> {
       cgst_amount: it.cgstAmount,
       sgst_amount: it.sgstAmount,
       igst_amount: it.igstAmount,
-      item_total: it.total
-    }))
+      item_total: it.total,
+      service_date: it.serviceDate,
+      service_start_date: it.serviceStartDate,
+      service_end_date: it.serviceEndDate,
+      duration: it.duration,
+      unit: it.unit
+    })),
+    payments: inv.initialPayments ? inv.initialPayments.map(p => ({
+      id: p.id,
+      amount: p.amount,
+      payment_date: p.paymentDate,
+      payment_mode: p.paymentMode,
+      transaction_ref: p.transactionRef,
+      notes: p.notes
+    })) : []
   };
 
   await mysqlFetch('invoices.php', {
